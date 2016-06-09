@@ -51,7 +51,7 @@ require "sketchup.rb"
 #   path = [Geom::Point3d.new, Geom::Point3d.new(10.m, 0, 5.m)]
 #   random_template = EneBuildings::Template.instances.sample
 #
-#   building = Ene_Buildings::Building.new
+#   building = EneBuildings::Building.new
 #   building.path = path
 #   building.template = random_template
 #

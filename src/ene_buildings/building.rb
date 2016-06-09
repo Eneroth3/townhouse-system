@@ -677,9 +677,6 @@ last_time = Time.now
 puts "Found cutting edges in #{Time.now-last_time} s."
 last_time = Time.now
       
-#@model.selection.add cutting_edges
-#return
-      
       # Traverse faces sharing a binding edge to list faces to cut away and to
       # keep. If the loop of cutting edges doesn't lie tight onto the original
       # mesh the cut away faces will leak out to the rest of the mesh but the
