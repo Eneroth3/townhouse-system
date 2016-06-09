@@ -597,6 +597,44 @@ class Building
     # Done after solid operations since it's not strictly a solid operation.
     i = 0
     segment_groups.each do |segment_group|
+    
+    
+    
+    
+    
+      
+      ops.each do |s|
+        part, operation, part_segment_group = s
+        next unless part_segment_group == segment_group
+        next unless operation == "cut_multiple_faces"
+        
+        temp_instance = segment_group.entities.add_instance(
+          part.definition,
+          part.transformation
+        )
+        
+        temp_instance.make_unique
+        temp_ents = temp_instance.definition.entities
+        temp_ents.erase_entities temp_ents.to_a.select { |e| [Sketchup::Group, Sketchup::ComponentInstance].include? e.class }
+        
+        explode_ents = temp_instance.explode
+        temp_faces = explode_ents.select { |e| e.is_a? Sketchup::Face }
+        new_edges = temp_faces.map { |f| f.edges }.flatten.uniq
+        
+        cutting_edges = new_edges.select { |e| !(e.faces-temp_faces).empty? }
+        
+        segment_group.entities.erase_entities(new_edges - cutting_edges + temp_faces)
+        
+      end
+    
+      return
+    
+    
+    
+    
+    
+    
+    
 last_time = Time.now
 
       # Copy naked edges of cutting parts into a temporary group and explode it
