@@ -615,6 +615,7 @@ class Building
         
         temp_instance.make_unique
         temp_ents = temp_instance.definition.entities
+        temp_ents.each { |e| e.find_faces if e.is_a?(Sketchup::Edge) }
         temp_ents.erase_entities temp_ents.to_a.select { |e| [Sketchup::Group, Sketchup::ComponentInstance].include? e.class }
         
         explode_ents = temp_instance.explode
