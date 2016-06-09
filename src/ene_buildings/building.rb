@@ -641,11 +641,14 @@ last_time = Time.now
       faces_to_keep  = []
       segment_group.entities.each do |e|
         next unless e.is_a? Sketchup::Edge
+        edge_pts = e.vertices.map { |v| v.position }
+        edge_bounds = Geom::BoundingBox.new
+        edge_bounds.add edge_pts
         cutting_edge_points.each do |pts|
+          next unless edge_bounds.contains? pts[0]
+          next unless edge_bounds.contains? pts[1]
           next unless pts.all? { |p| p.on_line? e.line }
-          
-          edge_pts = e.vertices.map { |v| v.position }
-          
+                    
           # If edge is inclusively between points, i.e. including edges split
           # off from the original naked edge on intersection, add it to list
           # of cutting edges.
@@ -702,6 +705,7 @@ last_time = Time.now
 #Copied naked edges in 1.360078 s.
 #Exploded in 0.226013 s.
 #Found cutting edges in 95.547465 s.
+#####Found cutting edges in 8.829505 s. (after checking bounding box first)
 #Traversed faces in 0.028001 s.
 #Hide in 0.199012 s.
       
