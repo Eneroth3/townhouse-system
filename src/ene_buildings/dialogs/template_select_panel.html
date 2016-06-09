@@ -1,0 +1,292 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <title>TITLE</title>
+    <script type="text/javascript">
+      /*Variables set from ruby side in WebDialog.show*/
+      //var templates = [{"id":"id-string","title":"Title"}];
+      //var selected;
+      //var sorting = 0;
+      //var grouping = "country";
+
+      /*Set dropdown values for grouping and sorting*/
+      function set_dropdowns(){
+        document.getElementById('sorting_options').value = sorting;
+        document.getElementById('grouping_options').value = grouping;
+      }
+
+      /*View template list in "library.*/
+      /*Runs from dialog.show and when changing grouping or sorting.*/
+      function view_list(){
+
+        //Filter.
+        filter = document.getElementById('filter').value;
+        if(filter == ''){
+          //No filter, all passes.
+          templates_to_print = templates.slice();//#.dup
+        }else{
+          //Filter, only those with any property matching any search word passes.
+          templates_to_print = []
+          filter_words = filter.split(' ');
+          for(i=0;i<templates.length;i++){
+            template = templates[i];
+            //Loop all search words.
+            //All words must match at least one property for a pass,
+            //therefore start with flag as true and set to false when any word is not matching.
+            match = true;
+            for(j=0;j<filter_words.length;j++){//.all?
+              word = filter_words[j];
+              //Loop all properties.
+              //At least one property must match current word for a pass,
+              //therefore start with flag set to false and set it to true on a match.
+              word_match = false;
+              for(var k in template){//.any?
+                if(template.hasOwnProperty(k)){
+                  property = template[k];
+                  if(typeof(property) == "string"){
+                    if(property.toLowerCase().indexOf(word.toLowerCase()) !== -1) word_match = true;
+                  }else if(typeof(property) == "number"){
+                    if(String(property).indexOf(String(word)) !== -1) word_match = true;
+                  }
+                }
+              }
+              //Set match flag for template.
+              if(!word_match) match = false;
+            }
+            //Keep template if it matches filter.
+            if(match) templates_to_print.push(template);
+          }
+        }
+
+        //Sort.
+        if(sorting != '0'){
+          //Sort (0 means don't sort, same as keeping the alphabetic order of titles).
+          templates_to_print.sort(function(a,b){
+             if(a[sorting] == '?') return 1
+             if(a[sorting] == b[sorting]){
+              return a['title'] < b['title'] ? -1 : 1;
+             }
+             return a[sorting] < b[sorting] ? -1 : 1;
+          });
+        }
+
+        //Group.
+        //Groups are associated arrays containing title (string) and content (array of template data).
+        groups = []
+        if(grouping == '0'){
+          //Put all in on group when grouping is 0.
+          groups.push({'title':'All','content':templates_to_print});
+        }else{
+          //Group according to value of the key named as grouping.
+          for(i=0;i<templates_to_print.length;i++){
+            template = templates_to_print[i];
+            group_by = template[grouping];
+            if(grouping == 'decade'){
+              y = template['year'];
+              if(typeof y === 'number') group_by = (y-(y%10))+'s';
+              else group_by = "Unknown";
+            }
+            if(group_by == undefined) group_by = "Unknown";
+            mathing_group = null;
+            for(j=0;j<groups.length;j++){
+              group = groups[j];
+              if(group['title'] == group_by) mathing_group = group;
+            }
+            //Add to existing group if anyone matched, otherwise create new.
+            if(mathing_group) mathing_group['content'].push(template);
+            else groups.push({'title':group_by,'content':[template]});
+          }
+          //Sort groups alphabetically by name.
+          groups.sort(function(a,b){
+             return a['title'] < b['title'] ? -1 : 1;
+          });
+        }
+
+        //Print html.
+        html = '';
+        for(i=0;i<groups.length;i++){
+          group = groups[i];
+          html += '<h4>' + group['title'] + '</h4>';
+          for(j=0;j<group['content'].length;j++){
+            template = group['content'][j];
+            tooltip = template['name']
+
+            //List all labels and corresponding keys to show in "table" here.
+            pairs = [
+              ['Modeler', 'modeler'],
+              ['Architect', 'architect'],
+              ['Country', 'country'],
+              ['Built year', 'year'],
+              ['Stories', 'stories'],
+              ['Source', 'source']
+            ]
+            for(var k=0;k<pairs.length;k++){
+              label = pairs[k][0];
+              key = pairs[k][1];
+              value = template[key];
+              if(!value) continue;
+              tooltip += '\n'+label+': '+value;
+            }
+            if(template['description']) tooltip +='\n\n' + template['description'];
+            src = preview_dir + '/' + template['id'] + '_100.png';
+            html += '<img src="' + src + '" data-id="' + template['id'] + '" onclick="select(this);" title="' + tooltip + '" />';
+          }
+        }
+        document.getElementById('library').innerHTML = html;
+
+        //Outline selected.
+        outline();
+      }
+
+      /*Select*/
+      /*Runs when clicking a template*/
+      function select(el){
+        selected = el.getAttribute('data-id');
+
+        //Ruby callback.
+        window.location='skp:select@' + selected;
+
+        //Outline selected.
+        outline();
+      }
+
+      /*Outline selected template*/
+      /*Runs when updating list and when clicking a template*/
+      function outline(){
+        imgs = document.getElementById('library').getElementsByTagName('img');
+
+        for(i=0;i<imgs.length;i++){
+          img = imgs[i]
+          if(selected == img.getAttribute('data-id')) img.className = 'selected';
+          else imgs[i].className = '';
+        }
+      }
+
+      /*Sorting and grouping UI*/
+      function show_options(id){
+        el=document.getElementById(id + '_options');
+        el.style.display='block';
+        el.focus();
+      }
+      function hide_options(el){
+        el.style.display='none';
+      }
+      function change_options(el){
+        if(el.id == 'sorting_options') sorting = el.value;
+        else grouping = el.value;
+        view_list();
+        window.location='skp:save_sorting_n_grouping@' + sorting + '&' + grouping;
+      }
+    </script>
+    <link href="style.css" rel="stylesheet" type="text/css">
+    <style type="text/css">
+      #toolbar{
+        overflow: hidden;
+      }
+      #toolbar button{
+        height: 22px; padding: 0;
+      }
+      #toolbar select{
+        display: none;
+        position: fixed;
+        z-index: 1;
+        right: 15px; top: 35px;
+        border: 1px outset ActiveBorder;
+      }
+
+      #library{
+        left: 0;
+        right: 0;
+        top: 35px;
+        bottom: 35px;
+        position: absolute;
+        background: white;
+        border-top: 1px solid ThreeDShadow;
+        border-bottom: 1px solid ThreeDShadow;
+        padding: 2px;
+        overflow: auto;
+      }
+      div#library h4{
+        clear: both;
+        margin: 2px;
+				color: ThreeDShadow;
+        border-bottom: 1px solid ThreeDShadow;
+        font-weight: normal;
+				font-size: 90%;
+				cursor: default;
+			}
+      #library img{
+        width: 100px;
+        height: 100px;
+        margin: 2px;
+        border: 1px solid ThreeDShadow;
+      }
+      #library img.selected{
+        margin: 0;
+        border: 3px solid Highlight;
+      }
+    </style>
+   </head>
+   <body>
+      <div class="dialog_buttons">
+        <!--First in document so OK is focused on load.-->
+        <div id="buttons_not_instant">
+          <button onclick="window.location='skp:close@true';">OK</button>
+          <button onclick="window.location='skp:close';">Cancel</button>
+        </div>
+        <div id="buttons_instant">
+          <button onclick="window.location='skp:close';">Close</button>
+        </div>
+			</div>
+      <div id="toolbar">
+        <span class="left">Filter:</span>
+        <span class="right">
+          <button type="button" onclick="show_options('sorting');" title="Sorting" ><img src="button_sorting.png" alt="" /></button>
+            <select id="sorting_options" size="7" onchange="change_options(this);" onblur="hide_options(this);" onmouseup="hide_options(this)">
+              <option value="0">Title</option>
+              <option value="modeler">Modeler</option>
+              <option value="architect">Architect</option>
+              <option value="country">Country</option>
+              <option value="year">Built Year</option>
+              <option value="stories">Stories</option>
+              <option value="source">Source</option>
+            </select>
+            <button type="button" onclick="show_options('grouping');" title="Grouping"><img src="button_grouping.png" alt="" /></button>
+            <select id="grouping_options" size="7" onchange="change_options(this);" onblur="hide_options(this);" onmouseup="hide_options(this)">
+              <option value="0">No Grouping</option>
+              <option value="modeler">Modeler</option>
+              <option value="architect">Architect</option>
+              <option value="country">Country</option>
+              <option value="decade">Built Decade</option>
+              <option value="stories">Stories</option>
+              <option value="source">Source</option>
+            </select>|
+            <button type="button" onclick="window.location='skp:open_dir';" title="Open template directory." ><img src="button_folder.png" alt="" /></button>
+        </span>
+        <span class="fill-rest"><input type="text" id="filter" onkeyup="view_list();" /></span>
+      </div>
+      <div id="library">
+        <!--Dynamically created content-->
+        <!--
+        <h4>Sweden</h4>
+        <img src="test.png" alt="" title="" data-id="id" />
+        <img src="test.png" alt="" title="" data-id="id" class="selected" />
+        <img src="test.png" alt="" title="" data-id="id" />
+        <h4>Utlandet</h4>
+        <img src="test.png" alt="" title="" data-id="id" />
+        -->
+      </div>
+    <script type="text/javascript">
+      //Cancel on Esc.
+      window.document.onkeydown = function (e){
+        e = e || event;
+        k = e.keyCode || e.wich;
+        if(k == 27){
+          window.location='skp:close';
+        }
+      }
+    </script>
+   </body>
+</html>

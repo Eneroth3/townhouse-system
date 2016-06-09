@@ -1,0 +1,100 @@
+/*General*/
+body{
+  margin: 4px;
+  padding: 0;
+	font: message-box;
+	font-size: 12px;
+  background: ButtonFace;
+}
+button{
+  font-size: 12px;
+}
+abbr{
+	color: gray;
+}
+
+/*Container for main content that doesn't cover dialog buttons*/
+.main_scrollable_container{
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 30px;
+  padding: 4px;
+  overflow: auto;
+}
+
+/*Dialog buttons - always at dialog bottom*/
+.dialog_buttons{
+  position: fixed;
+	bottom: 4px; right: 4px;
+	width: auto;
+	height: auto;
+}
+.dialog_buttons button{
+	width: 75px;
+	margin-left: 16px;
+	font-size: 12px;
+}
+
+/*16 px indent on everything but section headers*/
+/*
+  Requires parent .main_scrollable_container
+*/
+.section{
+  padding-left: 19px;
+  margin-bottom: 1em;
+  clear: both;
+}
+.section b, .section hr{
+  margin-left: -15px;
+}
+
+/*Fill remaining*/
+/*
+  Used to add something, e.g. an button or info, next to an input and make the
+  input fill the remaining space on the line.
+  
+  Example:
+  <span class="left">This is to the left</span>
+  <span class="right">This is to the right</span>
+  <span class="fill-rest"><input value="This fills the rest" /></span>
+*/
+.fill-rest{
+  display: block;
+  overflow: hidden;
+}
+.fill-rest > *{
+  box-sizing: border-box;
+  width: 100%;
+}
+.left{
+  float: left;
+  padding-right: 0.5em;
+}
+.right{
+  float: right;
+  padding-left: 0.5em;
+}
+
+/*Disabled label*/
+/*
+  When setting the disabled property of input, also set this class for
+  associated label.
+*/
+label.disabled{
+  opacity: 0.5;
+}
+
+/*Notify user if whole form is disabled and why*/
+#warning{
+  position: absolute;
+  top: 30%;
+  left: 2em;
+  right: 2em;
+  font-weight: bold;
+  opacity: 0.3;
+}
+#warning div{
+  font-size: large;
+}

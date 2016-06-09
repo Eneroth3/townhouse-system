@@ -1,0 +1,334 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <title>TITLE</title>
+    <script type="text/javascript">
+    
+      //Get label with specific for attribute.
+      function label_for(id){
+        labels = document.getElementsByTagName('label');
+        for(var i=0;i<labels.length;i++){
+          label = labels[i];
+          if(label.htmlFor == id) return label;
+        }
+        return null;
+      }
+
+      //Display either warning message or actual form.
+      function warn(bool, title, msg){
+
+        //Elements.
+        form = document.getElementById('form_content');
+        warning = document.getElementById('warning');
+
+        form.style.display = bool ? "none" : "";
+        warning.style.display = bool ? "" : "none";
+
+        if(title) warning.innerHTML = "<div>"+title+"</div>"+msg;
+
+      }
+
+      //Toggle between each individual section and a message telling why it
+      //cannot be shown.
+      function toggle_sections(){
+      
+        not_in_root_message = "Not available in nested groups or components.";
+        
+        sections = document.getElementsByClassName('section');//Requires IE9+
+        
+        for(var i=0;i<sections.length;i++){
+          section = sections[i];
+          id = section.id;
+          
+          //Material replacement is available in nested drawing contexts.
+          if(id == "material_replacement") continue;
+          
+          content = section.getElementsByTagName('table')[0];
+          warning = section.getElementsByTagName('p')[0];
+          
+          if(in_template_root){
+            content.style.display = '';
+            warning.style.display = 'none';
+          }else{
+            content.style.display = 'none';
+            warning.style.display = '';
+            warning.innerHTML = not_in_root_message;
+          }
+        }
+        
+        //TODO: FUTURE VERSION: exclude solids for gables and corners.
+      
+      }
+      
+      //Toggle what table rows are shown depending on positioning method.
+      //Called when selection changes or drop down changes.
+      function toggle_positioning(positioning){
+
+        //Direct div children of positioning table.
+        table = document.getElementById('positioning').getElementsByTagName('table')[0];
+        rows = table.getElementsByTagName('tr');
+        dropdown = document.getElementById('position_method');
+
+        //Show relevant options, hide rest.
+        for(var i=1;i<rows.length;i++){//First row is always shown.
+          row = rows[i];
+          show = row.getAttribute('data-category') == positioning;
+          row.style.display = (show ? '' : 'none');
+        }
+
+        //Set dropdown.
+        dropdown.value = positioning;
+
+      }
+
+      //Is spread using fixed number instead of length interval?
+      //Called when selection changes or checkbox changes.
+      function spread_fix_number(bool){
+
+        //Elements.
+        checkbox = document.getElementById('spread_fix_number_checkbox');
+        text_input = document.getElementById('spread_fix_number');
+        interval_inputs = [
+          document.getElementById('spread_distance'),
+          document.getElementById('rounding')
+        ];
+        fixed_input = document.getElementById('spread_int');
+
+        //Disable and enable other inputs.
+        for(var i=0;i<interval_inputs.length;i++){
+          input = interval_inputs[i];
+          input.disabled = bool;
+          label_for(input.id).className = bool ? "disabled" : "";
+        }
+        fixed_input.disabled = !bool;
+        label_for(fixed_input.id).className = bool ? "" : "disabled";
+
+        //Put value to text field for Ruby side.
+        text_input.value = bool ? 'true' : 'false';
+
+        //Update checkbox
+        checkbox.checked = bool;
+
+      }
+
+      //Should cut planes be overridden when spreading parts?
+      //Called when selection changes or checkbox changes.
+      function override_cut_planes(bool){
+
+        //Elements.
+        checkbox = document.getElementById('override_cut_planes_checkbox');
+        text_input = document.getElementById('override_cut_planes');
+
+        //Put value to text field for Ruby side.
+        text_input.value = bool ? 'true' : 'false';
+
+        //Update checkbox
+        checkbox.checked = bool;
+      }
+
+      //Should material replacement be done inside this group?
+      //Called when selection changes or checkbox changes.
+      function replace_nested_mateials(bool){
+
+        //Elements.
+        checkbox = document.getElementById('replace_nested_mateials_checkbox');
+        text_input = document.getElementById('replace_nested_mateials');
+
+        //Put value to text field for Ruby side.
+        text_input.value = bool ? 'true' : 'false';
+
+        //Update checkbox
+        checkbox.checked = bool;
+      }
+
+      //Changes available form settings depending on entity being a group or component.
+      //Called when selection changes.
+      function is_group(bool){
+
+        //Elements
+        checkbox = document.getElementById('replace_nested_mateials_checkbox');
+        label = label_for(checkbox.id)
+        table = document.getElementById('material_replacement').getElementsByTagName('table')[0];
+        rows = table.getElementsByTagName('tr');
+
+        checkbox.disabled = !bool;
+        label.className = bool ? "" : "disabled";
+        for(var i=1;i<rows.length;i++) rows[i].style.display = bool ? 'none' : '';//First row is always available.
+
+      }
+
+      //Toggle solid_index depending on what solid.
+      //Called when selection changes or drop down changes.
+      function toggle_solid(solid){
+      
+        checkbox = document.getElementById('solid_index');
+        label = label_for(checkbox.id)
+
+        disabled = solid == "" || solid == "cut_multiple_faces";
+        checkbox.disabled = disabled;
+        label.className = disabled ? "disabled" : "";
+
+      }
+
+      </script>
+    <link href="style.css" rel="stylesheet" type="text/css">
+    <style type="text/css">
+      .warning{
+        padding: 0.5em;
+        font-weight: bold;
+        opacity: 0.3;
+      }
+
+      table{
+        width: 100%;
+      }
+      td:nth-child(odd){/*Requires IE 9+.*/
+        text-align: right;
+        width: 80px;
+      }
+      input:not([type=checkbox]), select{
+        box-sizing: border-box;
+        width: 100%;
+      }
+    </style>
+   </head>
+   <body>
+    <div class="dialog_buttons">
+      <!--First in document so Close is focused on load.-->
+      <button onclick="window.location='skp:close';">Close</button>
+      <button onclick="window.location='skp:help';">Help</button>
+    </div>
+    <div id="warning"></div>
+    <div class="main_scrollable_container" id="form_content">
+
+      <!--TODO: COMPONENT REPLACMENT: separate field "name" used for both replaced, replacing, gables and corner-stuff. Add [?] with title text saying name is only relevant for replacements, those being replaced, corners and gables, not ordinary parts. Also validate this.-->
+      <div class="section" id="positioning">
+        <b>Positioning</b>
+        <hr />
+        <p class="warning"></p>
+        <table>
+          <tr>
+            <td><label for="position_method">Method:</label></td>
+            <td colspan="3">
+              <select name="position_method" id="position_method" onchange="toggle_positioning(this.value);">
+                <option value="">Unspecified (Keep position)</option>
+                <option value="spread">Array</option>
+                <option value="left">Align left</option>
+                <option value="right">Align right</option>
+                <option value="center">Center</option>
+                <option value="percentage">Relative</option><!--TODO: COMPONENT REPLACMENT: add replacements, corners and gables here.-->
+              </select>
+            </td>
+          </tr>
+
+          <tr data-category="spread">
+            <td></td>
+            <td colspan="3" style="text-align: center;"><img src="template_editor_part_spread.png" alt="" /></td>
+          </tr>
+          <tr data-category="spread">
+            <td><label for="margin">Margin:</label></td>
+            <td><input name="margin" id="margin" type="text" /></td>
+            <td><label for="margin_right">Right margin:</label></td>
+            <td>
+              <abbr class="right" title="Leave blank to inherit other margin length.">[?]</abbr>
+              <span class="fill-rest"><input name="margin_right" id="margin_right" type="text" /></span>
+            </td>
+          </tr>
+          <tr data-category="spread">
+            <td><label for="spread_distance">Interval:</label></td>
+            <td><input name="spread_distance" id="spread_distance" type="text" /></td>
+            <td><label for="rounding">Rounding:</label></td>
+            <td>
+              <select name="rounding" id="rounding">
+                <option value="">Nearest integer</option>
+                <option value="force_odd">To odd</option>
+                <option value="force_even">To even</option>
+              </select>
+            </td>
+          </tr>
+          <tr data-category="spread">
+            <td><label for="spread_int">Fixed number:</label></td>
+            <td><input name="spread_int" id="spread_int" type="text" /></td>
+            <td><input type="checkbox" id="spread_fix_number_checkbox" name="spread_fix_number_checkbox" onclick="spread_fix_number(this.checked);" /></td>
+            <td><label for="spread_fix_number_checkbox">Use fixed number</label></td>
+          </tr>
+          <tr data-category="spread">
+            <td><input name="override_cut_planes_checkbox" id="override_cut_planes_checkbox" type="checkbox" onclick="override_cut_planes(this.checked);" /></td>
+            <td colspan="3"><label for="override_cut_planes_checkbox">Allow parts outside building volume</label> <abbr title="By default parts partly outside their building section, e.g. a dormer window located on a roof hip, are not drawn.">[?]</abbr></td>
+          </tr>
+
+          <tr data-category="percentage">
+            <td></td>
+            <td colspan="3" style="text-align: center;"><img src="template_editor_part_percentage.png" alt="" /></td>
+          </tr>
+          <tr data-category="percentage">
+            <td><label for="align_percentage">Relation:</label></td>
+            <td><input name="align_percentage" id="align_percentage" type="text" /></td>
+            <td>&nbsp;</td>
+            <td><input type="text" style="visibility: hidden;" /></td><!--Hidden dummy input to fill out table so relation field has same width as other fields.-->
+          </tr>
+
+        </table>
+        <input type="hidden" name="spread_fix_number" id="spread_fix_number" />
+        <input type="hidden" name="override_cut_planes" id="override_cut_planes" />
+      </div>
+
+      <div class="section" id="material_replacement">
+        <b>Material Replacement</b>
+        <hr />
+        <!--<p class="warning"></p>-->
+        <table>
+          <tr>
+            <td><input name="replace_nested_mateials_checkbox" id="replace_nested_mateials_checkbox" type="checkbox" onclick="replace_nested_mateials(this.checked);" /></td>
+            <td><label for="replace_nested_mateials_checkbox">Replace materials within this part</label></td>
+          </tr>
+          <tr>
+            <td></td>
+            <td>Only available for Groups.</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td><button onclick="window.location='skp:convert_to_group';">Convert to group</button></td>
+          </tr>
+        </table>
+        <input type="hidden" name="replace_nested_mateials" id="replace_nested_mateials" />
+      </div>
+      
+      <div class="section" id="solids">
+        <b>Solid Operations</b>
+        <hr />
+        <p class="warning"></p>
+        <table>
+          <tr>
+            <td><label for="solid">Operation:</label></td>
+            <td>
+              <select name="solid" id="solid" onchange="toggle_solid(this.value);">
+                <option value="">None</option>
+				<option disabled>──────────</option>
+                <option value="union">Union</option>
+                <option value="subtract">Subtract</option>
+				<option disabled>──────────</option>
+                <option value="cut_multiple_faces">Cut Multiple Faces</option><!--TODO: Document that this tsrictly isn't a solid operation!-->
+              </select>
+            </td>
+            <td><label for="solid_index">Index:</label></td>
+            <td><input type="number" name="solid_index" id="solid_index" value="0" /></td>
+          </tr>
+        </table>
+      </div>
+
+    </div>
+    <script type="text/javascript">
+      //Cancel on Esc.
+      window.document.onkeydown = function (e){
+        e = e || event;
+        k = e.keyCode || e.wich;
+        if(k == 27){
+          window.location='skp:close';
+        }
+      }
+    </script>
+  </body>
+</html>

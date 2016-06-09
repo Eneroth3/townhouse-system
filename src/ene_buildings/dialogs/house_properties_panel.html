@@ -1,0 +1,281 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <title>TITLE</title>
+    <script type="text/javascript">
+      //Initialize each section.
+      //Runs when showing dialog and when template has changed.
+
+      //Template info.
+      //var template_info = <json_object>;
+      function update_template_section(){
+        //Preview image.
+        document.getElementById('template_preview').src = preview_dir+'/'+template_info['id']+'_200.png';
+
+        //div innerHTML.
+        //List all labels and corresponding keys to show in table here.
+        pairs = [
+          ['Modeler', 'modeler'],
+          ['Architect', 'architect'],
+          ['Country', 'country'],
+          ['Built year', 'year'],
+          ['Stories', 'stories'],
+          ['Source', 'source']
+        ]
+        html = '<span class="name">'+template_info['name']+'</span>';
+        html += '<table>';
+        for(var i=0;i<pairs.length;i++){
+          label = pairs[i][0];
+          key = pairs[i][1];
+          value = template_info[key];
+          if(!value) continue;
+          //Turn value into link for source if source_url is defined.
+          if(key == 'source' && template_info['source_url']){
+            value = '<a href="javascript:void(0);" onclick="window.location=\'skp:openUrl\';">'+value+'</a>';
+          }
+          html += '<tr><td>'+label+':</td><td>'+value+'</td></tr>';
+        }
+        html += '</table>';
+        description = template_info['description'];
+        if(description) html += description;
+        document.getElementById('template_info').innerHTML = html;
+      }
+
+      //Material replacement.
+      //var material_pairs = [array of material pairs];
+      function update_material_section(){
+        if(material_pairs.length == 0){
+          document.getElementById('material_replacement').style.display = 'none';
+        }else{
+          document.getElementById('material_replacement').style.display = '';
+          html = '';
+          for(var i=0;i<material_pairs.length;i++){
+            pair = material_pairs[i];
+            original = pair[0];
+            replacement = pair[1];
+
+            title = original['name'];
+            if(original['textured']) title += ' (Textured)';
+            tooltip = 'Replace '+original['name']+' with currently active material.';
+            if(replacement){
+              title_replacement = replacement['name'];
+              if(replacement['textured']) title_replacement += ' (Textured)';
+              color_replacement = replacement['color'];
+            }else{
+              title_replacement = 'No replacement.';
+              color_replacement = 'url(nil_material.png)';
+            }
+
+            html += '<div data-id="'+original['id']+'">';
+            html += '<div style="background:'+original['color']+';" title="'+title+'"></div>';
+            html += ' &rarr; ';
+            html += '<button onclick="window.location=\'skp:replace_material@'+original['id']+'\'" title="'+tooltip+'">';
+            html += '<div style="background:'+color_replacement+';" title="'+title_replacement+'"></div>';
+            html += ' Apply active';
+            html += '</button>';
+            html += '</div>';
+          }
+          document.getElementById('material_list').innerHTML = html;
+        }
+      }
+      function update_material_replacment(id_original, replacement){
+        replacer_divs = document.getElementById('material_list').getElementsByTagName('div');
+        for(i=0;i<replacer_divs.length;i++){
+          replacer_div = replacer_divs[i]
+          if(id_original != replacer_div.getAttribute('data-id')) continue;
+
+          //Update appearance of replacer button.
+          //Let material_pairs array be invalid, it's updated from ruby when
+          //used the next time anyway.
+          if(replacement){
+            title_replacement = replacement['name'];
+            if(replacement['textured']) title_replacement += ' (Textured)';
+            color_replacement = replacement['color'];
+          }else{
+            title_replacement = 'No replacement.';
+            color_replacement = 'url(nil_material.png)';
+          }
+          preview = replacer_div.getElementsByTagName('button')[0].getElementsByTagName('div')[0];
+          preview.title = title_replacement;
+          preview.style.background = color_replacement;
+        }
+      }
+
+      //Solid operations.
+      //var has_solids = <boolean>;
+      //var perform_solids = <boolean>;
+      function update_solids_section(){
+        document.getElementById('solids').style.display = has_solids ? '' : 'none';
+        document.getElementById('solids_checkbox').checked = perform_solids;
+      }
+
+
+      //Misc/UI stuff.
+
+      //Every time mouse enters document the style rule for hovered material
+      //assign button is updated to the currently active material's color.
+      function update_current_color(){
+        window.location='skp:update_style_rule';
+      }
+
+      //When a new dialog is created while other are opened it needs to
+      //be offset to not lie on top of the previous one.
+      function offset_window(offset){
+        var left = (window.screenLeft || window.screenX) + offset;
+        var top = (window.screenTop || window.screenY) + offset;
+        window.location='skp:set_position@' + left + ',' + top;
+      }
+    </script>
+    <link href="style.css" rel="stylesheet" type="text/css">
+    <style type="text/css">
+      #template img{
+        width: 200px;
+        height: 124px;/*golden rectangle*/
+        border: 1px solid ThreeDShadow;
+      }
+      #template button{
+        width: 202px;
+        margin-top: 10px;
+      }
+      #template .name{
+        font-weight: bold;
+      }
+      #template table{
+        margin: 0.5em;
+      }
+      #template td:first-child{
+        text-align: right;
+      }
+
+      #material_list{
+        margin-left: -30px;
+      }
+      #material_list > div{
+        float: left;
+        margin: 5px;
+        margin-left: 30px;
+        font-size: 1.5em;
+      }
+      #material_list button{
+        vertical-align: middle;
+      }
+      #material_list div div{
+        display: inline-block;
+        vertical-align: middle;
+        height: 18px;
+        width: 18px;
+        border: 1px solid ThreeDShadow;
+      }
+      #material_list button:hover div{
+        background: purple !important;/*This color is replaced with whatever color the active material has when mouse enters web dialog.*/
+      }
+      #material_browser_opener{
+        width: 150px;
+        margin-top: 10px;
+      }
+    </style>
+   </head>
+   <body>
+      <div class="dialog_buttons">
+        <!--First in document so OK is focused on load.-->
+				<button onclick="window.location='skp:apply@close';">OK</button>
+				<button onclick="window.location='skp:cancel';">Cancel</button>
+				<button onclick="window.location='skp:apply';">Apply</button>
+			</div>
+      <div class="main_scrollable_container">
+
+        <div id="template" class="section">
+          <!--This section is always visible but still wrapped in div for consistency in css selectors.-->
+          <b>Template</b>
+          <hr />
+          <div style="float: left; width: 210px;">
+            <img id="template_preview" src="../house_templates/test/preview_200.png" alt="" />
+            <button id="browse_templates" onclick="window.location='skp:browse_template';">Browse...</button>
+          </div>
+          <div id="template_info" style="margin-left: 220px; color: gray;">
+            <!--Dynamically created content-->
+            <!--
+            <span class="name">My House</span>
+            <table>
+              <tr><td>Modeler:</td><td>Eneroth3</td></tr>
+              <tr><td>Country:</td><td>Austria</td></tr>
+              <tr><td>Built Year:</td><td>1880</td></tr>
+            </table>
+            Made up building inspired by those in the old city of Bern. Built year is just a guess, could be older.
+            -->
+          </div>
+          <p style="clear: both;"></p>
+        </div>
+
+        <div id="material_replacement" class="section">
+          <!--Visibility is toggled depending on relevance of these settings.-->
+          <b>Material Replacement</b>
+          <hr />
+            <div id="material_list">
+              <!--Dynamically created content-->
+              <!--
+              <div>
+                <div style="background: LightGoldenRodYellow;"></div>
+                &rarr;
+                <button>
+                  <div style="background: LightCyan;"></div>
+                  Apply active
+                </button>
+              </div>
+              <div>
+                <div style="background: Beige;"></div>
+                &rarr;
+                <button>
+                  <div style="background: Azure;"></div>
+                  Apply active
+                </button>
+              </div>
+              <div>
+                <div style="background: PaleGoldenRod;"></div>
+                &rarr;
+                <button>
+                  <div style="background: Plum;"></div>
+                  Apply active
+                </button>
+              </div>
+              -->
+            </div>
+            <p style="clear: both;"></p>
+            <button id="material_browser_opener" onclick="window.location='skp:browse_materials';">Material browser...</button>
+          </div>
+
+        <!--<div id="component_replacement" class="section">
+          <!- -Visibility is toggled depending on relevance of these settings.- ->
+          <b>Component Replacement</b>
+          <hr>
+        </div>-->
+
+        <!--hörntorn...-->
+        <!--gabels etc...-->
+
+        <div id="solids" class="section">
+          <!--Visibility is toggled depending on relevance of these settings.-->
+          <b>Solid Operations</b>
+          <hr />
+          <p>Disabling solid operations can drastically decrease the drawing time for houses and be used when testing other settings.</p>
+          <label><input type="checkbox" id="solids_checkbox" onchange="window.location='skp:perform_solids@'+this.checked;"/> Perform solid operations</label>
+        </div>
+
+      </div>
+    <script type="text/javascript">
+      //Cancel on Esc.
+      window.document.onkeydown = function (e){
+        e = e || event;
+        k = e.keyCode || e.wich;
+        if(k == 27){
+          window.location='skp:cancel';
+        }
+      }
+
+      //Update active material when mouse enters window.
+      window.document.onmouseover = update_current_color;
+    </script>
+  </body>
+</html>

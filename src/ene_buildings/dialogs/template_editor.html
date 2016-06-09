@@ -1,0 +1,200 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <title>TITLE</title>
+    <script type="text/javascript">
+    
+      //Display either warning message or actual form.
+      function warn(bool, title, msg){
+
+        //Elements.
+        form = document.getElementById('form_content');
+        warning = document.getElementById('warning');
+
+        form.style.display = bool ? "none" : "";
+        warning.style.display = bool ? "" : "none";
+
+        if(title) warning.innerHTML = "<div>"+title+"</div>"+msg;
+
+      }
+      
+      //Set preview image.
+      function set_image_path(path){
+      
+        e = document.getElementById("general").getElementsByTagName("img")[0];
+        e.src = "file://" + path + '?' + (new Date()).getTime();
+        
+      }
+      
+      //Update preview image based on value in ID field.
+      //Called when value changes.
+      function load_preview(){
+        window.location='skp:load_preview';
+      }
+      
+      //Should ID be suggested?
+      //Called when selection/drawing context changes or checkbox changes.
+      function suggest_id(bool){
+
+        //Elements.
+        checkbox = document.getElementById('suggest_id_checkbox');
+        text_input = document.getElementById('suggest_id');
+
+        //Put value to text field for Ruby side.
+        text_input.value = bool ? 'true' : 'false';
+
+        //Update checkbox
+        checkbox.checked = bool;
+        
+      }
+      
+      //Suggest an ID based on name and author.
+      //Called when changing name and author. 
+      function make_id_suggestion(){
+      
+        checkbox = document.getElementById('suggest_id_checkbox');
+        if(!checkbox.checked) return;
+        
+        window.location='skp:make_id_suggestion';
+      
+      }    
+      
+    </script>
+    <link href="style.css" rel="stylesheet" type="text/css">
+    <style type="text/css">
+      table{
+        width: 100%;
+      }
+      td:nth-child(odd){/*Requires IE 9+.*/
+        text-align: right;
+        width: 80px;
+      }
+      input[type=text], select, textarea{
+        box-sizing: border-box;
+        width: 100%;
+      }
+      textarea{
+        font: caption;
+      }
+      
+      #general img{
+        width: 100px;
+        height: 100px;
+        border: 1px solid ThreeDShadow;
+      }
+    </style>
+   </head>
+   <body>
+    <div class="dialog_buttons">
+      <!--First in document so Close is focused on load.-->
+      <button onclick="window.location='skp:close';">Close</button>
+      <button onclick="window.location='skp:help';">Help</button>
+    </div>
+    <div id="warning"></div>
+    <div class="main_scrollable_container" id="form_content">
+      <div class="section">
+        <b>General</b>
+        <hr />
+        <table id="general">
+          <tr>
+            <td><label for="name">Name:</label></td>
+            <td><input type="text" id="name" name="name" onkeyup="make_id_suggestion();" /></td>
+            <td rowspan="4">
+              <img src="template_placeholder_100.png" alt="" />
+            </td>
+          </tr>
+          <tr>
+            <td><label for="modeler">Modeler:</label></td>
+            <td><input type="text" id="modeler" name="modeler" onkeyup="make_id_suggestion();" /></td>
+          </tr>
+          <tr>
+            <td><label for="id">ID:</label></td>
+            <td><input type="text" id="id" name="id" onkeydown="suggest_id(false);" onkeyup="load_preview();" /></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" id="suggest_id_checkbox" name="suggest_id_checkbox" onclick="suggest_id(this.checked); make_id_suggestion();" /></td>
+            <td><label for="suggest_id_checkbox">Suggest ID</label></td>
+          </tr>
+        </table>
+        <input type="hidden" name="suggest_id" id="suggest_id" />
+        <hr style="margin-left: 0;" />
+        <table>
+          <tr>
+            <td><label for="architect">Architect:</label></td>
+            <td><input type="text" id="architect" name="architect" /></td>
+            <td><label for="stories">Stories:</label></td>
+            <td><input type="text" id="stories" name="stories" /></td>
+          </tr>
+          <tr>
+            <td><label for="country">Country:</label></td>
+            <td><input type="text" id="country" name="country" /></td>
+            <td><label for="source">Source:</label></td>
+            <td><input type="text" id="source" name="source" /></td>
+          </tr>
+          <tr>
+            <td><label for="year">Year:</label></td>
+            <td><input type="text" id="year" name="year" /></td>
+            <td><label for="source_url">Source URL:</label></td>
+            <td><input type="text" id="source_url" name="source_url" /></td>
+          </tr>
+          <tr>
+            <td style="vertical-align: top;"><label for="description">Description:</label></td>
+            <td colspan="3">
+              <textarea id="description" name="description" style="height: 100px; overflow: auto;"></textarea>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <div class="section">
+        <b>Alignment</b>
+        <hr />
+        <table>
+          <tr>
+            <td><label for="alignment_back">Back:</label></td>
+            <td colspan="3">
+              <select id="alignment_back" name="alignment_back">
+                <option value="">Unspecified</option>
+                <option value="2">Firewall</option>
+                <option value="1">Courtyard</option>
+                <option value="0">Street</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td></td>
+            <td colspan="3" style="text-align: center;"><img src="template_editor_align.png" alt="" /></td>
+          </tr>
+          <tr>
+            <td><label for="alignment_front">Front:</label></td>
+            <td colspan="3">
+              <select id="alignment_front" name="alignment_front">
+                <option value="">Unspecified</option>
+                <option value="2">Firewall</option>
+                <option value="1">Courtyard</option>
+                <option value="0">Street</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td><label for="depth">Depth:</label></td>
+            <td><input type="text" id="depth" name="depth" /></td>
+            <td>&nbsp;</td>
+            <td><input type="text" style="visibility: hidden;" /></td><!--Hidden dummy input to fill out table so depth field has same width as other fields.-->
+          </tr>
+        </table>
+      </div>
+    </div>
+    <script type="text/javascript">
+      //Cancel on Esc.
+      window.document.onkeydown = function (e){
+        e = e || event;
+        k = e.keyCode || e.wich;
+        if(k == 27){
+          window.location='skp:close';
+        }
+      }
+    </script>
+  </body>
+</html>

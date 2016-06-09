@@ -1,0 +1,86 @@
+html {
+  margin: 0;
+  padding: 0;
+  background: #eee;
+}
+body{
+  width: 700px;
+  margin: 0;
+  padding: 2em;
+  margin-right: auto;
+  margin-left: auto;
+  background: white;
+  box-shadow: 10px 0 30px #bbb;
+
+  font-family: Helvetica, Arial, sans-serif;
+  color: #555;
+}
+#footer{
+  margin: -2em;
+  margin-top: 2em;
+  padding: 2em;
+  background: #bbb;
+  color: black;
+  text-align: center;
+}
+
+a{
+  color: #39F;
+  text-decoration:none;
+}
+a:hover{
+  color: #39F;
+  text-decoration:underline;
+}
+
+h1{
+  margin-bottom: 0;
+  font-weight: bold;
+  color: #000;
+  letter-spacing: 1px;
+}
+h2{
+  margin-bottom: 0;
+  font-weight: bold;
+  color: #333;
+}
+h3, h4, h5{
+  margin-bottom: 0;
+}
+
+p{
+ margin-top: 0.5em;
+}
+table{
+  font-size: small;
+  border: 1px solid #333;
+  border-collapse: collapse;
+}
+td{
+  border: 1px solid #333;
+}
+thead td{
+  text-align: center;
+  font-weight: bold;
+}
+
+.img-and-text{
+  position: relative;
+  display: inline-block;
+  width: auto;
+  height: auto;
+  text-align: right;
+  font-size: small;
+}
+.img-and-text img{
+  display: block;
+}
+.axis{
+  border-bottom: 1.5px solid;/*TODO: make this a text-decoration underline when more supported*/
+}
+.axis-negative{
+  border-bottom: 1.5px dotted;
+}
+.x { border-color: red;}
+.y { border-color: lime;}
+.z { border-color: blue;}

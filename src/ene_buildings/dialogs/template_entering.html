@@ -1,0 +1,36 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <title>TITLE</title>
+    <script type="text/javascript">
+    </script>
+    <link href="style.css" rel="stylesheet" type="text/css">
+    <style type="text/css">
+      .main_scrollable_container{
+        background: white;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="dialog_buttons">
+      <!--First in document so OK is focused on load.-->
+      <button onclick="window.location='skp:close';">OK</button>
+    </div>
+    <div class="dialog_buttons" style="left: 4px; right: auto;">
+      <label><input type="checkbox" onchange="window.location='skp:prevent@' + this.checked;" /> Do not show me this again.</label>
+    </div>
+    <div class="main_scrollable_container">
+      <p>
+        You have entered a template component.
+      </p>
+      <p>
+        Altering this component changes how buildings using this template are
+        drawn within this model. When done editing you can save the component
+        back to the template library and use it in other models as well.
+      </p>
+      <a href="javascript:void(0);" onclick="window.location='skp:help';">Read more about template editing.</a>
+    </div>
+  </body>
+</html>
