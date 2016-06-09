@@ -1,0 +1,125 @@
+<!DOCTYPE HTML>
+<!--
+Testing how user interface for component replacement could work.
+User needs to understand when a slot is taken.
+
+-->
+<html>
+  <head>
+    <style>
+      td {
+        padding: 0;
+      }
+      td:first-child {
+        width: 120px;
+        text-align: right;
+      }
+      span {
+        display: inline-block;
+        width: 30px;
+        text-align: center;
+      }
+      
+      /*
+      span:nth-child(odd) {
+        background: red;
+      }
+      span:nth-child(even) {
+        background: cyan;
+      }
+      */
+    </style>
+    <script>
+      'use strict';
+      
+      /*
+       * List all checkboxes in given context.
+       *
+       * Returns Array of Checkboxes.
+       */
+      function getCheckboxes(context) {
+        var inputs = context.getElementsByTagName('input');
+        var checkboxes = [];
+        for (var i=0; i<inputs.length; i++) {
+          var input = inputs[i];
+          if (input.type == 'checkbox') checkboxes.push(input);
+        }
+        return checkboxes;
+      }
+      
+      /*
+       * Disables checkboxes for component replacement that cannot be carried out
+       * because slots are occupied by another component replacement.
+       */
+      function updateCheckboxDisability() {
+        
+        var checkboxes = getCheckboxes(document);
+        for (var i=0; i<checkboxes.length; i++) {
+        
+          // A ticked checkbox is always enabled.
+          if (checkboxes[i].checked) { continue; }
+          
+          var i_start = parseInt(checkboxes[i].value);
+          var i_slots = parseInt(checkboxes[i].parentNode.parentNode.parentNode.getAttribute('data-slots'));
+          var i_end = i_start + i_slots - 1;
+
+          var occupied = false;
+          for (var j=0; j<checkboxes.length; j++) {
+          
+            if (!checkboxes[j].checked) continue;
+            
+            // Can't collide with self.
+            if (i == j) { continue; }
+          
+            var j_start = parseInt(checkboxes[j].value);
+            var j_slots = parseInt(checkboxes[j].parentNode.parentNode.parentNode.getAttribute('data-slots'));
+            var j_end = j_start + j_slots - 1;
+            
+            if (!(j_start > i_end || j_end < i_start)) {
+              occupied = true;
+              break;
+            }
+            
+          }
+          checkboxes[i].disabled = occupied;
+          
+        }
+        
+      }
+      
+      document.onclick = updateCheckboxDisability;
+    </script>
+  </head>
+  <body>
+    
+    
+    <table border="1" style="width: 800px;">
+      <tr data-slots="1">
+        <td>Door (1)</td>
+        <td>
+          <span><input type="checkbox" name="door" value="0" /></span><!--
+          --><span><input type="checkbox" name="door" value="1" /></span><!--
+          --><span><input type="checkbox" name="door" value="2" /></span><!--
+          --><span><input type="checkbox" name="door" value="3" /></span>
+        </td>
+      </tr>
+      <tr data-slots="2">
+        <td>Bay Window (2)</td>
+        <td style="padding-left: 15px;">
+          <span><input type="checkbox" name="door" value="0" /></span><!--
+          --><span><input type="checkbox" name="door" value="1" /></span><!--
+          --><span><input type="checkbox" name="door" value="2" /></span>
+        </td>
+      </tr>
+      <tr data-slots="3">
+        <td>Test (3)</td>
+        <td style="padding-left: 30px;">
+          <span><input type="checkbox" name="door" value="0" /></span><!--
+          --><span><input type="checkbox" name="door" value="1" /></span>
+        </td>
+      </tr>
+    </table>
+    
+    
+  </body>
+</html>
