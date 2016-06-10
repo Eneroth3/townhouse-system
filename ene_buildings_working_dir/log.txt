@@ -50,3 +50,7 @@ Preview creation can now be turned off.
 Done with model of Landsjövdingehus rveterat except for a few details.
 Implemented a template for it with the default facade segment only.
 Changed "sockel"-material for Tegelhus nationalromantik
+
+2016-06-09
+
+Started using Git for version control.

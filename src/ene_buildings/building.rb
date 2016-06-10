@@ -663,7 +663,7 @@ p "Drew building in #{Time.now - start_time}s."
 #
 # + No ugly intersect_with
 # + Quite nicely written code
-# - Faulty results on some occasions, doesn't punch holes.
+# + Faulty results on some occasions, doesn't punch holes.
 # - Slow, almost as slow as intersect with.
 # - Doesn't remove inner faces when a pre-existing edge intersects cut edges. There's no reference to the split of part and it doesn't get added to the list of edges to seperate what to keep and what to cut away.
 start_time = Time.now
@@ -673,7 +673,8 @@ start_time = Time.now
       # Save point references to later be able to identify the cutting edges.
       # Normalize point order to determine what face to keep and what to cut
       # away.
-      cutting_edge_points = []
+      
+      naked_edge_points = []
       cut_temp_group = segment_group.entities.add_group
       ops.each do |s|
         part, operation, part_segment_group = s
@@ -690,62 +691,68 @@ start_time = Time.now
           points = edge.vertices.map { |v| v.position }
           points.each { |p| p.transform! part.transformation }
           points.reverse! if edge.reversed_in?(edge.faces.first)
-          cutting_edge_points << points
+          naked_edge_points << points
           
           new_edge = cut_temp_group.entities.add_line points# TODO: add vertices to a hash indexed by position. Use vertex if found instead of point in add_line to weld the edges.
           new_edge.hidden = edge.hidden?
+          
+          # Create temporary faces, if possible, to make Sketchup punch holes
+          # in existing faces.
+          new_edge.find_faces
         end
         
       end
-      exploded = cut_temp_group.explode
       
-      ## Testing what vertices are returned from explode.
-      #exploded.each do |e|
-      #  next unless e.is_a? Sketchup::Vertex
-      #  segment_group.entities.add_line e, ORIGIN
-      #end
-      #return
-      # It seems like those from split edges are returned :D
+      # make sure the new temporary faces are directed so they later can be
+      # identified as faces to cut away.
+      cut_temp_group.entities.to_a.each do |f|
+        next unless f.is_a? Sketchup::Face
+        next unless f.edges.first.reversed_in?(f)
+        f.reverse!
+      end
+      
+      exploded = cut_temp_group.explode
+      exploded.each { |f| f.erase! if f.is_a?(Sketchup::Face) }
+      exploded_vertices = exploded.select { |v| v.is_a? Sketchup::Vertex }
       
       # Find the cutting edges. Edges may be split during explosion.
       # Also start listing faces to cut away and faces to keep bound by these
       # edges.
+      
       cutting_edges  = []
       cut_away_faces = []
       faces_to_keep  = []
       
-      ## select edges that with both vertices being in the exploded array and loop these when looking for cutting edges.
-      #potentially_cutting = segment_group.entities.select do |e|
-      #  e.is_a?(Sketchup::Edge) && e.vertices.all? { |v| exploded.include? v }
-      #end
-      # Had some false negative and it didn't get faster.
-
-     segment_group.entities.each do |e|
-        next unless e.is_a? Sketchup::Edge
-        edge_pts = e.vertices.map { |v| v.position }
-        ###edge_bounds = Geom::BoundingBox.new
-        ###edge_bounds.add edge_pts
-        cutting_edge_points.each do |pts|
-          #next unless (pts[0]-pts[1]).parallel? e.line
-          # Checking if the points of the original naked edge are within the actual edge gives false negatives when the edge has been split off by a crossing edge.
-          ###next unless edge_bounds.contains? pts[0]
-          ###next unless edge_bounds.contains? pts[1]
-          pts_bounds = Geom::BoundingBox.new # Looping points (of the original naked edges) outside edge loop (the existing edges) means duplicates of this objects aren't created. Might eb afaster.
-          pts_bounds.add pts
+      # Limit upcoming loop of physical edges to edges that connects to
+      # what was exploded.
+      potential_cutting_edges = segment_group.entities.select do |e|
+        e.is_a?(Sketchup::Edge) &&
+        e.vertices.any? { |v| exploded_vertices.include? v }
+      end
+      
+      # Loop point pairs of the original naked edges.
+      naked_edge_points.each do |pts|
+        pts_bounds = Geom::BoundingBox.new
+        pts_bounds.add pts
+        
+        # Loop physical edges.
+        potential_cutting_edges.each do |e|
+          edge_pts = e.vertices.map { |v| v.position }
+          
           next unless pts_bounds.contains? edge_pts[0]
           next unless pts_bounds.contains? edge_pts[1]
           next unless (pts[0] - pts[1]).parallel?(e.line[1])
           next unless pts.all? { |p| p.on_line? e.line }
                     
           # If edge is inclusively between points, i.e. including edges split
-          # off from the original naked edge on intersection, add it to list
+          # off from the original naked edge on explosion, add it to list
           # of cutting edges.
           l = pts[0].distance pts[1]
           next unless pts.all? { |p| edge_pts.all? { |p1| p.distance(p1) <= l } }
           cutting_edges << e
           
           # If edge is exactly defined by points, also determine what
-          # bounded face to keep and what to cut away.
+          # bounded face to keep and what to cut away from it.
           matches_as_non_reversed = pts == edge_pts
           matches_as_reversed     = pts == edge_pts.reverse
           next unless matches_as_non_reversed || matches_as_reversed
