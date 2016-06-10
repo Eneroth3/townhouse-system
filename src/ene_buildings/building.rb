@@ -601,8 +601,17 @@ class Building
     
     
     
-    
-      
+=begin
+# Attempt that relies on copying each instance. Kinda ugly but I had to try.
+#
+# Possible Improvements:
+#   make sure temporarily created faces have a correct normal direction and they'll hopefully merge more nicely.
+#   Still has no system of finding and hiding cut away entities, so far I'm just trying to make the actual cut.
+#
+# What I've learned:
+#   The importance of having welded edges when trying to cut interior hole.
+start_time = Time.now
+
       ops.each do |s|
         part, operation, part_segment_group = s
         next unless part_segment_group == segment_group
@@ -612,11 +621,15 @@ class Building
           part.definition,
           part.transformation
         )
-        
         temp_instance.make_unique
         temp_ents = temp_instance.definition.entities
-        temp_ents.each { |e| e.find_faces if e.is_a?(Sketchup::Edge) }
         temp_ents.erase_entities temp_ents.to_a.select { |e| [Sketchup::Group, Sketchup::ComponentInstance].include? e.class }
+        
+        old_geometry = temp_ents.to_a
+        temp_ents.each { |e| e.find_faces if e.is_a?(Sketchup::Edge) }
+        new_faces = temp_ents.to_a - old_geometry 
+        new_faces.each { |f| f.reverse! }
+        
         
         explode_ents = temp_instance.explode
         temp_faces = explode_ents.select { |e| e.is_a? Sketchup::Face }
@@ -628,19 +641,36 @@ class Building
         
       end
     
-      return
+    
+      # Seems quite close to make it work now!
+      # On back side of landshövdingehus reveterat everything lokks right.
+      # On front side there are errors that seem to be created by the temp faces being faulty directed. This is quite easily changed,
+      
+p "Drew building in #{Time.now - start_time}s."
+=end
     
     
     
     
     
-    
-    
-last_time = Time.now
+#=begin
+#  Attempt without intersect_with.
+#  The bottleneck is checking on_line? on each lots of edges with lots of points.
+#  Also has problem with not punching holes in facs.
+#
+# Possible improvements:
+#    Use vertices as arguments instead of points for add_line. This hopefully welds them together so they can cut openings.
+#
+# + No ugly intersect_with
+# + Quite nicely written code
+# - Faulty results on some occasions, doesn't punch holes.
+# - Slow, almost as slow as intersect with.
+# - Doesn't remove inner faces when a pre-existing edge intersects cut edges. There's no reference to the split of part and it doesn't get added to the list of edges to seperate what to keep and what to cut away.
+start_time = Time.now
 
       # Copy naked edges of cutting parts into a temporary group and explode it
-      # to them with pre-existing edges.
-      # Save point references to later be able to find the cutting edges.
+      # to merge and split them with pre-existing edges.
+      # Save point references to later be able to identify the cutting edges.
       # Normalize point order to determine what face to keep and what to cut
       # away.
       cutting_edge_points = []
@@ -662,30 +692,49 @@ last_time = Time.now
           points.reverse! if edge.reversed_in?(edge.faces.first)
           cutting_edge_points << points
           
-          new_edge = cut_temp_group.entities.add_line points
+          new_edge = cut_temp_group.entities.add_line points# TODO: add vertices to a hash indexed by position. Use vertex if found instead of point in add_line to weld the edges.
           new_edge.hidden = edge.hidden?
         end
         
       end
-puts "Copied naked edges in #{Time.now-last_time} s."
-last_time = Time.now
-      cut_temp_group.explode
-puts "Exploded in #{Time.now-last_time} s."
-last_time = Time.now
+      exploded = cut_temp_group.explode
       
-      # Find the cutting edges.
-      # Also start listing faces to cut away and faces to keep.
+      ## Testing what vertices are returned from explode.
+      #exploded.each do |e|
+      #  next unless e.is_a? Sketchup::Vertex
+      #  segment_group.entities.add_line e, ORIGIN
+      #end
+      #return
+      # It seems like those from split edges are returned :D
+      
+      # Find the cutting edges. Edges may be split during explosion.
+      # Also start listing faces to cut away and faces to keep bound by these
+      # edges.
       cutting_edges  = []
       cut_away_faces = []
       faces_to_keep  = []
-      segment_group.entities.each do |e|
+      
+      ## select edges that with both vertices being in the exploded array and loop these when looking for cutting edges.
+      #potentially_cutting = segment_group.entities.select do |e|
+      #  e.is_a?(Sketchup::Edge) && e.vertices.all? { |v| exploded.include? v }
+      #end
+      # Had some false negative and it didn't get faster.
+
+     segment_group.entities.each do |e|
         next unless e.is_a? Sketchup::Edge
         edge_pts = e.vertices.map { |v| v.position }
-        edge_bounds = Geom::BoundingBox.new
-        edge_bounds.add edge_pts
+        ###edge_bounds = Geom::BoundingBox.new
+        ###edge_bounds.add edge_pts
         cutting_edge_points.each do |pts|
-          next unless edge_bounds.contains? pts[0]
-          next unless edge_bounds.contains? pts[1]
+          #next unless (pts[0]-pts[1]).parallel? e.line
+          # Checking if the points of the original naked edge are within the actual edge gives false negatives when the edge has been split off by a crossing edge.
+          ###next unless edge_bounds.contains? pts[0]
+          ###next unless edge_bounds.contains? pts[1]
+          pts_bounds = Geom::BoundingBox.new # Looping points (of the original naked edges) outside edge loop (the existing edges) means duplicates of this objects aren't created. Might eb afaster.
+          pts_bounds.add pts
+          next unless pts_bounds.contains? edge_pts[0]
+          next unless pts_bounds.contains? edge_pts[1]
+          next unless (pts[0] - pts[1]).parallel?(e.line[1])
           next unless pts.all? { |p| p.on_line? e.line }
                     
           # If edge is inclusively between points, i.e. including edges split
@@ -713,8 +762,6 @@ last_time = Time.now
         
         end
       end
-puts "Found cutting edges in #{Time.now-last_time} s."
-last_time = Time.now
       
       # Traverse faces sharing a binding edge to list faces to cut away and to
       # keep. If the loop of cutting edges doesn't lie tight onto the original
@@ -725,25 +772,26 @@ last_time = Time.now
       faces_to_keep = EneBuildings.connected_faces faces_to_keep, cutting_edges
       cut_away_faces -= faces_to_keep
 
-puts "Traversed faces in #{Time.now-last_time} s."
-last_time = Time.now
       cut_away_edges = cut_away_faces.map { |f| f.edges }.flatten.uniq
       cut_away_edges.keep_if { |e| (e.faces - cut_away_faces).empty? }
       
       cut_away_faces.each { |f| f.hidden = true }
       cut_away_edges.each { |f| f.hidden = true }
 
-puts "Hide in #{Time.now-last_time} s."
-last_time = Time.now
+p "Drew building in #{Time.now - start_time}s."
+#=end
+
+
+
+
+
+
+
+
+
+
       end
       
-# Benchnark results.
-#Copied naked edges in 1.360078 s.
-#Exploded in 0.226013 s.
-#Found cutting edges in 95.547465 s.
-#####Found cutting edges in 8.829505 s. (after checking bounding box first)
-#Traversed faces in 0.028001 s.
-#Hide in 0.199012 s.
       
     nil
 
