@@ -205,6 +205,457 @@ class Building
 
   end
 
+  # Public: Tells if any solid operations can be performed on Building (based on
+  # template).
+  #
+  # Called when opening properties dialog to enable or disable the setting for
+  # performing solid operations.
+  #
+  # Returns true or false.
+  def has_solids?
+
+    @template.has_solids?
+
+  end
+
+  # Public: list replaceable groups/components (based on how building is drawn).
+  # Groups and components in the building segments can have attributes telling
+  # they can be optionally replaced by other groups/components, for instance a
+  # door replacing a window.
+  #
+  # Called when opening properties dialog to allow user to set what to replace
+  # with what.
+  #
+  # Returns array# TODO: COMPONENT REPLACEMENT: what does array contain?
+  def list_replaceable_components
+
+    # TODO: COMPONENT REPLACEMENT: get data from template and from var stored on last draw_basic.
+    # Return array like:
+    # [
+    #   {
+    #     :name => String, used to identify original component #(from template)
+    #     :replacement => [             #(from template)
+    #       {
+    #         :name => String, used to identify group/component.
+    #         :slots => Fixnum, how many slot this replacement requires (from template)
+    #       }
+    #     ]
+    #     :slots/available_slots = [    #(from last draw_basic)
+    #       Fixnum, slots (number of original component) in first segment
+    #       Fixnum, slots (number of original component) in second segment...
+    #   }...
+    # ]
+
+  end
+
+  # Public: List replaceable materials (based o template).
+  # Materials directly in segment groups are listed. Materials in nested groups
+  # are also listed if the group has an attribute specifically saying so.
+  #
+  # Called when opening properties dialog to allow user to set what materials
+  # to replace with what other materials.
+  #
+  # Returns array of Material objects.
+  def list_replaceable_materials
+
+    @template.list_replaceable_materials
+
+  end
+
+  # Public: [Re-]Load class instance variables from group attributes.
+  # Unknown (not installed) template will be nil.
+  #
+  # Returns nothing.
+  def load_attributes
+
+      # Loop group attributes and save as object attribute.
+      @group.attribute_dictionary(ATTR_DICT).each_pair do |key, value|
+        instance_variable_set("@" + key.to_s, value)
+      end
+      
+      # Set back_along_path to false if not already set for backward
+      # compatibility. The value nil is reserved to let PathHandling handle
+      # paths where back_along_path doesn't make any sense, e.g. plots instead
+      # of individual buildings.
+      @back_along_path ||= false
+
+      # Override template id string with reference to actual object.
+      #nil if not found.
+      @template = Template.get_from_id @template
+
+      # Override material replacement string identifiers with actual material
+      # references.
+      model_materials = @group.model.materials
+      @material_replacement = (@material_replacement || []).map do |p|
+        p.map{ |name| model_materials[name] }
+      end
+      # Delete replacement pair if replacer is nil. Replacer material becomes
+      # nil if it has been deleted from model.
+      @material_replacement.delete_if { |p| !p[1] }
+
+  end
+
+  # Public: Check if template isn't missing.
+  # If template is missing a the template select panel opens up to let user 
+  # pick another template to use instead for this building.
+  #
+  # Yields if template was missing but user chose to pick a new one instead.
+  #
+  # Examples
+  #
+  #   def my_method(building)
+  #     # If there is no valid_template, call same method again after once
+  #     # user has selected a new template.
+  #     return unless building.valid_template? { my_method(building) }
+  #     # Do stuff with building here.
+  #     p building.template
+  #   end
+  #
+  # Returns true if template can be found and nil if it's missing.
+  def valid_template?(&block)
+
+    return true if @template
+    return false unless block
+
+    missing = @group.get_attribute ATTR_DICT, "template", "nil"
+    msg =
+      "The template '#{missing}' used on this building could not be found.\n"\
+      "Perhaps building was drawn on a computer with more templates installed.\n\n"\
+      "Choose new template?"
+    return false if UI.messagebox(msg, MB_OKCANCEL) == IDCANCEL
+
+    Template.select_panel("Replace missing template") do |t|
+      next unless t
+      @template = t
+      block.call
+    end
+
+    false
+
+  end
+
+  # Public: Open web dialog and let user set Building properties.
+  # Template, material replacement and component replacement among others can be
+  # set.
+  #
+  # When changing values in the form the Building object attributes are directly
+  # changed. These changes are not saved to the Group if user cancels but still
+  # exist in the Building object.
+  #
+  # Do not use the same Building object at a later point, instead initialize a
+  # new from the group as this:
+  #   b = Building.new b.group
+  #
+  # REVIEW: Do not instantly change Building object. Change it once user saves.
+  #
+  # Returns WebDialog object.
+  def properties_panel
+  
+    # Building object is instantly updated when changes are made in the dialog.
+    # The building Group is redrawn and instance variables saved as attributes
+    # once the user clicks OK ar Apply.
+
+    # Only allow one properties dialog for each building at a time.
+    # References to opened properties dialogs are saved as a hash indexed by the
+    # guid of the group.
+    @@opened_dialogs ||= {}
+    dlg = @@opened_dialogs[@group.guid]
+    if dlg
+      dlg.bring_to_front
+      return dlg
+    end
+
+    # Check if template is known.
+    # Model could be created on a computer that has more templates installed.
+    return unless valid_template? { properties_panel }
+
+    # Create dialog.
+    dlg = UI::WebDialog.new("Building Properties", false, "#{ID}_building_properties_panel", 610, 450, 100, 100, true)
+    dlg.min_width = 440
+    dlg.min_height = 300
+    dlg.navigation_buttons_enabled = false
+    dlg.set_file(File.join(PLUGIN_DIR, "dialogs", "building_properties_panel.html"))
+    @@opened_dialogs[@group.guid] = dlg
+
+    # Material and component replacement cannot run twice without redrawing the
+    # original building from template in between to have the original content to
+    # replace. This flag tells if the building group is "pure" (drawn by draw_basic
+    # but no other draw methods). Assume this is false and set it to true when
+    # changing template, thus redrawing the basics.
+    pure = false
+
+    # Reference to template dialog.
+    # Used to make sure just one is opened from this properties dialog and to
+    # close when this dialog closes.
+    dlg_template = nil
+
+    # Add data.
+    add_data = lambda do
+
+      js ="var preview_dir = '#{Template::PREVIEW_DIR}';"
+
+      # If more dialogs are opened, offset this one to avoid it being on top of others
+      js << "offset_window(10);" if @@opened_dialogs.size > 1
+
+      # Template info.
+      js << "var template_info=#{@template.json_data};"
+      js << "update_template_section();";
+
+      # Material replacement options (based on template component) and current
+      # preferences (saved to building).
+      material_pairs = list_replaceable_materials.map do |original|
+        pair = @material_replacement.find { |e| e[0] == original}
+        replacement = pair[1] if pair
+        a = [
+          {# Original to replace.
+            :name => original.display_name,
+            :id => original.name,
+            :css_string => EneBuildings.material_to_css(original),
+            :textured => !original.texture.nil?
+          }
+        ]
+        a << {# Replace preference (if any is set).
+          :name => replacement.display_name,
+          :id => replacement.name,
+          :css_string => EneBuildings.material_to_css(replacement),
+          :textured => !replacement.texture.nil?
+        } if replacement
+        a
+      end
+      js << "var material_pairs=#{JSON.generate(material_pairs)};"
+      js << "update_material_section();";
+
+      # Component replacement...
+
+      # <Hörntorn>...
+
+      # Solids.
+      js << "var has_solids = #{has_solids?};"
+      js << "var perform_solids = #{@perform_solid_operations};"
+      js << "update_solids_section();";
+
+      dlg.execute_script js
+
+    end
+
+    # Show dialog.
+    if Sketchup.platform == :platform_win
+      dlg.show { add_data.call }
+    else
+      dlg.show_modal { dadd_data.call }
+    end
+
+    # Start operator.
+    # This operator is committed when pressing OK or Apply and aborted when
+    # pressing cancel.
+    op_name = "Building Properties"
+    @group.model.start_operation op_name, true
+    
+    # HACK: Make a temporary group to apply materials to to load them into
+    # model.
+    temp_material_group = @group.model.entities.add_group
+    temp_material_group.visible = false
+    temp_material_group.entities.add_cpoint ORIGIN
+
+    # Closing dialog.
+    # Cancels (Abort operation) unless called from "apply" callback.
+    set_on_close_called_from_apply = false
+    dlg.set_on_close do
+      unless set_on_close_called_from_apply
+        temp_material_group.erase!
+        @group.model.abort_operation
+      end
+
+      # Close template selector if opened.
+      dlg_template.close if dlg_template && dlg_template.visible?
+
+      @@opened_dialogs.delete @group.guid
+    end
+
+    # Dialog buttons.
+    
+    model = @group.model
+
+    # Clicking OK or apply.
+    dlg.add_action_callback("apply") do |_, close|
+      close = close == "close"
+
+      # Call all draw methods.
+      # Draw basic is included if group isn't "pure" (if it has been customized
+      # since last draw_basic).
+      draw nil, pure
+      pure = false
+
+      temp_material_group.erase!
+      model.commit_operation
+
+      if close
+        set_on_close_called_from_apply = true
+        dlg.close
+      else
+        model.start_operation op_name, true
+      end
+    end
+
+    # Clicking cancel.
+    dlg.add_action_callback("cancel") do
+      dlg.close
+    end
+
+    # Changing values.
+
+    # Open building template selector.
+    dlg.add_action_callback("browse_template") do
+      if dlg_template && dlg_template.visible?
+        dlg_template.bring_to_front
+      else
+        dlg_template = Template.select_panel("Change Template", @template) do |t|
+          next unless t
+          next if t == @template
+          @template = t
+          # Redraw with new template so information about component placement can
+          # be gathered.
+          draw_basic
+          pure = true
+
+          # Update form.
+          add_data.call
+          dlg.bring_to_front
+        end
+      end
+    end
+
+    # Material replacement.
+    dlg.add_action_callback("replace_material") do |_, original_string|
+      original = model.materials[original_string]
+      next unless original
+      active_m = model.materials.current
+
+      # Make sure active_m is added to model.
+      temp_face = temp_material_group.entities.add_face(
+        Geom::Point3d.new(rand, rand, rand),
+        Geom::Point3d.new(rand, rand, rand),
+        Geom::Point3d.new(rand, rand, rand)
+      )
+      temp_face.material = active_m
+      active_m = temp_face.material
+
+      # Save preference
+      pair = @material_replacement.find { |e| e[0] == original}
+      if pair
+        # override replacement or remove if active material is nil.
+          if active_m
+            pair[1] = active_m
+          else
+            @material_replacement.delete pair
+          end
+      elsif active_m
+        # Create replacement unless active material is nil.
+        @material_replacement << [original, active_m]
+      end
+
+      # Update preview.
+      json =
+        if active_m
+          JSON.generate({
+            :name => active_m.display_name,
+            :id => active_m.name,
+            :css_string => EneBuildings.material_to_css(active_m),
+            :textured => !active_m.texture.nil?
+          })
+        else
+         "null"
+        end
+      # js = "update_material_section();"# Recreating whole list moves focus.
+      js = "update_material_replacment('#{original_string}', #{json});"
+      dlg.execute_script js
+    end
+
+    # Component replacement.
+    #...
+
+    # Corners
+    #...
+
+    # Gables
+    #...
+
+    # Solids
+    dlg.add_action_callback("perform_solids") do |_, perform_solids|
+      @perform_solid_operations = perform_solids == "true"
+    end
+
+    # Misc (UI stuff)
+
+    # Open information website.
+    dlg.add_action_callback("openUrl") do
+    p @template.source_url
+      UI.openURL @template.source_url
+    end
+
+    # Open material browser.
+    dlg.add_action_callback("browse_materials") do
+      UI.show_inspector "Materials"
+    end
+
+    # Set dialog position
+    dlg.add_action_callback("set_position") do |_, callbacks|
+      left, top = callbacks.split(",")
+      dlg.set_position left.to_i, top.to_i
+    end
+
+    # Update style rule for hovered "apply material" button so thumbnail shows
+    # the currently active material.
+    # Runs when mouse enters document.
+    dlg.add_action_callback("update_style_rule") do
+    
+      mat_string = EneBuildings.material_to_css model.materials.current
+      js = "var selector = '#material_list button:hover div';"
+      js << "var property = 'background';"
+      js << "var value = \"#{mat_string} !important\";"
+      js << "var stylesheet = document.styleSheets[1];"#0th stylesheet is linked, 1st is the embedded.
+      js << "var rule_string = selector+'{'+property+':'+value+';}';"
+      js << "var rule_index = stylesheet.cssRules.length;"
+      js << "stylesheet.insertRule(rule_string, rule_index);"
+      dlg.execute_script js
+
+    end
+
+    dlg
+
+  end
+
+  # Public: Saves the instance variables of the building object as attributes to
+  # Group so they ca be retrieved when object is later re-initialized.
+  # Called from draw.
+  #
+  # Returns nothing.
+  def save_attributes
+
+    # Add all class instance variables as group attributes.
+    instance_variables.each do |key|
+      next if key == :@group # Do not save group reference.
+      value = instance_variable_get(key)
+      key = key.to_s  # Make string of symbol
+      key[0] = ""     # Remove @ sign from key
+      @group.set_attribute ATTR_DICT, key, value
+    end
+
+    # Override template object reference with string.
+    @group.set_attribute ATTR_DICT, "template", @template ? @template.id : nil
+
+    # Override material replacements wit string identifiers.
+    array = @material_replacement.map { |e| e.map{ |m| m.name } }
+    @group.set_attribute ATTR_DICT, "material_replacement", array
+
+    nil
+
+  end
+
+  
+  
+  # Internal: Methods for doing a specific part in building drawing.
+  
   # Public: Performs the basic Building drawing.
   #
   # This method draws building template to path but does not customize building.
@@ -716,451 +1167,6 @@ class Building
 
   end
 
-  # Public: Tells if any solid operations can be performed on Building (based on
-  # template).
-  #
-  # Called when opening properties dialog to enable or disable the setting for
-  # performing solid operations.
-  #
-  # Returns true or false.
-  def has_solids?
-
-    @template.has_solids?
-
-  end
-
-  # Public: list replaceable groups/components (based on how building is drawn).
-  # Groups and components in the building segments can have attributes telling
-  # they can be optionally replaced by other groups/components, for instance a
-  # door replacing a window.
-  #
-  # Called when opening properties dialog to allow user to set what to replace
-  # with what.
-  #
-  # Returns array# TODO: COMPONENT REPLACEMENT: what does array contain?
-  def list_replaceable_components
-
-    # TODO: COMPONENT REPLACEMENT: get data from template and from var stored on last draw_basic.
-    # Return array like:
-    # [
-    #   {
-    #     :name => String, used to identify original component #(from template)
-    #     :replacement => [             #(from template)
-    #       {
-    #         :name => String, used to identify group/component.
-    #         :slots => Fixnum, how many slot this replacement requires (from template)
-    #       }
-    #     ]
-    #     :slots/available_slots = [    #(from last draw_basic)
-    #       Fixnum, slots (number of original component) in first segment
-    #       Fixnum, slots (number of original component) in second segment...
-    #   }...
-    # ]
-
-  end
-
-  # Public: List replaceable materials (based o template).
-  # Materials directly in segment groups are listed. Materials in nested groups
-  # are also listed if the group has an attribute specifically saying so.
-  #
-  # Called when opening properties dialog to allow user to set what materials
-  # to replace with what other materials.
-  #
-  # Returns array of Material objects.
-  def list_replaceable_materials
-
-    @template.list_replaceable_materials
-
-  end
-
-  # Public: [Re-]Load class instance variables from group attributes.
-  # Unknown (not installed) template will be nil.
-  #
-  # Returns nothing.
-  def load_attributes
-
-      # Loop group attributes and save as object attribute.
-      @group.attribute_dictionary(ATTR_DICT).each_pair do |key, value|
-        instance_variable_set("@" + key.to_s, value)
-      end
-      
-      # Set back_along_path to false if not already set for backward
-      # compatibility. The value nil is reserved to let PathHandling handle
-      # paths where back_along_path doesn't make any sense, e.g. plots instead
-      # of individual buildings.
-      @back_along_path ||= false
-
-      # Override template id string with reference to actual object.
-      #nil if not found.
-      @template = Template.get_from_id @template
-
-      # Override material replacement string identifiers with actual material
-      # references.
-      model_materials = @group.model.materials
-      @material_replacement = (@material_replacement || []).map do |p|
-        p.map{ |name| model_materials[name] }
-      end
-      # Delete replacement pair if replacer is nil. Replacer material becomes
-      # nil if it has been deleted from model.
-      @material_replacement.delete_if { |p| !p[1] }
-
-  end
-
-  # Public: Check if template isn't missing.
-  # If template is missing a the template select panel opens up to let user 
-  # pick another template to use instead for this building.
-  #
-  # Yields if template was missing but user chose to pick a new one instead.
-  #
-  # Examples
-  #
-  #   def my_method(building)
-  #     # If there is no valid_template, call same method again after once
-  #     # user has selected a new template.
-  #     return unless building.valid_template? { my_method(building) }
-  #     # Do stuff with building here.
-  #     p building.template
-  #   end
-  #
-  # Returns true if template can be found and nil if it's missing.
-  def valid_template?(&block)
-
-    return true if @template
-    return false unless block
-
-    missing = @group.get_attribute ATTR_DICT, "template", "nil"
-    msg =
-      "The template '#{missing}' used on this building could not be found.\n"\
-      "Perhaps building was drawn on a computer with more templates installed.\n\n"\
-      "Choose new template?"
-    return false if UI.messagebox(msg, MB_OKCANCEL) == IDCANCEL
-
-    Template.select_panel("Replace missing template") do |t|
-      next unless t
-      @template = t
-      block.call
-    end
-
-    false
-
-  end
-
-  # Public: Open web dialog and let user set Building properties.
-  # Template, material replacement and component replacement among others can be
-  # set.
-  #
-  # When changing values in the form the Building object attributes are directly
-  # changed. These changes are not saved to the Group if user cancels but still
-  # exist in the Building object.
-  #
-  # Do not use the same Building object at a later point, instead initialize a
-  # new from the group as this:
-  #   b = Building.new b.group
-  #
-  # REVIEW: Do not instantly change Building object. Change it once user saves.
-  #
-  # Returns WebDialog object.
-  def properties_panel
-
-    # Only allow one properties dialog for each building at a time.
-    # References to opened properties dialogs are saved as a hash indexed by the
-    # guid of the group.
-    @@opened_dialogs ||= {}
-    dlg = @@opened_dialogs[@group.guid]
-    if dlg
-      dlg.bring_to_front
-      return dlg
-    end
-
-    # Check if template is known.
-    # Model could be created on a computer that has more templates installed.
-    return unless valid_template? { properties_panel }
-
-    # Create dialog.
-    dlg = UI::WebDialog.new("Building Properties", false, "#{ID}_building_properties_panel", 610, 450, 100, 100, true)
-    dlg.min_width = 440
-    dlg.min_height = 300
-    dlg.navigation_buttons_enabled = false
-    dlg.set_file(File.join(PLUGIN_DIR, "dialogs", "building_properties_panel.html"))
-    @@opened_dialogs[@group.guid] = dlg
-
-    # Material and component replacement cannot run twice without redrawing the
-    # original building from template in between to have the original content to
-    # replace. This flag tells if the building group is "pure" (drawn by draw_basic
-    # but no other draw methods). Assume this is false and set it to true when
-    # changing template, thus redrawing the basics.
-    pure = false
-
-    # Reference to template dialog.
-    # Used to make sure just one is opened from this properties dialog and to
-    # close when this dialog closes.
-    dlg_template = nil
-
-    # Add data.
-    add_data = lambda do
-
-      js ="var preview_dir = '#{Template::PREVIEW_DIR}';"
-
-      # If more dialogs are opened, offset this one to avoid it being on top of others
-      js << "offset_window(10);" if @@opened_dialogs.size > 1
-
-      # Template info.
-      js << "var template_info=#{@template.json_data};"
-      js << "update_template_section();";
-
-      # Material replacement options (based on template component) and current
-      # preferences (saved to building).
-      material_pairs = list_replaceable_materials.map do |original|
-        pair = @material_replacement.find { |e| e[0] == original}
-        replacement = pair[1] if pair
-        a = [
-          {# Original to replace.
-            :name => original.display_name,
-            :id => original.name,
-            :css_string => EneBuildings.material_to_css(original),
-            :textured => !original.texture.nil?
-          }
-        ]
-        a << {# Replace preference (if any is set).
-          :name => replacement.display_name,
-          :id => replacement.name,
-          :css_string => EneBuildings.material_to_css(replacement),
-          :textured => !replacement.texture.nil?
-        } if replacement
-        a
-      end
-      js << "var material_pairs=#{JSON.generate(material_pairs)};"
-      js << "update_material_section();";
-
-      # Component replacement...
-
-      # <Hörntorn>...
-
-      # Solids.
-      js << "var has_solids = #{has_solids?};"
-      js << "var perform_solids = #{@perform_solid_operations};"
-      js << "update_solids_section();";
-
-      dlg.execute_script js
-
-    end
-
-    # Show dialog.
-    if Sketchup.platform == :platform_win
-      dlg.show { add_data.call }
-    else
-      dlg.show_modal { dadd_data.call }
-    end
-
-    # Start operator.
-    # This operator is committed when pressing OK or Apply and aborted when
-    # pressing cancel.
-    op_name = "Building Properties"
-    @group.model.start_operation op_name, true
-    
-    # HACK: Make a temporary group to apply materials to to load them into
-    # model.
-    temp_material_group = @group.model.entities.add_group
-    temp_material_group.visible = false
-    temp_material_group.entities.add_cpoint ORIGIN
-
-    # Closing dialog.
-    # Cancels (Abort operation) unless called from "apply" callback.
-    set_on_close_called_from_apply = false
-    dlg.set_on_close do
-      unless set_on_close_called_from_apply
-        temp_material_group.erase!
-        @group.model.abort_operation
-      end
-
-      # Close template selector if opened.
-      dlg_template.close if dlg_template && dlg_template.visible?
-
-      @@opened_dialogs.delete @group.guid
-    end
-
-    # Dialog buttons.
-    
-    model = @group.model
-
-    # Clicking OK or apply.
-    dlg.add_action_callback("apply") do |_, close|
-      close = close == "close"
-
-      # Call all draw methods.
-      # Draw basic is included if group isn't "pure" (if it has been customized
-      # since last draw_basic).
-      draw nil, pure
-      pure = false
-
-      temp_material_group.erase!
-      model.commit_operation
-
-      if close
-        set_on_close_called_from_apply = true
-        dlg.close
-      else
-        model.start_operation op_name, true
-      end
-    end
-
-    # Clicking cancel.
-    dlg.add_action_callback("cancel") do
-      dlg.close
-    end
-
-    # Changing values.
-
-    # Open building template selector.
-    dlg.add_action_callback("browse_template") do
-      if dlg_template && dlg_template.visible?
-        dlg_template.bring_to_front
-      else
-        dlg_template = Template.select_panel("Change Template", @template) do |t|
-          next unless t
-          next if t == @template
-          @template = t
-          # Redraw with new template so information about component placement can
-          # be gathered.
-          draw_basic
-          pure = true
-
-          # Update form.
-          add_data.call
-          dlg.bring_to_front
-        end
-      end
-    end
-
-    # Material replacement.
-    dlg.add_action_callback("replace_material") do |_, original_string|
-      original = model.materials[original_string]
-      next unless original
-      active_m = model.materials.current
-
-      # Make sure active_m is added to model.
-      temp_face = temp_material_group.entities.add_face(
-        Geom::Point3d.new(rand, rand, rand),
-        Geom::Point3d.new(rand, rand, rand),
-        Geom::Point3d.new(rand, rand, rand)
-      )
-      temp_face.material = active_m
-      active_m = temp_face.material
-
-      # Save preference
-      pair = @material_replacement.find { |e| e[0] == original}
-      if pair
-        # override replacement or remove if active material is nil.
-          if active_m
-            pair[1] = active_m
-          else
-            @material_replacement.delete pair
-          end
-      elsif active_m
-        # Create replacement unless active material is nil.
-        @material_replacement << [original, active_m]
-      end
-
-      # Update preview.
-      json =
-        if active_m
-          JSON.generate({
-            :name => active_m.display_name,
-            :id => active_m.name,
-            :css_string => EneBuildings.material_to_css(active_m),
-            :textured => !active_m.texture.nil?
-          })
-        else
-         "null"
-        end
-      # js = "update_material_section();"# Recreating whole list moves focus.
-      js = "update_material_replacment('#{original_string}', #{json});"
-      dlg.execute_script js
-    end
-
-    # Component replacement.
-    #...
-
-    # Corners
-    #...
-
-    # Gables
-    #...
-
-    # Solids
-    dlg.add_action_callback("perform_solids") do |_, perform_solids|
-      @perform_solid_operations = perform_solids == "true"
-    end
-
-    # Misc (UI stuff)
-
-    # Open information website.
-    dlg.add_action_callback("openUrl") do
-    p @template.source_url
-      UI.openURL @template.source_url
-    end
-
-    # Open material browser.
-    dlg.add_action_callback("browse_materials") do
-      UI.show_inspector "Materials"
-    end
-
-    # Set dialog position
-    dlg.add_action_callback("set_position") do |_, callbacks|
-      left, top = callbacks.split(",")
-      dlg.set_position left.to_i, top.to_i
-    end
-
-    # Update style rule for hovered "apply material" button so thumbnail shows
-    # the currently active material.
-    # Runs when mouse enters document.
-    dlg.add_action_callback("update_style_rule") do
-    
-      mat_string = EneBuildings.material_to_css model.materials.current
-      js = "var selector = '#material_list button:hover div';"
-      js << "var property = 'background';"
-      js << "var value = \"#{mat_string} !important\";"
-      js << "var stylesheet = document.styleSheets[1];"#0th stylesheet is linked, 1st is the embedded.
-      js << "var rule_string = selector+'{'+property+':'+value+';}';"
-      js << "var rule_index = stylesheet.cssRules.length;"
-      js << "stylesheet.insertRule(rule_string, rule_index);"
-      dlg.execute_script js
-
-    end
-
-    dlg
-
-  end
-
-  # Public: Saves the instance variables of the building object as attributes to
-  # Group so they ca be retrieved when object is later re-initialized.
-  # Called from draw.
-  #
-  # Returns nothing.
-  def save_attributes
-
-    # Add all class instance variables as group attributes.
-    instance_variables.each do |key|
-      next if key == :@group # Do not save group reference.
-      value = instance_variable_get(key)
-      key = key.to_s  # Make string of symbol
-      key[0] = ""     # Remove @ sign from key
-      @group.set_attribute ATTR_DICT, key, value
-    end
-
-    # Override template object reference with string.
-    @group.set_attribute ATTR_DICT, "template", @template ? @template.id : nil
-
-    # Override material replacements wit string identifiers.
-    array = @material_replacement.map { |e| e.map{ |m| m.name } }
-    @group.set_attribute ATTR_DICT, "material_replacement", array
-
-    nil
-
-  end
-
-  # TODO: COMPONENT REPLACEMENT: make method that sets component replacements either randomly or from template preset. can be called from add building tool. do the same with materials.
-  
 end
 
 end
