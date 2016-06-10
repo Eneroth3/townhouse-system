@@ -598,9 +598,13 @@ class Building
     i = 0
     segment_groups.each do |segment_group|
     
+      
+      # Copy naked edges on cutting parts into parent drawing context and keep
+      # reference to new edges.
+      # Also keep references to the end points of each edge, in normalized
+      # order, to later determine which faces are inside the cutting edges.
       cutting_edges = []
       cutting_edge_points = []
-    
       ops.each do |s|
         part, operation, part_segment_group = s
         next unless part_segment_group == segment_group
@@ -625,8 +629,8 @@ class Building
         
       end
       
-      # HACK: Run intersect to split edges where they cross and add inner loops
-      # to faces. Would be much much very much faster if the geometry merger
+      # HACK: Run intersect to split edges where they cross and punch holes in
+      # faces. Would be much much very much faster if the geometry merger
       # that runs after each tool operation in SU could be called directly.
       #
       # Also use attributes for referencing cutting edges since attributes
@@ -667,8 +671,11 @@ class Building
         cutting_edges.uniq!
       end
      
+      # Loop cutting edges an look for bounded faces that are "inside" the
+      # cutting edge.
       cut_away_faces = []
       cutting_edges.each do |e|
+      
         # Edge can be marked as deleted if merged with another edge.
         next unless e.valid?
         
@@ -676,7 +683,9 @@ class Building
         matches_as_non_reversed = cutting_edge_points.include?(edge_points)
         matches_as_reversed = cutting_edge_points.include?(edge_points.reverse)
         
-        # Id edge has been split it doesn't match any pair of points.
+        # If edge has been split it doesn't match any pair of points and no
+        # face can be found from it. If any of the edges of a loop is intact
+        # all faces inside will be found later on.
         next unless matches_as_non_reversed || matches_as_reversed
         next if matches_as_non_reversed && matches_as_reversed
         
@@ -686,10 +695,13 @@ class Building
         end
       end
       
-     # REVIEW: If cutting edges doesn't form closed loops on the existing
-     # mesh the whole mesh gets cut away. Also happens if any face is faulty
-     # oriented along loop. Loop should be validated and face crawler thing
-     # must be more stable.
+      # REVIEW: If cutting edges doesn't form closed loops on the existing
+      # mesh the whole mesh gets cut away. Also happens if any face is faulty
+      # oriented along loop. Loop should be validated and face crawler thing
+      # must be more stable.
+      
+      # Traverse faces by shared binding edge that isn't a cut edge to find
+      # all faces inside a loop and hide them.
       cut_away_faces = EneBuildings.connected_faces cut_away_faces, cutting_edges
 
       cut_away_edges = cut_away_faces.map { |f| f.edges }.flatten.uniq
