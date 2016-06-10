@@ -188,7 +188,7 @@ class Building
     # (and possible replace material) only should be called, unless there are
     # solid operations. If there are solid operations redraw all. Hmmm
 
-    draw_basic
+    draw_volume
     ### draw_parts
     draw_solids write_status
     draw_replace_materials
@@ -208,36 +208,6 @@ class Building
   def has_solids?
 
     @template.has_solids?
-
-  end
-
-  # Public: list replaceable groups/components (based on how building is drawn).
-  # Groups and components in the building segments can have attributes telling
-  # they can be optionally replaced by other groups/components, for instance a
-  # door replacing a window.
-  #
-  # Called when opening properties dialog to allow user to set what to replace
-  # with what.
-  #
-  # Returns array# TODO: COMPONENT REPLACEMENT: what does array contain?
-  def list_replaceable_components
-
-    # TODO: COMPONENT REPLACEMENT: get data from template and from var stored on last draw_basic.
-    # Return array like:
-    # [
-    #   {
-    #     :name => String, used to identify original component #(from template)
-    #     :replacement => [             #(from template)
-    #       {
-    #         :name => String, used to identify group/component.
-    #         :slots => Fixnum, how many slot this replacement requires (from template)
-    #       }
-    #     ]
-    #     :slots/available_slots = [    #(from last draw_basic)
-    #       Fixnum, slots (number of original component) in first segment
-    #       Fixnum, slots (number of original component) in second segment...
-    #   }...
-    # ]
 
   end
 
@@ -642,9 +612,181 @@ class Building
 
   
   
+
+  # Public: List data for parts (nested Groups and ComponentInstances) (based on
+  # current @path and Template).
+  # This will be used to create part replacement field in Properties dialog.
+  #
+  # Return Array of Hash objects corresponding to each part.
+  # Hash has reference to original_instance and transformations.
+  # Transformations is an Array with one element for each segment in building.
+  # Each element is an Array of Transformation objects.
+  def list_parts
+
+    # Prepare path.
+  
+    # RVIWEW: Make Path class and move some of this stuff there instead of
+    # just having same code copied here from draw_basic.
+    
+    # Transform path to local building coordinates.
+    trans_inverse = @group.transformation.inverse
+    path = @path.map { |p| p.transform trans_inverse }
+
+    # Get tangent for each point in path.
+    # Tangents point in the positive direction of path.
+    tangents = []
+    tangents << path[1] - path[0]
+    if path.size > 2
+      (1..path.size - 2).each do |corner|
+        p_prev = path[corner - 1]
+        p_here = path[corner]
+        p_next = path[corner + 1]
+        v_prev = p_here - p_prev
+        v_next = p_next - p_here
+        tangents << Geom.linear_combination(0.5, v_prev, 0.5, v_next)
+      end
+    end
+    tangents << path[-1] - path[-2]
+
+    # Rotate first and last tangent according to @end_angles.
+    tangents.first.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.first
+    tangents.last.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.last
+    
+    # If building should be drawn with it back along the path instead of its
+    # front, reverse the path and tangents.
+    # The terms left and right relates to the building front side.
+    if @back_along_path
+      path.reverse!
+      tangents.reverse!
+      tangents.each { |t| t.reverse! }
+    end
+    
+    # Collect parts data.
+    
+    parts_data = []
+    
+    # Loop parts in Template's ComponentDefinition.
+    @template.component_def.entities.each do |e|
+      next unless [Sketchup::Group, Sketchup::ComponentInstance].include? e.class
+      next unless ad = e.attribute_dictionary(Template::ATTR_DICT_PART)
+      
+      part_data = {
+        :original_instance => e,
+        :defintion => e.definition,
+        :transformations => []
+      }
+      parts_data << part_data
+
+      origin      = e.transformation.origin# TODO: take building depth into account here somehow if back should be on path? Compare with old draw_basic code.
+      line_origin = [origin, X_AXIS]
+      t_array     = e.transformation.to_a
+      
+      # Loop path segments.
+      (0..path.size - 2).each do |segment_index|
+      
+        transformations = []
+        part_data[:transformations] << transformations
+      
+        # Values in main building @group's coordinates.
+        corner_left    = path[segment_index]
+        corner_right   = path[segment_index + 1]
+        segment_vector = corner_right - corner_left
+        segment_length = segment_vector.length
+        tangent_left   = tangents[segment_index]
+        tangent_right  = tangents[segment_index + 1]
+        segment_trans  = Geom::Transformation.axes(
+          corner_left,
+          segment_vector,
+          Z_AXIS * segment_vector,
+          Z_AXIS
+        )
+        
+        # Values in local segment group's coordinates.
+        plane_left       = [ORIGIN, tangent_left.reverse.transform(segment_trans.inverse)]
+        plane_right      = [[segment_length, 0, 0], tangent_right.transform(segment_trans.inverse)]
+        origin_leftmost  = Geom.intersect_line_plane line_origin, plane_left
+        origin_rightmost = Geom.intersect_line_plane line_origin, plane_right
+        
+        # Create Transformation objects from current Transformation, path
+        # segment and attribute data.
+        if ad["align"]
+          # Align one instance
+          # Either "left", "right", "center" or percentage (float between 0 and
+          # 1).
+          
+          new_origin =
+            if ad["align"] == "left"
+              origin_leftmost
+            elsif ad["align"] == "right"
+             origin_rightmost
+            elsif ad["align"] == "center"
+              Geom.linear_combination 0.5, origin_leftmost, 0.5, origin_rightmost
+            elsif ad["align"].is_a? Float
+              Geom.linear_combination(1-ad["align"], origin_leftmost, ad["align"], origin_rightmost)
+            end
+          t_array[12] = new_origin.x
+          transformations << Geom::Transformation.new(t_array)
+
+        elsif ad["spread"]
+          # Spread multiple groups/components.
+          # Either Fixnum telling number of copies or float/length telling
+          # approximate distance between (in inches). This distance will adapt
+          # to fit available space.
+          
+          available_distance = origin_leftmost.distance origin_rightmost
+          margin_l = ad["margin_left"] || ad["margin"] || 0
+          margin_r = ad["margin_right"] || ad["margin"] || 0
+          available_distance -= (margin_l + margin_r)
+          if ad["spread"].is_a?(Fixnum)
+            total_number = ad["spread"]
+            raise "If 'spread' is a Fuxnum it must be zero or more." if total_number < 0
+          else
+            total_number = available_distance/ad["spread"]
+            raise "If 'spread' is a Length it must bigger than zero." unless ad["spread"] > 0
+            # Round total_number to closets Int or force to odd/even.
+            #(If rounding is set to anything else than "force_odd" it's used as "force_even".)
+            total_number =
+              if ad["rounding"]
+                fraction = total_number%2
+                (ad["rounding"] == "force_odd") && fraction > 1 ? total_number.floor : total_number.ceil
+              else
+                total_number.round
+              end
+          end
+          distance_between = available_distance/total_number
+          # Each copy has its origin at x = margin_l + (n + 0.5)*distance_between
+          e_def = e.definition
+          (0..total_number-1).each do |n|
+            x = origin_leftmost.x + margin_l + (n + 0.5) * distance_between
+            t_array[12] = x
+            trans = Geom::Transformation.new t_array
+            # Don't place anything with its bounding box outside the segment if
+            # not specifically told to do so.
+            unless ad["override_cut_planes"]
+              corners = MyGeom.bb_corners(e_def.bounds)
+              corners.each { |c| c.transform! trans }
+              next if corners.any? { |c| MyGeom.front_of_plane?(plane_left, c) || MyGeom.front_of_plane?(plane_right, c) }
+            end
+            transformations << trans
+          end
+          
+        end
+
+      end
+    
+    end
+    
+    parts_data
+    
+  end
+  
+  
+  
+  
   
   
   # Internal: Methods for doing a specific part in building drawing.
+  # TODO: rewrite documentation for these and write clearly what they require from @group and in what order they can be called.
   
   # Public: Performs the basic Building drawing.
   #
@@ -656,7 +798,7 @@ class Building
   #                not yet drawn (default: current).
   #
   # Returns nothing.
-  def draw_basic(entities = nil)
+  def draw_volume(entities = nil)#TODO: don't add parts here.
 
     entities ||= Sketchup.active_model.active_entities
 
@@ -718,6 +860,8 @@ class Building
       # pointing towards right one (seen from front).
       # building side following path (usually front) lies on Y axis.
       segment_trans  = Geom::Transformation.axes corner_l, s_vector, Z_AXIS * s_vector, Z_AXIS
+      plane_l = [ORIGIN, tangent_l.reverse.transform(segment_trans.inverse)]
+      plane_r = [[s_width, 0, 0], tangent_r.transform(segment_trans.inverse)]
       segment_group  = ents.add_group
       segment_group.transformation = segment_trans
       segment_ents   = segment_group.entities
@@ -728,19 +872,14 @@ class Building
       end
       component_inst = segment_ents.add_instance @template.component_def, component_trans
       component_inst.explode
-      segment_ents_raw = segment_ents.select { |e| [Sketchup::Edge, Sketchup::Face].include? e.class }
                   
       # Allow material replacement in segment group.
       segment_group.set_attribute Template::ATTR_DICT_PART, "replace_nested_mateials", true
 
-      # Segment end planes, local segment coordinates.
-      plane_l = [ORIGIN, tangent_l.reverse.transform(segment_trans.inverse)]
-      plane_r = [[s_width, 0, 0], tangent_r.transform(segment_trans.inverse)]
-
       # Left and right wall faces.
       faces_l = segment_ents.select { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?([-1,0,0]) }
       faces_r = segment_ents.select { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?([1,0,0]) }
-      unless faces_l.size == 1 && faces_r.size == 1# TODO: Make separate validation method.
+      unless faces_l.size == 1 && faces_r.size == 1# TODO: Use separate validation method.
         msg =
           "Invalid building volume. Template root must contain exactly 2 "\
           "gable faces, one with its normal along positive X and one with its "\
@@ -763,14 +902,23 @@ class Building
       # Remove replacement component/groups, corners, gables etc from this group.
       # (corners and gables are added later and are not a part of each segment.)
       # TODO: COMPONENT REPLACEMENT: Remove these entities.
+      
+      # Hack: Unglue all glued components so they don't get randomly moved
+      # around, e.g. turned upside down, when the face they are glued to is
+      # stretched.
+      segment_ents.to_a.each do |c|
+        next unless c.respond_to? :glued_to
+        c.glued_to = nil
+      end
 
       # Adapt building volume to fill this segment.
       # The building template model can have any width.
       # Side walls are moved and sheared to fit.
       x_l = face_l.vertices.first.position.x
       x_r = face_r.vertices.first.position.x
-      ents_l = segment_ents_raw.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_l } }
-      ents_r = segment_ents_raw.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_r } }
+      segment_edges = segment_ents.select { |e| e.is_a? Sketchup::Edge }
+      ents_l = segment_edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_l } }
+      ents_r = segment_edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_r } }
       
       trans_a = Geom::Transformation.new.to_a
 
@@ -897,23 +1045,8 @@ class Building
       end
 
     end# Main volume (each segment)
-
-    # TODO: Place corner and gable parts here.
     
     nil
-
-  end
-
-  # Public: Replaces groups/components in Building Group according to
-  # @componet_replacement.
-  #
-  # After this method was last run draw_basic must be called to
-  # reset original components to replace.
-  #
-  # Returns nothing.
-  def draw_replace_components
-
-    #...copy all attributes from replacement, e.g. solid operations.
 
   end
 
@@ -955,6 +1088,8 @@ class Building
 
   end
 
+  # draw_parts...
+  
   # Public: Perform solid operations on Building if @perform_solid_operations is
   # true.
   #
