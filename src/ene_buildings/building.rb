@@ -355,6 +355,8 @@ class Building
     # The building Group is redrawn and instance variables saved as attributes
     # once the user clicks OK ar Apply.
 
+    model = @group ? @group.model : Sketchup.active_model
+    
     # Only allow one properties dialog for each building at a time.
     # References to opened properties dialogs are saved as a hash indexed by the
     # guid of the group.
@@ -370,26 +372,29 @@ class Building
     return unless valid_template? { properties_panel }
 
     # Create dialog.
-    dlg = UI::WebDialog.new("Building Properties", false, "#{ID}_building_properties_panel", 610, 450, 100, 100, true)
-    dlg.min_width = 440
+    dlg = UI::WebDialog.new(
+      "Building Properties",
+      false,
+      "#{ID}_building_properties_panel",
+      610,
+      450,
+      100,
+      100,
+      true
+    )
+    dlg.min_width  = 440
     dlg.min_height = 300
     dlg.navigation_buttons_enabled = false
     dlg.set_file(File.join(PLUGIN_DIR, "dialogs", "building_properties_panel.html"))
     @@opened_dialogs[@group.guid] = dlg
-
-    # Material and component replacement cannot run twice without redrawing the
-    # original building from template in between to have the original content to
-    # replace. This flag tells if the building group is "pure" (drawn by draw_basic
-    # but no other draw methods). Assume this is false and set it to true when
-    # changing template, thus redrawing the basics.
-    pure = false
 
     # Reference to template dialog.
     # Used to make sure just one is opened from this properties dialog and to
     # close when this dialog closes.
     dlg_template = nil
 
-    # Add data.
+    # Adds data to form. Called when dialog is shown and when template has been
+    # changed.
     add_data = lambda do
 
       js ="var preview_dir = '#{Template::PREVIEW_DIR}';"
@@ -425,9 +430,11 @@ class Building
       js << "var material_pairs=#{JSON.generate(material_pairs)};"
       js << "update_material_section();";
 
-      # Component replacement...
+      # Part replacement...
 
-      # <Hörntorn>...
+      # Corners...
+      
+      # Gables...
 
       # Solids.
       js << "var has_solids = #{has_solids?};"
@@ -442,18 +449,18 @@ class Building
     if Sketchup.platform == :platform_win
       dlg.show { add_data.call }
     else
-      dlg.show_modal { dadd_data.call }
+      dlg.show_modal { add_data.call }
     end
 
     # Start operator.
     # This operator is committed when pressing OK or Apply and aborted when
     # pressing cancel.
     op_name = "Building Properties"
-    @group.model.start_operation op_name, true
+    model.start_operation op_name, true
     
     # HACK: Make a temporary group to apply materials to to load them into
     # model.
-    temp_material_group = @group.model.entities.add_group
+    temp_material_group = model.entities.add_group
     temp_material_group.visible = false
     temp_material_group.entities.add_cpoint ORIGIN
 
@@ -463,7 +470,7 @@ class Building
     dlg.set_on_close do
       unless set_on_close_called_from_apply
         temp_material_group.erase!
-        @group.model.abort_operation
+        model.abort_operation
       end
 
       # Close template selector if opened.
@@ -471,20 +478,13 @@ class Building
 
       @@opened_dialogs.delete @group.guid
     end
-
-    # Dialog buttons.
     
-    model = @group.model
-
-    # Clicking OK or apply.
+    # Clicking OK or apply buttons.
     dlg.add_action_callback("apply") do |_, close|
       close = close == "close"
 
       # Call all draw methods.
-      # Draw basic is included if group isn't "pure" (if it has been customized
-      # since last draw_basic).
-      draw nil, pure
-      pure = false
+      draw
 
       temp_material_group.erase!
       model.commit_operation
@@ -497,14 +497,13 @@ class Building
       end
     end
 
-    # Clicking cancel.
+    # Clicking cancel button.
     dlg.add_action_callback("cancel") do
       dlg.close
     end
 
-    # Changing values.
-
-    # Open building template selector.
+    # Clicking on browse template button.
+    # Open building template selector or bring to front if already opened.
     dlg.add_action_callback("browse_template") do
       if dlg_template && dlg_template.visible?
         dlg_template.bring_to_front
@@ -513,10 +512,6 @@ class Building
           next unless t
           next if t == @template
           @template = t
-          # Redraw with new template so information about component placement can
-          # be gathered.
-          draw_basic
-          pure = true
 
           # Update form.
           add_data.call
@@ -525,7 +520,7 @@ class Building
       end
     end
 
-    # Material replacement.
+    # Clicking material replacement button.
     dlg.add_action_callback("replace_material") do |_, original_string|
       original = model.materials[original_string]
       next unless original
@@ -540,7 +535,7 @@ class Building
       temp_face.material = active_m
       active_m = temp_face.material
 
-      # Save preference
+      # Save setting.
       pair = @material_replacement.find { |e| e[0] == original}
       if pair
         # override replacement or remove if active material is nil.
@@ -580,7 +575,7 @@ class Building
     # Gables
     #...
 
-    # Solids
+    # Toggling  solid operations checkbox.
     dlg.add_action_callback("perform_solids") do |_, perform_solids|
       @perform_solid_operations = perform_solids == "true"
     end
