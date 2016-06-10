@@ -844,27 +844,34 @@ class Building
       tangents.each { |t| t.reverse! }
     end
     
-    # Main Volume(s).
-    # Volume is placed and fitted to each segment in path.
+    # Loop path segments.
     (0..path.size - 2).each do |segment_index|
 
-      # Some variables in building coordinates.
-      corner_l = path[segment_index]
-      corner_r = path[segment_index + 1]
-      s_vector = corner_r - corner_l
-      s_width = s_vector.length
-      tangent_l = tangents[segment_index]
-      tangent_r = tangents[segment_index + 1]
+      # Values in main building @group's coordinates.
+      corner_left    = path[segment_index]
+      corner_right   = path[segment_index + 1]
+      segment_vector = corner_right - corner_left
+      segment_length = segment_vector.length
+      tangent_left   = tangents[segment_index]
+      tangent_right  = tangents[segment_index + 1]
+      segment_trans  = Geom::Transformation.axes(
+        corner_left,
+        segment_vector,
+        Z_AXIS * segment_vector,
+        Z_AXIS
+      )
+      
+      # Values in local segment group's coordinates.
+      plane_left       = [ORIGIN, tangent_left.reverse.transform(segment_trans.inverse)]
+      plane_right      = [[segment_length, 0, 0], tangent_right.transform(segment_trans.inverse)]
 
-      # Place building component (as group) with origin on left corner and X axis
-      # pointing towards right one (seen from front).
-      # building side following path (usually front) lies on Y axis.
-      segment_trans  = Geom::Transformation.axes corner_l, s_vector, Z_AXIS * s_vector, Z_AXIS
-      plane_l = [ORIGIN, tangent_l.reverse.transform(segment_trans.inverse)]
-      plane_r = [[s_width, 0, 0], tangent_r.transform(segment_trans.inverse)]
-      segment_group  = ents.add_group
+      # Place template component in segment and explode it so it can be edited
+      # without interfering with template.
+      # Shift position along Y axis if the back of the building is what follows
+      # the given path and not the front.
+      segment_group                = ents.add_group
       segment_group.transformation = segment_trans
-      segment_ents   = segment_group.entities
+      segment_ents                 = segment_group.entities
       component_trans = if @back_along_path
         Geom::Transformation.new [0, -(@template.depth || Template::FALLBACK_DEPTH), 0]
       else
@@ -872,69 +879,63 @@ class Building
       end
       component_inst = segment_ents.add_instance @template.component_def, component_trans
       component_inst.explode
-                  
+      
+      # Remove all Groups and ComponentInstances from segment.
+      # This method only draws the volume and another methods add the details.
+      instances = segment_ents.select { |e| [Sketchup::Group, Sketchup::ComponentInstance].include? e.class }
+      segment_ents.erase_entities instances
+
       # Allow material replacement in segment group.
       segment_group.set_attribute Template::ATTR_DICT_PART, "replace_nested_mateials", true
 
-      # Left and right wall faces.
-      faces_l = segment_ents.select { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?([-1,0,0]) }
-      faces_r = segment_ents.select { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?([1,0,0]) }
-      unless faces_l.size == 1 && faces_r.size == 1# TODO: Use separate validation method.
+      # Find faces at segment ends.
+      faces_left  = segment_ents.select { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?(X_AXIS.reverse) }
+      faces_right = segment_ents.select { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?(X_AXIS) }
+      unless faces_left.size == 1 && faces_right.size == 1
         msg =
           "Invalid building volume. Template root must contain exactly 2 "\
           "gable faces, one with its normal along positive X and one with its "\
           "normal along negative X."
         raise msg
       end
-      face_l = faces_l.first
-      face_r = faces_r.first
+      face_left = faces_left.first
+      face_right = faces_right.first
 
       # Hide walls between segments.
       unless segment_index == 0
-        face_l.hidden = true
-        face_l.edges.each { |e| e.hidden = true if e.line[1].perpendicular?(Z_AXIS) }
+        face_left.hidden = true
+        face_left.edges.each { |e| e.hidden = true if e.line[1].perpendicular?(Z_AXIS) }
       end
       unless segment_index == path.size - 2
-        face_r.hidden = true
-        face_r.edges.each { |e| e.hidden = true if e.line[1].perpendicular?(Z_AXIS) }
+        face_right.hidden = true
+        face_right.edges.each { |e| e.hidden = true if e.line[1].perpendicular?(Z_AXIS) }
       end
 
-      # Remove replacement component/groups, corners, gables etc from this group.
-      # (corners and gables are added later and are not a part of each segment.)
-      # TODO: COMPONENT REPLACEMENT: Remove these entities.
-      
-      # Hack: Unglue all glued components so they don't get randomly moved
-      # around, e.g. turned upside down, when the face they are glued to is
-      # stretched.
-      segment_ents.to_a.each do |c|
-        next unless c.respond_to? :glued_to
-        c.glued_to = nil
-      end
-
-      # Adapt building volume to fill this segment.
-      # The building template model can have any width.
-      # Side walls are moved and sheared to fit.
-      x_l = face_l.vertices.first.position.x
-      x_r = face_r.vertices.first.position.x
-      segment_edges = segment_ents.select { |e| e.is_a? Sketchup::Edge }
-      ents_l = segment_edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_l } }
-      ents_r = segment_edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_r } }
+      # Adapt building volume to fill this segment by moving and shearing side
+      # walls.
+      x_min       = face_left.vertices.first.position.x
+      x_max       = face_right.vertices.first.position.x
+      edges       = segment_ents.select { |e| e.is_a? Sketchup::Edge }
+      edges_left  = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_min } }# TODO: why not just use face_*.edges instead of this select code? Because Landshövdingehus äldre has a stupränna lying loose in it. Should that be allowed? It prevents solid operations from working. However it would be nice to have stuprännething in "Landshövdingehus" reveterat too that is also cut by certain parts.
+      edges_right = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_max } }
       
       trans_a = Geom::Transformation.new.to_a
 
-      trans_a_l = trans_a.dup
-      trans_a_l[12] = -x_l
-      trans_a_l[4] = -plane_l[1].y/plane_l[1].x# Y value of tangent in local coordinates is same as x for (horizontal) normal.
-      trans_l = Geom::Transformation.new trans_a_l
+      y_axis = plane_left[1]*Z_AXIS
+      y_axis.length = 1/Math.cos(y_axis.angle_between(Y_AXIS))
+      trans_left = MyGeom.transformation_axes [-x_min, 0, 0], X_AXIS, y_axis, Z_AXIS, true, true
+      y_axis = Z_AXIS*plane_right[1]
+      y_axis.length = 1/Math.cos(y_axis.angle_between(Y_AXIS))
+      trans_right = MyGeom.transformation_axes [segment_length - x_max, 0, 0], X_AXIS, y_axis, Z_AXIS, true, true
 
-      trans_a_r = trans_a.dup
-      trans_a_r[12] = -x_r + s_width
-      trans_a_r[4] = -plane_r[1].y/plane_r[1].x
-      trans_r = Geom::Transformation.new trans_a_r
+      segment_ents.transform_entities trans_left, edges_left
+      segment_ents.transform_entities trans_right, edges_right
 
-      segment_ents.transform_entities trans_l, ents_l
-      segment_ents.transform_entities trans_r, ents_r
-
+      
+      
+      # TODO: Move into separate draw_parts and make it rely on list_parts.
+      # remove from here...
+=begin
       # Copy and position nested groups/components (parts).
       # z and y position is kept, x is calculated from a formula in attributes.
       segment_ents.to_a.each do |e|
@@ -943,8 +944,8 @@ class Building
 
         origin = e.transformation.origin
         line = [origin, Geom::Vector3d.new(1, 0, 0)]
-        point_l = Geom.intersect_line_plane line, plane_l
-        point_r = Geom.intersect_line_plane line, plane_r
+        point_l = Geom.intersect_line_plane line, plane_left
+        point_r = Geom.intersect_line_plane line, plane_right
         trans_a = e.transformation.to_a
 
         if ad["align"]
@@ -1001,7 +1002,7 @@ class Building
             unless ad["override_cut_planes"]
               corners = MyGeom.bb_corners(e_def.bounds)
               corners.each { |c| c.transform! trans }
-              next if corners.any? { |c| MyGeom.front_of_plane?(plane_l, c) || MyGeom.front_of_plane?(plane_r, c) }
+              next if corners.any? { |c| MyGeom.front_of_plane?(plane_left, c) || MyGeom.front_of_plane?(plane_right, c) }
             end
             trans
           end
@@ -1026,7 +1027,6 @@ class Building
 
       end
       
-      # TODO: Component Replacement: replace here. Or possibly draw add the replacements from the start when the transformations are calculated before anything is even placed
 
       # Hack: glue all components to the face they are on.
       # Components may loose their glued face when adapting segment volume.
@@ -1043,8 +1043,11 @@ class Building
           c.glued_to = f
         end
       end
+      
+=end
+# ...to here
 
-    end# Main volume (each segment)
+    end
     
     nil
 
