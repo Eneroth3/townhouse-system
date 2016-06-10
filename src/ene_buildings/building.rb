@@ -172,31 +172,24 @@ class Building
   end
 
   # Public: Draws building.
-  # Shortcut for all the drawing methods.
   #
-  # entities     - Entities object (drawing context) to add building group to if
-  #                not yet drawn (default: current).
-  # exlude_basic - When true the basic drawing method is skipped and only
-  #                methods customizing the basic building are run. (default: false)
-  #
-  #                Typically the basic drawing (just applying template to path)
-  #                is done first, then data is acquired from the building to see
-  #                what can be customized (materials, components etc) and
-  #                Then all other draw methods are called to customize the
-  #                the basic building based on acquired data.
   # write_status - Write to statusbar while drawing (default: true).
   #
   # Returns nothing.
-  def draw(entities = nil, exlude_basic = false, write_status = true)
+  def draw(write_status = true)
   
     raise "No template set for building." unless @template
 
     Sketchup.status_text = STATUS_DRAWING if write_status
+    
+    # OPTIMIZE: Keep track on what changes where made since last draw and only
+    # call relevant methods. E.g., if material changes draw_replace_materials
+    # alone should be enough. If component replacement changes, draw_parts
+    # (and possible replace material) only should be called, unless there are
+    # solid operations. If there are solid operations redraw all. Hmmm
 
-    draw_basic(entities) unless exlude_basic
-    ### draw_replace_components
-    ### draw_corners
-    ### draw_gabels
+    draw_basic
+    ### draw_parts
     draw_solids write_status
     draw_replace_materials
     save_attributes
@@ -280,7 +273,7 @@ class Building
       @back_along_path ||= false
 
       # Override template id string with reference to actual object.
-      #nil if not found.
+      # Nil if not found.
       @template = Template.get_from_id @template
 
       # Override material replacement string identifiers with actual material
@@ -289,8 +282,8 @@ class Building
       @material_replacement = (@material_replacement || []).map do |p|
         p.map{ |name| model_materials[name] }
       end
-      # Delete replacement pair if replacer is nil. Replacer material becomes
-      # nil if it has been deleted from model.
+      # Delete replacement pair if replacement Material is nil. Replacer
+      # Material becomes nil if it has been deleted from model.
       @material_replacement.delete_if { |p| !p[1] }
 
   end
@@ -527,7 +520,7 @@ class Building
       active_m = model.materials.current
 
       # Make sure active_m is added to model.
-      temp_face = temp_material_group.entities.add_face(
+      temp_face = temp_material_group.entities.add_face(# FIXME: In SU2015 when applying a material not already defined in the model temp_face refers to the material :S ??? :O
         Geom::Point3d.new(rand, rand, rand),
         Geom::Point3d.new(rand, rand, rand),
         Geom::Point3d.new(rand, rand, rand)
@@ -647,6 +640,8 @@ class Building
 
   end
 
+  
+  
   
   
   # Internal: Methods for doing a specific part in building drawing.
