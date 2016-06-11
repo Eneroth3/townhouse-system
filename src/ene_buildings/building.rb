@@ -181,35 +181,41 @@ class Building
 
     Sketchup.status_text = STATUS_DRAWING if write_status
     
-    # OPTIMIZE: Keep track on what changes where made since last draw and only
-    # call relevant methods. E.g., if material changes draw_material_replacement
-    # alone should be enough. If component replacement changes, draw_parts
-    # (and possible replace material) only should be called, unless there are
-    # solid operations. If there are solid operations redraw all. Hmmm
-    
-    # If
-    #  complete_redraw (argument),
-    #  template changed,
-    #  path changed or
-    #  has solids and solid was enabled on last draw
-    # Then
-    #  draw_volume
-    #  draw_parts
-    #  draw_solids
-    #  draw_material_replacement
-    # Else if part replacement changed
-    #   draw_parts
-    #   draw material_replacement
-    # Else if material replacement changed
-    #  draw_material_replacement
 
-    draw_volume
-    draw_parts
-    draw_solids write_status
-    draw_material_replacement
+    
+    # TODO: Clean up code and test so it fully functions.
+    
+    # Get a copy of the instance variables as they were when building was last
+    # drawn. Use these to compare changes and only draw what is relevant.
+    last_drawn_as = @group && @group.valid? ? load_attributes_to_hash : {}
+
+    # Do either full or partial redraw depending on what has changed
+    # since method was previously called.
+    if(
+      !@group ||
+      !@group.entities.first ||
+      @template        != last_drawn_as[:template] ||
+      @path            != last_drawn_as[:path] ||
+      @back_along_path != last_drawn_as[:back_along_path] ||
+      @end_angles      != last_drawn_as[:end_angles]# ||
+      # has_solids? && last_drawn_as[:perform_solid_operations] && (<anything related to part placement changed>).
+    )
+      draw_volume
+      draw_parts
+      draw_solids write_status
+      draw_material_replacement
+    # elsif <anything related to part placement changed>
+    #   draw_parts
+    #   draw_material_replacement
+    else
+      draw_material_replacement
+    end
+    
     save_attributes
 
     Sketchup.status_text = STATUS_DONE if write_status
+    
+    nil
 
   end
 
@@ -301,7 +307,7 @@ class Building
         transformation_original = translation * transformation_original
       end
 
-      origin      = transformation_original.origin# TODO: take building depth into account here somehow if back should be on path? Compare with old draw_basic code.
+      origin      = transformation_original.origin
       line_origin = [origin, X_AXIS]
       t_array     = transformation_original.to_a
       
@@ -424,31 +430,13 @@ class Building
   # Returns nothing.
   def load_attributes
 
-      # Loop group attributes and save as object attribute.
-      @group.attribute_dictionary(ATTR_DICT).each_pair do |key, value|
-        instance_variable_set("@" + key.to_s, value)
-      end
-      
-      # Set back_along_path to false if not already set for backward
-      # compatibility. The value nil is reserved to let PathHandling handle
-      # paths where back_along_path doesn't make any sense, e.g. plots instead
-      # of individual buildings.
-      @back_along_path ||= false
-
-      # Override template id string with reference to actual object.
-      # Nil if not found.
-      @template = Template.get_from_id @template
-
-      # Override material replacement string identifiers with actual material
-      # references.
-      model_materials = @group.model.materials
-      @material_replacement = (@material_replacement || []).map do |p|
-        p.map{ |name| model_materials[name] }
-      end
-      # Delete replacement pair if replacement Material is nil. Replacer
-      # Material becomes nil if it has been deleted from model.
-      @material_replacement.delete_if { |p| !p[1] }
-
+    # Set instance variable for each attribute.
+    load_attributes_to_hash.each_pair do |key, value|
+      instance_variable_set("@" + key.to_s, value)
+    end
+    
+    nil
+    
   end
 
   # Public: Check if template isn't missing.
@@ -802,6 +790,39 @@ class Building
     nil
 
   end
+
+  # Internal: Load building group's attributes as Hash.
+  # Replaces string references used in attributes with actual objects such as
+  # Template and Material.
+  #
+  # Return Hash.
+  def load_attributes_to_hash
+  
+    h = EneBuildings.attr_dict_to_hash @group, ATTR_DICT, true
+    
+    # Set back_along_path to false if not already set for backward
+    # compatibility. The value nil is reserved to let PathHandling handle
+    # paths where back_along_path doesn't make any sense, e.g. plots instead
+    # of individual buildings.
+    h[:back_along_path] ||= false
+
+    # Override template id string with reference to actual object.
+    # Nil if not found.
+    h[:template] = Template.get_from_id h[:template]
+
+    # Override material replacement string identifiers with actual material
+    # references.
+    model_materials = @group.model.materials
+    h[:material_replacement] = (h[:material_replacement] || []).map do |p|
+      p.map{ |name| model_materials[name] }
+    end
+    # Delete replacement pair if replacement Material is nil. Replacer
+    # Material becomes nil if it has been deleted from model.
+    h[:material_replacement].delete_if { |p| !p[1] }
+    
+    h
+  
+  end
   
   # Building drawing methods ordered by the order they should be called in.
   
@@ -818,7 +839,7 @@ class Building
   #                not yet drawn (default: current).
   #
   # Returns nothing.
-  def draw_volume(entities = nil)#TODO: don't add parts here.
+  def draw_volume(entities = nil)
 
     entities ||= Sketchup.active_model.active_entities
 
