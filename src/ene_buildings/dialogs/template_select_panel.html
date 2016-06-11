@@ -65,6 +65,8 @@
           //Sort (0 means don't sort, same as keeping the alphabetic order of titles).
           templates_to_print.sort(function(a,b){
              if(a[sorting] == '?') return 1
+             if(a[sorting] === undefined) return 1
+             if(b[sorting]  === undefined) return -1
              if(a[sorting] == b[sorting]){
               return a['title'] < b['title'] ? -1 : 1;
              }

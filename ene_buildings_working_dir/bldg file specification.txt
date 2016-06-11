@@ -92,7 +92,7 @@ model.skp
   solid:
     Solid operation this group/component performs on main building section
     volume.
-    Values: "union" | "subtract".
+    Values: "union" | "subtract" | "cut_multiple_faces".
   solid_index:
     Order to perform solid operations in. Lowest first.
     Values: <any Integer>.
