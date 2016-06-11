@@ -183,62 +183,39 @@ class Building
     
 
     
-    # OPTIMIZE: Keep track on what changes where made since last draw and only
-    # call relevant methods. E.g., if material changes draw_material_replacement
-    # alone should be enough. If component replacement changes, draw_parts
-    # (and possible replace material) only should be called, unless there are
-    # solid operations. If there are solid operations redraw all. Hmmm
+    # TODO: Clean up code and test so it fully functions.
     
     # Get a copy of the instance variables as they were when building was last
     # drawn. Use these to compare changes and only draw what is relevant.
-    last_drawn_as = load_attributes_to_hash
+    last_drawn_as = @group && @group.valid? ? load_attributes_to_hash : {}
 
-    ###puts "@path changed: #{last_drawn_as[:path] != @path}."
-    ###puts "@back_along_path changed: #{last_drawn_as[:back_along_path] != @back_along_path}."
-    ###puts "@template changed: #{last_drawn_as[:template] != @template}."
-    
+    # Do either full or partial redraw depending on what has changed
+    # since method was previously called.
     if(
       !@group ||
       !@group.entities.first ||
       @template        != last_drawn_as[:template] ||
       @path            != last_drawn_as[:path] ||
       @back_along_path != last_drawn_as[:back_along_path] ||
-      @end_angles      != last_drawn_as[:end_angles]
-      # has_solids? && last_drawn_as[:] && (<anything related to part placement changed>).
+      @end_angles      != last_drawn_as[:end_angles]# ||
+      # has_solids? && last_drawn_as[:perform_solid_operations] && (<anything related to part placement changed>).
     )
-      puts "Redraw all"
+      draw_volume
+      draw_parts
+      draw_solids write_status
+      draw_material_replacement
     # elsif <anything related to part placement changed>
     #   draw_parts
     #   draw_material_replacement
     else
-      puts "replace materials only."
+      draw_material_replacement
     end
     
-    # If
-    #  complete_redraw (argument),
-    #  template changed,
-    #  path changed or
-    #  has solids and solid was enabled on last draw
-    # Then
-    #  draw_volume
-    #  draw_parts
-    #  draw_solids
-    #  draw_material_replacement
-    # Else if part replacement changed
-    #   draw_parts
-    #   draw material_replacement
-    # Else if material replacement changed
-    #  draw_material_replacement
-
-    
-    
-    draw_volume
-    draw_parts
-    draw_solids write_status
-    draw_material_replacement
     save_attributes
 
     Sketchup.status_text = STATUS_DONE if write_status
+    
+    nil
 
   end
 
