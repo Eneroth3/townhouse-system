@@ -189,7 +189,7 @@ class Building
     # solid operations. If there are solid operations redraw all. Hmmm
 
     draw_volume
-    ### draw_parts
+    draw_parts
     draw_solids write_status
     draw_replace_materials
     save_attributes
@@ -432,7 +432,7 @@ class Building
     set_on_close_called_from_apply = false
     dlg.set_on_close do
       unless set_on_close_called_from_apply
-        temp_material_group.erase!
+        temp_material_group.erase! if temp_material_group.valid?
         model.abort_operation
       end
 
@@ -449,7 +449,7 @@ class Building
       # Call all draw methods.
       draw
 
-      temp_material_group.erase!
+      temp_material_group.erase! if temp_material_group.valid?
       model.commit_operation
 
       if close
@@ -621,6 +621,8 @@ class Building
   # Hash has reference to original_instance and transformations.
   # Transformations is an Array with one element for each segment in building.
   # Each element is an Array of Transformation objects.
+  # Transformation is in the local coordinate system of the relevant segment
+  # group.
   def list_parts
 
     # Prepare path.
@@ -913,6 +915,7 @@ class Building
 
       # Adapt building volume to fill this segment by moving and shearing side
       # walls.
+      
       x_min       = face_left.vertices.first.position.x
       x_max       = face_right.vertices.first.position.x
       edges       = segment_ents.select { |e| e.is_a? Sketchup::Edge }
@@ -930,122 +933,6 @@ class Building
 
       segment_ents.transform_entities trans_left, edges_left
       segment_ents.transform_entities trans_right, edges_right
-
-      
-      
-      # TODO: Move into separate draw_parts and make it rely on list_parts.
-      # remove from here...
-=begin
-      # Copy and position nested groups/components (parts).
-      # z and y position is kept, x is calculated from a formula in attributes.
-      segment_ents.to_a.each do |e|
-        next unless [Sketchup::Group, Sketchup::ComponentInstance].include? e.class
-        next unless ad = e.attribute_dictionary(Template::ATTR_DICT_PART)
-
-        origin = e.transformation.origin
-        line = [origin, Geom::Vector3d.new(1, 0, 0)]
-        point_l = Geom.intersect_line_plane line, plane_left
-        point_r = Geom.intersect_line_plane line, plane_right
-        trans_a = e.transformation.to_a
-
-        if ad["align"]
-          # Align one group/component.
-          # Either "left", "right", "center" or percentage (float between 0 and
-          # 1).
-          new_origin =
-            if ad["align"] == "left"
-              point_l
-            elsif ad["align"] == "right"
-             point_r
-            elsif ad["align"] == "center"
-              Geom.linear_combination 0.5, point_l, 0.5, point_r
-            elsif ad["align"].is_a? Float
-              Geom.linear_combination(1-ad["align"], point_l, ad["align"], point_r)
-            end
-          trans_a[12] = new_origin.x
-          e.transformation = Geom::Transformation.new trans_a
-
-        elsif ad["spread"]
-          # Spread multiple groups/components.
-          # Either Fixnum telling number of copies or float/length telling
-          # approximate distance between (in inches). This distance will adapt
-          # to available space.
-          available_distance = point_l.distance point_r
-          margin_l = ad["margin_left"] || ad["margin"] || 0
-          margin_r = ad["margin_right"] || ad["margin"] || 0
-          available_distance -= (margin_l + margin_r)
-          if ad["spread"].is_a?(Fixnum)
-            total_number = ad["spread"]
-            raise "If 'spread' is a Fuxnum it must be zero or more." if total_number < 0
-          else
-            total_number = available_distance/ad["spread"]
-            raise "If 'spread' is a Length it must bigger than zero." unless ad["spread"] > 0
-            # Round total_number to closets Int or force to odd/even.
-            #(If rounding is set to anything else than "force_odd" it's used as "force_even".)
-            total_number =
-              if ad["rounding"]
-                fraction = total_number%2
-                (ad["rounding"] == "force_odd") && fraction > 1 ? total_number.floor : total_number.ceil
-              else
-                total_number.round
-              end
-          end
-          distance_between = available_distance/total_number
-          # Each copy has its origin at x = margin_l + (n + 0.5)*distance_between
-          e_def = e.definition
-          transformations = (0..total_number-1).map do |n|
-            x = point_l.x + margin_l + (n + 0.5) * distance_between
-            trans_a[12] = x
-            trans = Geom::Transformation.new trans_a
-            # Don't place anything with its bounding box outside the segment if
-            # not specifically told to do so.
-            unless ad["override_cut_planes"]
-              corners = MyGeom.bb_corners(e_def.bounds)
-              corners.each { |c| c.transform! trans }
-              next if corners.any? { |c| MyGeom.front_of_plane?(plane_left, c) || MyGeom.front_of_plane?(plane_right, c) }
-            end
-            trans
-          end
-          transformations.compact!
-          if transformations.empty?
-            # Remove existing component if it didn't fit.
-            e.erase!
-          else
-            # Position existing group/component.
-            e.transformation = transformations.first
-            # Place new ones.
-            (1..transformations.size - 1).each do |n|
-              instance = segment_ents.add_instance e_def, transformations[n]
-              instance.material = e.material
-              instance.layer = e.layer
-              instance.name = e.name
-              instance.glued_to = e.glued_to if e.is_a?(Sketchup::ComponentInstance) && e.glued_to
-              EneBuildings.copy_attributes e, instance
-            end
-          end
-        end
-
-      end
-      
-
-      # Hack: glue all components to the face they are on.
-      # Components may loose their glued face when adapting segment volume.
-      # All references to faces saved before refers to deleted entities
-      # after.
-      segment_ents.to_a.each do |f|
-        next unless f.is_a? Sketchup::Face
-        segment_ents.to_a.each do |c|
-          next unless c.respond_to? :glued_to
-          next if c.glued_to
-          t = c.transformation
-          next unless f.normal.samedirection? t.zaxis
-          next unless f.classify_point(t.origin) == Sketchup::Face::PointInside
-          c.glued_to = f
-        end
-      end
-      
-=end
-# ...to here
 
     end
     
@@ -1091,7 +978,60 @@ class Building
 
   end
 
-  # draw_parts...
+  # Internal: Place groups and/or components inside building Group as defined by
+  # @template, @path and in the future also part replacement data.
+  #
+  # Return nothing.
+ def draw_parts
+ 
+  # TODO: CORNERS: Maybe sort these out from corners, if corners lie in @group root.
+  segment_groups = @group.entities.to_a
+ 
+  part_data = list_parts
+  
+  # Loop path segments.
+    (0..path.size - 2).each do |segment_index|
+    
+    segment_group = segment_groups[segment_index]
+    segment_ents  = segment_group.entities
+    
+    # Place instances of all parts that has transformations for this segment.
+    # Copy entity properties, including attributes.
+    part_data.each do |part|
+      part[:transformations][segment_index].each do |trans|
+        original = part[:original_instance]
+        instance = segment_ents.add_instance original.definition, trans
+        instance.material = original.material
+        instance.layer = original.layer
+        instance.name = original.name
+        EneBuildings.copy_attributes original, instance
+      end
+    end
+    
+    # Glue all components to the face they are located on.
+    valid_cps = [
+      Sketchup::Face::PointInside,
+      Sketchup::Face::PointOnEdge,
+      Sketchup::Face::PointOnVertex
+    ]
+    segment_ents.to_a.each do |f|
+      next unless f.is_a? Sketchup::Face
+      segment_ents.to_a.each do |c|
+        next unless c.respond_to? :glued_to
+        next if c.glued_to
+        t = c.transformation
+        next unless f.normal.parallel? t.zaxis
+        cp = f.classify_point t.origin
+        next unless valid_cps.include? cp
+        c.glued_to = f
+      end
+    end
+    
+  end
+  
+  nil
+ 
+ end
   
   # Public: Perform solid operations on Building if @perform_solid_operations is
   # true.
