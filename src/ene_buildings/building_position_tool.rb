@@ -185,6 +185,8 @@ class BuildingPositionTool
   end
 
   def commit_reposition
+  
+    # OPTIMIZE: If path is same as it was on reposition start, just abort instead.
 
     # Draw building to new path.
     @building.path            = @path

@@ -668,7 +668,7 @@ class Template
     b = Building.new
     b.template = self
     b.path = p
-    b.draw entities, nil, false
+    b.draw false
     
     # Hide parts under ground level and set background color.
     # Change rendering options and backup existing options.
