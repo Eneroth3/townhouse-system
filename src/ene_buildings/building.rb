@@ -28,9 +28,8 @@ class Building
   # Internal: Statusbar text.
   STATUS_DRAWING       = "Drawing Building..."
   STATUS_DONE          = "Done Drawing."
-  STATUS_SOLIDS        = "Performing solid operations"
-  STATUS_CUTTING       = "Cutting opening"
-  STATUS_CUT_INTERSECT = "Intersecting..."
+  STATUS_SOLIDS        = "Performing solid operations"# + " (progress/total)"
+  STATUS_CUTTING       = "Cutting openings..."
 
   # Class methods
 
@@ -183,15 +182,31 @@ class Building
     Sketchup.status_text = STATUS_DRAWING if write_status
     
     # OPTIMIZE: Keep track on what changes where made since last draw and only
-    # call relevant methods. E.g., if material changes draw_replace_materials
+    # call relevant methods. E.g., if material changes draw_material_replacement
     # alone should be enough. If component replacement changes, draw_parts
     # (and possible replace material) only should be called, unless there are
     # solid operations. If there are solid operations redraw all. Hmmm
+    
+    # If
+    #  complete_redraw (argument),
+    #  template changed,
+    #  path changed or
+    #  has solids and solid was enabled on last draw
+    # Then
+    #  draw_volume
+    #  draw_parts
+    #  draw_solids
+    #  draw_material_replacement
+    # Else if part replacement changed
+    #   draw_parts
+    #   draw material_replacement
+    # Else if material replacement changed
+    #  draw_material_replacement
 
     draw_volume
     draw_parts
     draw_solids write_status
-    draw_replace_materials
+    draw_material_replacement
     save_attributes
 
     Sketchup.status_text = STATUS_DONE if write_status
@@ -211,6 +226,175 @@ class Building
 
   end
 
+  # Public: List data for parts (nested Groups and ComponentInstances) (based on
+  # current @path and Template).
+  # This will be used to create part replacement field in Properties dialog.
+  #
+  # Return Array of Hash objects corresponding to each part.
+  # Hash has reference to original_instance and transformations Array.
+  # Transformations Array has one element for each segment in building.
+  # Each element is an Array of Transformation objects.
+  # Transformation is in the local coordinate system of the relevant segment
+  # group.
+  def list_parts
+
+    # Prepare path.
+  
+    # RVIWEW: Make Path class and move some of this stuff there instead of
+    # just having same code copied here from draw_basic.
+    
+    # Transform path to local building coordinates.
+    trans_inverse = @group.transformation.inverse
+    path = @path.map { |p| p.transform trans_inverse }
+
+    # Get tangent for each point in path.
+    # Tangents point in the positive direction of path.
+    tangents = []
+    tangents << path[1] - path[0]
+    if path.size > 2
+      (1..path.size - 2).each do |corner|
+        p_prev = path[corner - 1]
+        p_here = path[corner]
+        p_next = path[corner + 1]
+        v_prev = p_here - p_prev
+        v_next = p_next - p_here
+        tangents << Geom.linear_combination(0.5, v_prev, 0.5, v_next)
+      end
+    end
+    tangents << path[-1] - path[-2]
+
+    # Rotate first and last tangent according to @end_angles.
+    tangents.first.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.first
+    tangents.last.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.last
+    
+    # If building should be drawn with it back along the path instead of its
+    # front, reverse the path and tangents.
+    # The terms left and right relates to the building front side.
+    if @back_along_path
+      path.reverse!
+      tangents.reverse!
+      tangents.each { |t| t.reverse! }
+    end
+    
+    # Collect parts data.
+    
+    parts_data = []
+    
+    # Loop parts in Template's ComponentDefinition.
+    @template.component_def.entities.each do |e|
+      next unless [Sketchup::Group, Sketchup::ComponentInstance].include? e.class
+      next unless ad = e.attribute_dictionary(Template::ATTR_DICT_PART)
+      
+      part_data = {
+        :original_instance => e,
+        :defintion => e.definition,
+        :transformations => []
+      }
+      parts_data << part_data
+
+      origin      = e.transformation.origin# TODO: take building depth into account here somehow if back should be on path? Compare with old draw_basic code.
+      line_origin = [origin, X_AXIS]
+      t_array     = e.transformation.to_a
+      
+      # Loop path segments.
+      (0..path.size - 2).each do |segment_index|
+      
+        transformations = []
+        part_data[:transformations] << transformations
+      
+        # Values in main building @group's coordinates.
+        corner_left    = path[segment_index]
+        corner_right   = path[segment_index + 1]
+        segment_vector = corner_right - corner_left
+        segment_length = segment_vector.length
+        tangent_left   = tangents[segment_index]
+        tangent_right  = tangents[segment_index + 1]
+        segment_trans  = Geom::Transformation.axes(
+          corner_left,
+          segment_vector,
+          Z_AXIS * segment_vector,
+          Z_AXIS
+        )
+        
+        # Values in local segment group's coordinates.
+        plane_left       = [ORIGIN, tangent_left.reverse.transform(segment_trans.inverse)]
+        plane_right      = [[segment_length, 0, 0], tangent_right.transform(segment_trans.inverse)]
+        origin_leftmost  = Geom.intersect_line_plane line_origin, plane_left
+        origin_rightmost = Geom.intersect_line_plane line_origin, plane_right
+        
+        # Create Transformation objects from current Transformation, path
+        # segment and attribute data.
+        if ad["align"]
+          # Align one instance
+          # Either "left", "right", "center" or percentage (float between 0 and
+          # 1).
+          
+          new_origin =
+            if ad["align"] == "left"
+              origin_leftmost
+            elsif ad["align"] == "right"
+             origin_rightmost
+            elsif ad["align"] == "center"
+              Geom.linear_combination 0.5, origin_leftmost, 0.5, origin_rightmost
+            elsif ad["align"].is_a? Float
+              Geom.linear_combination(1-ad["align"], origin_leftmost, ad["align"], origin_rightmost)
+            end
+          t_array[12] = new_origin.x
+          transformations << Geom::Transformation.new(t_array)
+
+        elsif ad["spread"]
+          # Spread multiple groups/components.
+          # Either Fixnum telling number of copies or float/length telling
+          # approximate distance between (in inches). This distance will adapt
+          # to fit available space.
+          
+          available_distance = origin_leftmost.distance origin_rightmost
+          margin_l = ad["margin_left"] || ad["margin"] || 0
+          margin_r = ad["margin_right"] || ad["margin"] || 0
+          available_distance -= (margin_l + margin_r)
+          if ad["spread"].is_a?(Fixnum)
+            total_number = ad["spread"]
+            raise "If 'spread' is a Fuxnum it must be zero or more." if total_number < 0
+          else
+            total_number = available_distance/ad["spread"]
+            raise "If 'spread' is a Length it must bigger than zero." unless ad["spread"] > 0
+            # Round total_number to closets Int or force to odd/even.
+            #(If rounding is set to anything else than "force_odd" it's used as "force_even".)
+            total_number =
+              if ad["rounding"]
+                fraction = total_number%2
+                (ad["rounding"] == "force_odd") && fraction > 1 ? total_number.floor : total_number.ceil
+              else
+                total_number.round
+              end
+          end
+          distance_between = available_distance/total_number
+          # Each copy has its origin at x = margin_l + (n + 0.5)*distance_between
+          e_def = e.definition
+          (0..total_number-1).each do |n|
+            x = origin_leftmost.x + margin_l + (n + 0.5) * distance_between
+            t_array[12] = x
+            trans = Geom::Transformation.new t_array
+            # Don't place anything with its bounding box outside the segment if
+            # not specifically told to do so.
+            unless ad["override_cut_planes"]
+              corners = MyGeom.bb_corners(e_def.bounds)
+              corners.each { |c| c.transform! trans }
+              next if corners.any? { |c| MyGeom.front_of_plane?(plane_left, c) || MyGeom.front_of_plane?(plane_right, c) }
+            end
+            transformations << trans
+          end
+          
+        end
+
+      end
+    
+    end
+    
+    parts_data
+    
+  end
+  
   # Public: List replaceable materials (based o template).
   # Materials directly in segment groups are listed. Materials in nested groups
   # are also listed if the group has an attribute specifically saying so.
@@ -609,192 +793,17 @@ class Building
     nil
 
   end
-
   
+  # Building drawing methods ordered by the order they should be called in.
   
-
-  # Public: List data for parts (nested Groups and ComponentInstances) (based on
-  # current @path and Template).
-  # This will be used to create part replacement field in Properties dialog.
+  # Internal: Draw the volume of the building to @group according to @path and
+  # @template.
   #
-  # Return Array of Hash objects corresponding to each part.
-  # Hash has reference to original_instance and transformations.
-  # Transformations is an Array with one element for each segment in building.
-  # Each element is an Array of Transformation objects.
-  # Transformation is in the local coordinate system of the relevant segment
-  # group.
-  def list_parts
-
-    # Prepare path.
-  
-    # RVIWEW: Make Path class and move some of this stuff there instead of
-    # just having same code copied here from draw_basic.
-    
-    # Transform path to local building coordinates.
-    trans_inverse = @group.transformation.inverse
-    path = @path.map { |p| p.transform trans_inverse }
-
-    # Get tangent for each point in path.
-    # Tangents point in the positive direction of path.
-    tangents = []
-    tangents << path[1] - path[0]
-    if path.size > 2
-      (1..path.size - 2).each do |corner|
-        p_prev = path[corner - 1]
-        p_here = path[corner]
-        p_next = path[corner + 1]
-        v_prev = p_here - p_prev
-        v_next = p_next - p_here
-        tangents << Geom.linear_combination(0.5, v_prev, 0.5, v_next)
-      end
-    end
-    tangents << path[-1] - path[-2]
-
-    # Rotate first and last tangent according to @end_angles.
-    tangents.first.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.first
-    tangents.last.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.last
-    
-    # If building should be drawn with it back along the path instead of its
-    # front, reverse the path and tangents.
-    # The terms left and right relates to the building front side.
-    if @back_along_path
-      path.reverse!
-      tangents.reverse!
-      tangents.each { |t| t.reverse! }
-    end
-    
-    # Collect parts data.
-    
-    parts_data = []
-    
-    # Loop parts in Template's ComponentDefinition.
-    @template.component_def.entities.each do |e|
-      next unless [Sketchup::Group, Sketchup::ComponentInstance].include? e.class
-      next unless ad = e.attribute_dictionary(Template::ATTR_DICT_PART)
-      
-      part_data = {
-        :original_instance => e,
-        :defintion => e.definition,
-        :transformations => []
-      }
-      parts_data << part_data
-
-      origin      = e.transformation.origin# TODO: take building depth into account here somehow if back should be on path? Compare with old draw_basic code.
-      line_origin = [origin, X_AXIS]
-      t_array     = e.transformation.to_a
-      
-      # Loop path segments.
-      (0..path.size - 2).each do |segment_index|
-      
-        transformations = []
-        part_data[:transformations] << transformations
-      
-        # Values in main building @group's coordinates.
-        corner_left    = path[segment_index]
-        corner_right   = path[segment_index + 1]
-        segment_vector = corner_right - corner_left
-        segment_length = segment_vector.length
-        tangent_left   = tangents[segment_index]
-        tangent_right  = tangents[segment_index + 1]
-        segment_trans  = Geom::Transformation.axes(
-          corner_left,
-          segment_vector,
-          Z_AXIS * segment_vector,
-          Z_AXIS
-        )
-        
-        # Values in local segment group's coordinates.
-        plane_left       = [ORIGIN, tangent_left.reverse.transform(segment_trans.inverse)]
-        plane_right      = [[segment_length, 0, 0], tangent_right.transform(segment_trans.inverse)]
-        origin_leftmost  = Geom.intersect_line_plane line_origin, plane_left
-        origin_rightmost = Geom.intersect_line_plane line_origin, plane_right
-        
-        # Create Transformation objects from current Transformation, path
-        # segment and attribute data.
-        if ad["align"]
-          # Align one instance
-          # Either "left", "right", "center" or percentage (float between 0 and
-          # 1).
-          
-          new_origin =
-            if ad["align"] == "left"
-              origin_leftmost
-            elsif ad["align"] == "right"
-             origin_rightmost
-            elsif ad["align"] == "center"
-              Geom.linear_combination 0.5, origin_leftmost, 0.5, origin_rightmost
-            elsif ad["align"].is_a? Float
-              Geom.linear_combination(1-ad["align"], origin_leftmost, ad["align"], origin_rightmost)
-            end
-          t_array[12] = new_origin.x
-          transformations << Geom::Transformation.new(t_array)
-
-        elsif ad["spread"]
-          # Spread multiple groups/components.
-          # Either Fixnum telling number of copies or float/length telling
-          # approximate distance between (in inches). This distance will adapt
-          # to fit available space.
-          
-          available_distance = origin_leftmost.distance origin_rightmost
-          margin_l = ad["margin_left"] || ad["margin"] || 0
-          margin_r = ad["margin_right"] || ad["margin"] || 0
-          available_distance -= (margin_l + margin_r)
-          if ad["spread"].is_a?(Fixnum)
-            total_number = ad["spread"]
-            raise "If 'spread' is a Fuxnum it must be zero or more." if total_number < 0
-          else
-            total_number = available_distance/ad["spread"]
-            raise "If 'spread' is a Length it must bigger than zero." unless ad["spread"] > 0
-            # Round total_number to closets Int or force to odd/even.
-            #(If rounding is set to anything else than "force_odd" it's used as "force_even".)
-            total_number =
-              if ad["rounding"]
-                fraction = total_number%2
-                (ad["rounding"] == "force_odd") && fraction > 1 ? total_number.floor : total_number.ceil
-              else
-                total_number.round
-              end
-          end
-          distance_between = available_distance/total_number
-          # Each copy has its origin at x = margin_l + (n + 0.5)*distance_between
-          e_def = e.definition
-          (0..total_number-1).each do |n|
-            x = origin_leftmost.x + margin_l + (n + 0.5) * distance_between
-            t_array[12] = x
-            trans = Geom::Transformation.new t_array
-            # Don't place anything with its bounding box outside the segment if
-            # not specifically told to do so.
-            unless ad["override_cut_planes"]
-              corners = MyGeom.bb_corners(e_def.bounds)
-              corners.each { |c| c.transform! trans }
-              next if corners.any? { |c| MyGeom.front_of_plane?(plane_left, c) || MyGeom.front_of_plane?(plane_right, c) }
-            end
-            transformations << trans
-          end
-          
-        end
-
-      end
-    
-    end
-    
-    parts_data
-    
-  end
-  
-  
-  
-  
-  
-  
-  # Internal: Methods for doing a specific part in building drawing.
-  # TODO: rewrite documentation for these and write clearly what they require from @group and in what order they can be called.
-  
-  # Public: Performs the basic Building drawing.
-  #
-  # This method draws building template to path but does not customize building.
-  # Other methods are called to replace materials and groups/components
-  # according to building properties.
+  # This is the most fundamental of the draw methods.
+  # Calling this resets all modifications by any other draw method.
+  # When calling this, call the others too.
+  # This method has to be called at least once for the other draw methods to
+  # have anything to work on.
   #
   # entities     - Entities object (drawing context) to add Building Group to if
   #                not yet drawn (default: current).
@@ -940,46 +949,15 @@ class Building
 
   end
 
-  # Public: Replaces materials in Building Group according to
-  # @material_replacement.
+  # Internal: Draw groups and/or components inside the building @group according
+  # to @template, @path and in the future also part replacement settings.
   #
-  # After this method was last run draw_basic must be called to reset original
-  # materials to replace.
-  #
-  # Returns nothing.
-  def draw_replace_materials
-
-    return if @material_replacement.empty?
-
-    # Hash of replacements. Original as key and replacement as value.
-    # Used for faster indexing.
-    replace  = Hash[*@material_replacement.flatten]
-
-    # Recursive material replacer.
-    # Replace materials in group and in all nested groups with an attribute
-    # specifically telling it to do so.
-    recursive = lambda do |group|
-      group.name += ""# Make group unique.
-      group.entities.each do |e|
-        next unless e.respond_to? :material
-        replacment = replace[e.material]
-        e.material = replacment if replacment
-
-        if e.is_a?(Sketchup::Group) && e.get_attribute(Template::ATTR_DICT_PART, "replace_nested_mateials")# OPTIMIZE: edit groups using same definition once. Create one new definition for all instances in this building (this entities collection)
-          recursive.call(e)
-        end
-      end
-    end
-
-    # Replace materials in all groups in building root (segments, corner etc).
-    recursive.call @group
-
-    nil
-
-  end
-
-  # Internal: Place groups and/or components inside building Group as defined by
-  # @template, @path and in the future also part replacement data.
+  # This method modifies the building @group non-destructively.
+  # If the replacement setting changes this can be called again without first
+  # calling draw_volume to reset what it has previously drawn (unless there are
+  # solid operations too to perform).
+  # draw_material_replacement should be called after calling this to make sure
+  # new groups/components get the right materials.
   #
   # Return nothing.
  def draw_parts
@@ -994,6 +972,12 @@ class Building
     
     segment_group = segment_groups[segment_index]
     segment_ents  = segment_group.entities
+    
+    # Purge all existing parts in segment.
+    # This method can be called if part settings are changed without first
+    # calling draw_volume.
+    instances = segment_ents.select { |e| [Sketchup::Group, Sketchup::ComponentInstance].include? e.class }
+    segment_ents.erase_entities instances
     
     # Place instances of all parts that has transformations for this segment.
     # Copy entity properties, including attributes.
@@ -1036,8 +1020,10 @@ class Building
   # Public: Perform solid operations on Building if @perform_solid_operations is
   # true.
   #
-  # After this method was last run draw_basic must be called to reset original
-  # building solids.
+  # This method modifies the building @group DESTRUCTIVELY.
+  # If this has run previously draw_volume must be called before this or
+  # draw_parts is called again and draw_material_replacement should be called
+  # after.
   #
   # write_status - Write to statusbar that solid operations are performed
   #                (default: true).
@@ -1114,7 +1100,6 @@ class Building
   
     # Perform own multiple-face cut-opening.
     # Done after solid operations since it's not strictly a solid operation.
-    i = 0
     segment_groups.each do |segment_group|
     
       
@@ -1129,9 +1114,7 @@ class Building
         next unless part_segment_group == segment_group
         next unless operation == "cut_multiple_faces"
         
-        progress = " (#{i + 1}/#{nbr_cutting_ops})"
-        i += 1
-        Sketchup.status_text = STATUS_CUTTING + progress if write_status
+        Sketchup.status_text = STATUS_CUTTING if write_status
         
         naked_edges = EneBuildings.naked_edges part.definition.entities
         
@@ -1158,7 +1141,6 @@ class Building
       # called as somehow return the relationship between new entities
       # and the entities they are split off from.
       cutting_edges.each { |e| e.set_attribute ID, "cutting_edges", true }
-      Sketchup.status_text = STATUS_CUT_INTERSECT if write_status
       cutting_edges += segment_group.entities.intersect_with(
         false,
         Geom::Transformation.new,
@@ -1230,6 +1212,54 @@ class Building
       cut_away_edges.each { |f| f.hidden = true }
       
     end
+
+    nil
+
+  end
+
+  # Internal: Replaces materials in building @group according to
+  # @material_replacement.
+  #
+  # This method modifies the building @group non-destructively.
+  # If the material replacement settings changes this can be called again
+  # without having to call any other draw methods.
+  #
+  # Returns nothing.
+  def draw_material_replacement
+
+    # Hash of replacements. Original as key and replacement as value.
+    # Used for faster indexing.
+    replacements  = Hash[*@material_replacement.flatten]
+
+    # Recursive material replacer.
+    # Replace materials in group and in all nested groups with an attribute
+    # specifically telling it to do so.
+    recursive = lambda do |group|
+      group.name += ""# Make group unique.
+      group.entities.each do |e|
+        next unless e.respond_to? :material
+        original_name = e.get_attribute(Template::ATTR_DICT_PART, "original_material")
+        original = if original_name
+          @group.model.materials[original_name]
+        else
+          e.material
+        end
+        replacment = replacements[original]
+        if replacment
+          e.material = replacment
+          e.set_attribute(Template::ATTR_DICT_PART, "original_material", original.name)
+        elsif e.material != original && original.valid?
+          e.material = original
+        end
+
+        if e.is_a?(Sketchup::Group) && e.get_attribute(Template::ATTR_DICT_PART, "replace_nested_mateials")# OPTIMIZE: edit groups using same definition once. Create one new definition for all instances in this building (this entities collection)
+          recursive.call(e)
+        end
+      end
+    end
+
+    # Replace materials in all groups in building root (segments, corner etc).
+    recursive.call @group
 
     nil
 
