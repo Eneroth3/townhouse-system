@@ -61,14 +61,18 @@ module EneBuildings
     #
     # entity    - The entity the dictionary is attached to.
     # dict_name - Name of the dictionary.
+    # symbol    - Use symbols instead of keys as keys.
     #
     # Returns hash. Hash is empty if dictionary is empty or not found.
-    def self.attr_dict_to_hash(entity, dict_name)
+    def self.attr_dict_to_hash(entity, dict_name, symbol = false)
 
       h = {}
       ad = entity.attribute_dictionary(dict_name)
       return h unless ad
-      ad.each_pair { |k, v| h[k] = v }
+      ad.each_pair do |k, v|
+        k = k.to_sym if symbol
+        h[k] = v
+      end
 
       h
 
