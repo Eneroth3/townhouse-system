@@ -291,10 +291,19 @@ class Building
         :transformations => []
       }
       parts_data << part_data
+      
+      transformation_original = e.transformation
+      
+      # If building is drawn with its back along path, adapt transformation.
+      if @back_along_path
+        delta_y = -(@template.depth || Template::FALLBACK_DEPTH)
+        translation = Geom::Transformation.translation([0, delta_y, 0])
+        transformation_original = translation * transformation_original
+      end
 
-      origin      = e.transformation.origin# TODO: take building depth into account here somehow if back should be on path? Compare with old draw_basic code.
+      origin      = transformation_original.origin# TODO: take building depth into account here somehow if back should be on path? Compare with old draw_basic code.
       line_origin = [origin, X_AXIS]
-      t_array     = e.transformation.to_a
+      t_array     = transformation_original.to_a
       
       # Loop path segments.
       (0..path.size - 2).each do |segment_index|

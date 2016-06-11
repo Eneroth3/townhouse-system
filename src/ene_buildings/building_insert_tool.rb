@@ -16,7 +16,7 @@ class BuildingInsertTool
 
  # Template to draw building to.
  # Class variable so it's kept when tool is reactivated.
- @@template = nil
+ @@template ||= nil
 
   def initialize
 
