@@ -186,11 +186,7 @@ class Building
     raise "No template set for building." unless @template
 
     Sketchup.status_text = STATUS_DRAWING if write_status
-    
-
-    
-    # TODO: Clean up code and test so it fully functions.
-    
+        
     # Get a copy of the instance variables as they were when building was last
     # drawn. Use these to compare changes and only draw what is relevant.
     last_drawn_as = @group && @group.valid? ? load_attributes_to_hash : {}
@@ -200,19 +196,30 @@ class Building
     if(
       !@group ||
       !@group.entities.first ||
-      @template        != last_drawn_as[:template] ||
-      @path            != last_drawn_as[:path] ||
-      @back_along_path != last_drawn_as[:back_along_path] ||
-      @end_angles      != last_drawn_as[:end_angles]# ||
-      # has_solids? && last_drawn_as[:perform_solid_operations] && (<anything related to part placement changed>).
+      @template                 != last_drawn_as[:template] ||
+      @path                     != last_drawn_as[:path] ||
+      @back_along_path          != last_drawn_as[:back_along_path] ||
+      @end_angles               != last_drawn_as[:end_angles] ||
+      @perform_solid_operations != last_drawn_as[:perform_solid_operations] ||
+      (
+        has_solids? &&
+        last_drawn_as[:perform_solid_operations] &&
+        (
+          @gables != last_drawn_as[:gables] # ||
+          # Add anything related to part placement here...
+        )
+      )
     )
       draw_volume
       draw_parts
       draw_solids write_status
       draw_material_replacement
-    # elsif <anything related to part placement changed>
-    #   draw_parts
-    #   draw_material_replacement
+     elsif(
+      @gables != last_drawn_as[:gables] # ||
+      # Add anything related to part placement here...
+     )
+       draw_parts
+       draw_material_replacement
     else
       draw_material_replacement
     end
@@ -255,7 +262,7 @@ class Building
   # Template).
   #
   # Returns Array of Hash objects corresponding to each gable.
-  # Hash has reference to original_instance and width.
+  # Hash has reference to definition, name, original_instance and width.
   def list_gable_parts
   
     parts_data = []
@@ -283,12 +290,13 @@ class Building
   # and replacements.
   #
   # Return Array of Hash objects corresponding to each part.
-  # Hash has reference to original_instance and transformations Array.
+  # Hash has reference to definition, name, original_instance and
+  # transformations Array.
   # Transformations Array has one element for each segment in building.
   # Each element is an Array of Transformation objects.
   # Transformation is in the local coordinate system of the relevant segment
   # group.
-  def list_replacable_parts# TODO: Rename or document better: Only those of these with a name is considered replaceable.
+  def list_replacable_parts# TODO: Rename or document better: Only those of these with a name is considered replaceable. This lists all ghat are spread or aligned.
 
     # Prepare path.
   
@@ -1050,7 +1058,7 @@ class Building
   end
 
   # Internal: Draw groups and/or components inside the building @group according
-  # to @template, @path and in the future also part replacement settings.
+  # to @template, @path, @gables and in the future also part replacement settings.
   #
   # This method modifies the building @group non-destructively.
   # If the replacement setting changes this can be called again without first
@@ -1061,14 +1069,25 @@ class Building
   #
   # Return nothing.
  def draw_parts
+  
+  available_gables = list_gable_parts
+  gable_settings = @gables[@template.id]
+  left_gables = []
+  right_gables = []
+  available_gables.each do |potential_gable|
+    next unless a = gable_settings[potential_gable[:name]]
+    left_gables << potential_gable if a[0]
+    right_gables << potential_gable if a[1]
+  end
+  gable_transformations = calculate_gable_transformations
+  
+  part_data = list_replacable_parts
  
   # TODO: CORNERS: Maybe sort these out from corners, if corners lie in @group root.
   segment_groups = @group.entities.to_a
- 
-  part_data = list_replacable_parts
-  
+
   # Loop path segments.
-    (0..path.size - 2).each do |segment_index|
+  (0..path.size - 2).each do |segment_index|
     
     segment_group = segment_groups[segment_index]
     segment_ents  = segment_group.entities
@@ -1079,16 +1098,28 @@ class Building
     instances = segment_ents.select { |e| [Sketchup::Group, Sketchup::ComponentInstance].include? e.class }
     segment_ents.erase_entities instances
     
-    # Place instances of all parts that has transformations for this segment.
-    # Copy entity properties, including attributes.
+    # Place gables if this is an end segment.
+    if segment_index == 0
+      left_gables.each do |gable|
+        trans = gable_transformations[0]
+        original = gable[:original_instance]
+        EneBuildings.copy_instance original, segment_ents, trans
+      end
+    end
+    if segment_index == @path.size - 2
+      right_gables.each do |gable|
+        trans = gable_transformations[1]
+        original = gable[:original_instance]
+        EneBuildings.copy_instance original, segment_ents, trans
+      end
+    end
+    
+    # Place instances of all spread or aligned parts that has transformations
+    # for this segment.
     part_data.each do |part|
       part[:transformations][segment_index].each do |trans|
         original = part[:original_instance]
-        instance = segment_ents.add_instance original.definition, trans
-        instance.material = original.material
-        instance.layer = original.layer
-        instance.name = original.name
-        EneBuildings.copy_attributes original, instance
+        EneBuildings.copy_instance original, segment_ents, trans
       end
     end
     
@@ -1317,6 +1348,30 @@ class Building
 
   end
 
+  # Internal: Calculate the Transformation objects used when placing gables.
+  def calculate_gable_transformations
+  
+    [
+      MyGeom.transformation_axes(
+        ORIGIN,
+        X_AXIS,
+        Geom::Vector3d.new(-Math.tan(@end_angles[0]), 1, 0),
+        Z_AXIS,
+        true,
+        true
+      ),
+      MyGeom.transformation_axes(
+        Geom::Point3d.new(@path[-1].distance(@path[-2]), 0, 0),
+        X_AXIS.reverse,
+        Geom::Vector3d.new(-Math.tan(@end_angles[1]), 1, 0),
+        Z_AXIS,
+        true,
+        true
+      )
+    ]
+    
+  end
+  
   # Internal: Replaces materials in building @group according to
   # @material_replacement.
   #

@@ -98,7 +98,34 @@ module EneBuildings
 
     end
 
-    # Internal: Turns component instance to group.
+    # Internal: Copy an instance with properties such as layer and attributes.
+    #
+    # old_instance       - The Group or ComponentInstance to copy.
+    # new_entities       - The Entities object to place new instance in
+    #                      (default: same as the original).
+    # new_transformation - The Transformation of the new instance
+    #                      (default: same as the original).
+    #
+    # Returns newly placed Group or ComponentInstance.
+    def self.copy_instance(old_instance, new_entities = nil, new_transformation = nil)
+      
+      new_entities       ||= old_instance.entities
+      new_transformation ||= old_instance.transformation
+      
+      instance          = new_entities.add_instance(
+        old_instance.definition,
+        new_transformation
+      )
+      instance.material = old_instance.material
+      instance.layer    = old_instance.layer
+      instance.name     = old_instance.name
+      copy_attributes old_instance, instance
+        
+      instance
+      
+    end
+    
+    # Internal: Replaces component instance with similar group.
     #
     # component      - The ComponentInstance.
     # keep_component - Keep the original component (default: false).
