@@ -142,6 +142,13 @@ module MyGeom
 
   end
 
+  # Check if a Transformation is mirrored.
+  def self.transformation_mirrored?(transformation)
+  
+    (transformation.xaxis*transformation.yaxis) % transformation.zaxis < 0
+    
+  end
+  
 end
 
 end

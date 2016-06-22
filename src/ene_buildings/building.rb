@@ -161,7 +161,7 @@ class Building
       # End angles in radians.
       @end_angles = [0, 0]
       
-      @gables = []
+      @gables = {}
 
       # Array of Materials to replace and replacement.
       # Each element is an array containing the original and the replacement
@@ -865,6 +865,30 @@ class Building
 
   end
 
+  # Internal: Calculate the Transformation objects used when placing gables.
+  def calculate_gable_transformations
+  
+    [
+      MyGeom.transformation_axes(
+        ORIGIN,
+        X_AXIS,
+        Geom::Vector3d.new(-Math.tan(@end_angles[0]), 1, 0),
+        Z_AXIS,
+        true,
+        true
+      ),
+      MyGeom.transformation_axes(
+        Geom::Point3d.new(@path[-1].distance(@path[-2]), 0, 0),
+        X_AXIS.reverse,
+        Geom::Vector3d.new(-Math.tan(@end_angles[1]), 1, 0),
+        Z_AXIS,
+        true,
+        true
+      )
+    ]
+    
+  end
+  
   # Internal: Load building group's attributes as Hash.
   # Replaces string references used in attributes with actual objects such as
   # Template and Material.
@@ -1071,7 +1095,7 @@ class Building
  def draw_parts
   
   available_gables = list_gable_parts
-  gable_settings = @gables[@template.id]
+  gable_settings = @gables[@template.id] || {}
   left_gables = []
   right_gables = []
   available_gables.each do |potential_gable|
@@ -1148,7 +1172,7 @@ class Building
  
  end
   
-  # Public: Perform solid operations on Building if @perform_solid_operations is
+  # Internal: Perform solid operations on Building if @perform_solid_operations is
   # true.
   #
   # This method modifies the building @group DESTRUCTIVELY.
@@ -1248,11 +1272,13 @@ class Building
         Sketchup.status_text = STATUS_CUTTING if write_status
         
         naked_edges = EneBuildings.naked_edges part.definition.entities
+        original_mirrored = MyGeom.transformation_mirrored? part.transformation
         
         naked_edges.each do |edge|
           points = edge.vertices.map { |v| v.position }
           points.each { |p| p.transform! part.transformation }
           points.reverse! if edge.reversed_in?(edge.faces.first)
+          points.reverse! if original_mirrored
           cutting_edge_points << points
           
           new_edge = segment_group.entities.add_line points
@@ -1348,30 +1374,6 @@ class Building
 
   end
 
-  # Internal: Calculate the Transformation objects used when placing gables.
-  def calculate_gable_transformations
-  
-    [
-      MyGeom.transformation_axes(
-        ORIGIN,
-        X_AXIS,
-        Geom::Vector3d.new(-Math.tan(@end_angles[0]), 1, 0),
-        Z_AXIS,
-        true,
-        true
-      ),
-      MyGeom.transformation_axes(
-        Geom::Point3d.new(@path[-1].distance(@path[-2]), 0, 0),
-        X_AXIS.reverse,
-        Geom::Vector3d.new(-Math.tan(@end_angles[1]), 1, 0),
-        Z_AXIS,
-        true,
-        true
-      )
-    ]
-    
-  end
-  
   # Internal: Replaces materials in building @group according to
   # @material_replacement.
   #
