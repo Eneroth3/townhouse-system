@@ -61,6 +61,12 @@ model.skp
     Cannot be used along with spread. If both are set align is used.
     Values: "left" | "right" | "center" | <any Float>.
     Float 0 corresponds to left side and 1 to right side.
+  gable:
+    Set to truthy when part represents a gable.
+    Requires name to be set.
+  gable_width:
+    The margin for any spread or aligned part to leave space for this gable.
+    Only applies to gables.
   margin:
     What distance should be left on each side when arraying group/component.
     Does not affect align. To have a margin on an aligned group/component
@@ -73,6 +79,11 @@ model.skp
   margin_right:
     As margin but for right side only.
     When not set margin is used instead.
+  name:
+    Optional unique string to identify part.
+    Must be set for gable, corner and replacement.
+    Must also be set for any part that should be replaceable (spread, aligned or
+    centered).
   override_cut_planes:
     By default arrayed groups/components are not drawn if they are positioned
     partly outside the building segment.

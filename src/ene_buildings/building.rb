@@ -102,6 +102,13 @@ class Building
   # Array containing 2 angels in radians cc seen from above.
   attr_accessor :end_angles
 
+  # Public: Gets/sets what gables should be drawn to building.
+  # Hash indexed by String template id where each value is:
+  # hash indexed by String gable name where each value is Array of two booleans.
+  # First boolean tells if gable is used on the left end and second if it's 
+  # used on the right end.
+  attr_reader :gables
+  
   # Public: Returns Group Building is drawn to.
   attr_reader :group
 
@@ -153,14 +160,13 @@ class Building
 
       # End angles in radians.
       @end_angles = [0, 0]
+      
+      @gables = []
 
       # Array of Materials to replace and replacement.
       # Each element is an array containing the original and the replacement
       # Material object.
       @material_replacement = []
-
-      # Array... TODO: COMPONENT REPLACEMENT.
-      @componet_replacement = []
 
       # Boolean telling whether solid operations should be performed during
       # building drawing.
@@ -219,6 +225,19 @@ class Building
 
   end
 
+  # Public: Tells if pre-modeled gable can be added to building (based on
+  # template).
+  #
+  # Called when opening properties dialog to enable or disable the setting for
+  # selecting gables.
+  #
+  # Returns true or false.
+  def has_gables?
+
+    @template.has_gables?
+
+  end
+
   # Public: Tells if any solid operations can be performed on Building (based on
   # template).
   #
@@ -232,9 +251,36 @@ class Building
 
   end
 
-  # Public: List data for parts (nested Groups and ComponentInstances) (based on
-  # current @path and Template).
-  # This will be used to create part replacement field in Properties dialog.
+  # Public: List data for all gables available for building (based on current
+  # Template).
+  #
+  # Returns Array of Hash objects corresponding to each gable.
+  # Hash has reference to original_instance and width.
+  def list_gable_parts
+  
+    parts_data = []
+    
+    @template.component_def.entities.each do |e|
+      next unless e.get_attribute(Template::ATTR_DICT_PART, "gable")
+      next unless e.get_attribute(Template::ATTR_DICT_PART, "name")
+      
+      part_data = {
+        :defintion => e.definition,
+        :original_instance => e,
+        :name => e.get_attribute(Template::ATTR_DICT_PART, "name"),
+        :width => e.get_attribute(Template::ATTR_DICT_PART, "gable_width")
+      }
+      parts_data << part_data
+    end
+    
+    parts_data
+    
+  end
+  
+  # Public: List data for replaceable parts (based on current @path and
+  # Template).
+  # List contains arrayed, aligned and centered parts but not gables, corners
+  # and replacements.
   #
   # Return Array of Hash objects corresponding to each part.
   # Hash has reference to original_instance and transformations Array.
@@ -242,7 +288,7 @@ class Building
   # Each element is an Array of Transformation objects.
   # Transformation is in the local coordinate system of the relevant segment
   # group.
-  def list_parts
+  def list_replacable_parts# TODO: Rename or document better: Only those of these with a name is considered replaceable.
 
     # Prepare path.
   
@@ -292,8 +338,9 @@ class Building
       next unless ad = e.attribute_dictionary(Template::ATTR_DICT_PART)
       
       part_data = {
-        :original_instance => e,
         :defintion => e.definition,
+        :name => ad["name"],
+        :original_instance => e,
         :transformations => []
       }
       parts_data << part_data
@@ -550,6 +597,26 @@ class Building
       js << "var template_info=#{@template.json_data};"
       js << "update_template_section();";
 
+      # Gables.
+      js << "var has_gables = #{has_gables?};"
+      if has_gables?
+        gable_list = list_gable_parts.map do |g|
+          #gable_is_used = @gables[@template.id][g[:name]]
+          gable_is_used = @gables.fetch(@template.id, {}).fetch(g[:name], [false, false])
+          {
+            :name       => g[:name],
+            :used_left  => gable_is_used[0],
+            :used_right => gable_is_used[1]
+          }
+        end
+        js << "var gable_settings = #{JSON.generate gable_list};"
+      end
+      js << "update_gable_section();";
+      
+      # Corners...
+
+      # Part replacements...
+
       # Material replacement options (based on template component) and current
       # preferences (saved to building).
       material_pairs = list_replaceable_materials.map do |original|
@@ -573,12 +640,6 @@ class Building
       end
       js << "var material_pairs=#{JSON.generate(material_pairs)};"
       js << "update_material_section();";
-
-      # Part replacement...
-
-      # Corners...
-      
-      # Gables...
 
       # Solids.
       js << "var has_solids = #{has_solids?};"
@@ -663,6 +724,17 @@ class Building
         end
       end
     end
+    
+    # Toggling a gable.
+    dlg.add_action_callback("toggle_gable") do |_, params|
+      gable_name, side, status = JSON.parse(params)
+      @gables[@template.id] ||= {}
+      @gables[@template.id][gable_name] ||= []
+      @gables[@template.id][gable_name][side] = status
+    end
+    
+    # Corners...
+    # Part replacement...
 
     # Clicking material replacement button.
     dlg.add_action_callback("replace_material") do |_, original_string|
@@ -709,15 +781,6 @@ class Building
       js = "update_material_replacment('#{original_string}', #{json});"
       dlg.execute_script js
     end
-
-    # Component replacement.
-    #...
-
-    # Corners
-    #...
-
-    # Gables
-    #...
 
     # Toggling  solid operations checkbox.
     dlg.add_action_callback("perform_solids") do |_, perform_solids|
@@ -783,6 +846,9 @@ class Building
     # Override template object reference with string.
     @group.set_attribute ATTR_DICT, "template", @template ? @template.id : nil
 
+    # Override gable Hash with JSON String.
+    @group.set_attribute ATTR_DICT, "gables", JSON.generate(@gables)
+    
     # Override material replacements wit string identifiers.
     array = @material_replacement.map { |e| e.map{ |m| m.name } }
     @group.set_attribute ATTR_DICT, "material_replacement", array
@@ -800,15 +866,19 @@ class Building
   
     h = EneBuildings.attr_dict_to_hash @group, ATTR_DICT, true
     
-    # Set back_along_path to false if not already set for backward
-    # compatibility. The value nil is reserved to let PathHandling handle
-    # paths where back_along_path doesn't make any sense, e.g. plots instead
-    # of individual buildings.
+    # Backward compatibility: Set back_along_path to false if not already set. 
+    # The value nil is reserved to let PathHandling handle paths where
+    # back_along_path doesn't make any sense, e.g. plots instead of individual
+    # buildings.
     h[:back_along_path] ||= false
 
     # Override template id string with reference to actual object.
     # Nil if not found.
     h[:template] = Template.get_from_id h[:template]
+    
+    # Override gable JSON String with actual Hash object.
+    # Backward compatibility: Set gables to empty Hash if not already set.
+    h[:gables] = h[:gables] ? JSON.parse(h[:gables]) : {}
 
     # Override material replacement string identifiers with actual material
     # references.
@@ -995,7 +1065,7 @@ class Building
   # TODO: CORNERS: Maybe sort these out from corners, if corners lie in @group root.
   segment_groups = @group.entities.to_a
  
-  part_data = list_parts
+  part_data = list_replacable_parts
   
   # Loop path segments.
     (0..path.size - 2).each do |segment_index|

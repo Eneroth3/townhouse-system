@@ -901,7 +901,7 @@ module TemplateEditor
             UI.messagebox msg
             sp = old_data["spread"] || 1
           end
-          sp = old_data["spread"] unless sp > 0
+          sp = old_data["spread"] unless sp > 0# FIXME: If arrayed is selected in UI but no length is set spread is saved as nil, causing the dialog to stop functioniong.
           sp
         end
       rounding = @@dlg_part.get_element_value("rounding")

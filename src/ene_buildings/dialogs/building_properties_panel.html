@@ -42,6 +42,33 @@
         if(description) html += description;
         document.getElementById('template_info').innerHTML = html;
       }
+      
+      //Gables.
+      //var has_gables = <boolean>.
+      //var gable_settings = <array>, each element is object with keys:
+      // name, used_left and used_right.
+      function update_gable_section(){
+        document.getElementById('gables').style.display = has_gables ? '' : 'none';
+        html = '<table class="leftmost-is-label">';
+        
+        for(i=0; i<gable_settings.length; i++) {
+          var gable_data = gable_settings[i];
+          html += '<tr>';
+          html += '<td>' + gable_data['name'] + ':</td>';
+          html += '<td><input type="checkbox" ' + (gable_data['used_left'] ? 'checked="checked"' : '') + ' onclick="toggle_gable(\'' + gable_data['name'] + '\', 0, this.checked);" /></td>';// FIXME: What if name contains quote or other special character?
+          html += '<td><input type="checkbox" ' + (gable_data['used_right'] ? 'checked="checked"' : '') + ' onclick="toggle_gable(\'' + gable_data['name'] + '\', 1, this.checked);"/></td>';
+          html += '</tr>';
+        }
+        
+        html += '</table>';
+        document.getElementById('gable-settings').innerHTML = html;
+      }
+      
+      //Corners.
+      //...
+      
+      //Part replacements.
+      //...
 
       //Material replacement.
       //var material_pairs = [array of material pairs];
@@ -111,6 +138,13 @@
         document.getElementById('solids_checkbox').checked = perform_solids;
       }
 
+      //Handle user input.
+      //Most input is handled by inline code in click attribute of input.
+      
+      function toggle_gable(gable_name, side, status){
+        params = JSON.stringify([gable_name, side, status]);
+        window.location='skp:toggle_gable@' + params;
+      }
 
       //Misc/UI stuff.
 
@@ -130,6 +164,11 @@
     </script>
     <link href="style.css" rel="stylesheet" type="text/css">
     <style type="text/css">
+      table.leftmost-is-label tr td:nth-child(1){
+        width: 80px;
+        text-align: right;
+      }
+      
       #template img{
         width: 200px;
         height: 124px;/*golden rectangle*/
@@ -208,6 +247,30 @@
           </div>
           <p style="clear: both;"></p>
         </div>
+        
+        <div id="gables" class="section">
+          <!--Visibility is toggled depending on relevance of these settings.-->
+          <b>Gables</b>
+          <hr />
+          <div id="gable-settings">
+            <!--Dynamically created content-->
+            <!--
+            <table class="leftmost-is-label">
+              <tr><td>Facade:</td><td><input type="checkbox" /></td><td><input type="checkbox" /></td></tr>
+              <tr><td>Portik:</td><td><input type="checkbox" /></td><td><input type="checkbox" /></td></tr>
+              <tr><td>Irregular Windows:</td><td><input type="checkbox" /></td><td><input type="checkbox" /></td></tr>
+            </table>
+            -->
+          </div>
+        </div>
+        
+        <!--corners...-->
+
+        <!--<div id="component_replacement" class="section">
+          <!- -Visibility is toggled depending on relevance of these settings.- ->
+          <b>Component Replacement</b>
+          <hr>
+        </div>-->
 
         <div id="material_replacement" class="section">
           <!--Visibility is toggled depending on relevance of these settings.-->
@@ -245,15 +308,6 @@
             <p style="clear: both;"></p>
             <button id="material_browser_opener" onclick="window.location='skp:browse_materials';">Material browser...</button>
           </div>
-
-        <!--<div id="component_replacement" class="section">
-          <!- -Visibility is toggled depending on relevance of these settings.- ->
-          <b>Component Replacement</b>
-          <hr>
-        </div>-->
-
-        <!--hörntorn...-->
-        <!--gabels etc...-->
 
         <div id="solids" class="section">
           <!--Visibility is toggled depending on relevance of these settings.-->
