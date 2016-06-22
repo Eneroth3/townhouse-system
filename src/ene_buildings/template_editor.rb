@@ -311,19 +311,24 @@ module TemplateEditor
             spread_distance = data["spread"]
           end
           "spread"
+        elsif data["gable"]
+          "gable"
         else
           ""
         end
-      margin =                  data["margin"]                  || 0.to_l
-      margin_right =            data["margin_right"]            || ""
-      rounding =                data["rounding"]                || ""
-      override_cut_planes =     data["override_cut_planes"]     || false
+      name                    = data["name"]                    || ""
+      margin                  = data["margin"]                  || 0.to_l
+      margin_right            = data["margin_right"]            || ""
+      rounding                = data["rounding"]                || ""
+      override_cut_planes     = data["override_cut_planes"]     || false
       replace_nested_mateials = data["replace_nested_mateials"] || false
-      solid =                   data["solid"]                   || ""
-      solid_index =             data["solid_index"]             || 0
+      gable_width             = data["gable_width"]             || 0.to_l
+      solid                   = data["solid"]                   || ""
+      solid_index             = data["solid_index"]             || 0
 
       # Add data to dialog.
       js = "warn(false);"
+      js << "document.getElementById('name').value=#{name.to_s.inspect};"
       js << "toggle_positioning(#{position_method.inspect});"
       js << "document.getElementById('margin').value=#{margin.to_s.inspect};"
       js << "document.getElementById('margin_right').value=#{margin_right.to_s.inspect};"
@@ -333,6 +338,7 @@ module TemplateEditor
       js << "document.getElementById('rounding').value=#{rounding.inspect};"
       js << "document.getElementById('align_percentage').value=#{percentage};"
       js << "override_cut_planes(#{override_cut_planes});"
+      js << "document.getElementById('gable_width').value=#{gable_width.to_s.inspect};"
       js << "replace_nested_mateials(#{replace_nested_mateials});"
       js << "is_group(#{@@part.is_a? Sketchup::Group});"
       js << "document.getElementById('solid').value=#{solid.inspect};"
@@ -859,6 +865,8 @@ module TemplateEditor
     # Silently correct certain input by negate numbers or keep old value.
     # Notify user when input cannot be parsed as length and keep old value.
     data = {}
+    name = @@dlg_part.get_element_value "name"
+    data["name"] = unique_part_name(@@part, name) unless name.empty?
     case @@dlg_part.get_element_value "position_method"
     when "spread"
       margin = @@dlg_part.get_element_value("margin")
@@ -885,31 +893,47 @@ module TemplateEditor
         end
         data["margin_right"] = margin_r unless margin_r == margin
       end
-      data["spread"] =
-        if @@dlg_part.get_element_value("spread_fix_number") == "true"
-          sp = @@dlg_part.get_element_value("spread_int").to_i
-          sp = -sp if sp < 0
-          sp
-        else
-          sp = @@dlg_part.get_element_value("spread_distance")
-          begin
-            sp = sp.start_with?("~") ? old_data["spread"] : sp.to_l
-          rescue ArgumentError
-            msg =
-              "'#{sp}' could not be parsed as length.\n"\
-              "Keeping old value for spread interval."
-            UI.messagebox msg
-            sp = old_data["spread"] || 1
-          end
-          sp = old_data["spread"] unless sp > 0# FIXME: If arrayed is selected in UI but no length is set spread is saved as nil, causing the dialog to stop functioniong.
-          sp
+      if @@dlg_part.get_element_value("spread_fix_number") == "true"
+        sp = @@dlg_part.get_element_value("spread_int").to_i
+        sp = -sp if sp < 0
+      else
+        sp = @@dlg_part.get_element_value("spread_distance")
+        begin
+          sp = sp.start_with?("~") ? old_data["spread"] : sp.to_l
+        rescue ArgumentError
+          msg =
+            "'#{sp}' could not be parsed as length.\n"\
+            "Keeping old value for spread interval."
+          UI.messagebox msg
+          sp = old_data["spread"] || 1.m
         end
+        sp = old_data["spread"] unless sp > 0
+      end
+      data["spread"] = sp if sp
       rounding = @@dlg_part.get_element_value("rounding")
       data["rounding"] = rounding unless rounding.empty?
     when "left", "right", "center"
       data["align"] = @@dlg_part.get_element_value "position_method"
-     when "percentage"
+    when "percentage"
       data["align"] = @@dlg_part.get_element_value("align_percentage").gsub(",",".").to_f
+    when "gable"
+      data["gable"] = true
+      gable_width = @@dlg_part.get_element_value("gable_width")
+      begin
+        gable_width = gable_width.start_with?("~") ? old_data["gable_width"] : gable_width.to_l
+      rescue ArgumentError
+        msg =
+          "'#{gable_width}' could not be parsed as length.\n"\
+          "Keeping old value for margin."
+        UI.messagebox msg
+        gable_width = old_data["gable_width"] || 0
+      end
+      data["gable_width"] = gable_width unless gable_width == 0
+      unless data["name"]
+         data["name"] = unique_part_name(@@part, "Gable")
+         msg = "Gable must have a name.\nUsing '#{data["name"]}."
+         UI.messagebox msg
+      end
     end
     data["override_cut_planes"] = true if @@dlg_part.get_element_value("override_cut_planes") == "true"
     data["replace_nested_mateials"] = true if @@dlg_part.get_element_value("replace_nested_mateials") == "true"
@@ -952,6 +976,36 @@ module TemplateEditor
 
   end
 
+  # Create a name that is unique for a part in same drawing context.
+  #
+  # part     - The part (Group or ComponentInstance) to create the name for.
+  #            Exclude this part when loocking for name collisions.
+  # basename - The approximate name to use. Add incrementing number if taken.
+  #
+  # Returns String name.
+  def self.unique_part_name(part, basename)
+  
+    entities = part.parent.entities
+    taken_names = entities.map do |e|
+      next if e == part
+      next unless [Sketchup::Group, Sketchup::ComponentInstance].include? e.class
+      e.get_attribute Template::ATTR_DICT_PART, "name"
+    end
+    taken_names.compact!
+    
+   basename = basename.sub(/ #\d+$/, "")
+    
+    name = basename
+    i = 1
+    while taken_names.include? name
+      name = "#{basename} ##{i}"
+      i += 1
+    end
+    
+    name
+    
+  end
+  
 end
 
 end

@@ -67,6 +67,7 @@ model.skp
   gable_width:
     The margin for any spread or aligned part to leave space for this gable.
     Only applies to gables.
+    May be left out.
   margin:
     What distance should be left on each side when arraying group/component.
     Does not affect align. To have a margin on an aligned group/component

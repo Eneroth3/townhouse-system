@@ -1105,6 +1105,8 @@ class Building
   end
   gable_transformations = calculate_gable_transformations
   
+  # TODO: Use largest width of currently used gables as margin when listing parts in between
+  
   part_data = list_replacable_parts
  
   # TODO: CORNERS: Maybe sort these out from corners, if corners lie in @group root.
