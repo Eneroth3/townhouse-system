@@ -658,37 +658,6 @@ class Building
 
   end
 
-  
-  
-  
-  
-  # Internal: Calculate the Transformation objects used when placing gables.
-  def calculate_gable_transformations
-  
-    [
-      MyGeom.transformation_axes(
-        ORIGIN,
-        X_AXIS,
-        Geom::Vector3d.new(-Math.tan(@end_angles[0]), 1, 0),
-        Z_AXIS,
-        true,
-        true
-      ),
-      MyGeom.transformation_axes(
-        Geom::Point3d.new(@path[-1].distance(@path[-2]), 0, 0),
-        X_AXIS.reverse,
-        Geom::Vector3d.new(-Math.tan(@end_angles[1]), 1, 0),
-        Z_AXIS,
-        true,
-        true
-      )
-    ]
-    
-  end
-
-  
-  
-  
   # Internal: List gables available for building.
   # Based on Template.
   #
@@ -715,9 +684,9 @@ class Building
     
   end
   
-  # Internal: List replaceable parts (those with positioning set to spread or
-  # align) available for this building.
-  # Also list the Transformation objects how they could be placed.
+  # Internal: List replaceable parts (spread and aligned parts) available for
+  # this building.
+  # Also list the Transformation objects for each part.
   # Based on Template and @path. # TODO: Should also be based on used gables.
   #
   # Return Array of Hash objects corresponding to each part.
@@ -727,7 +696,7 @@ class Building
   # Each element is an Array of Transformation objects.
   # Transformation is in the local coordinate system of the relevant segment
   # group.
-  def list_available_replacable# TODO: Rename or document better: Only those of these with a name is considered replaceable. This lists all ghat are spread or aligned.
+  def list_available_replacable
 
     # Prepare path.
   
@@ -908,23 +877,52 @@ class Building
   # group.
   def list_used_gables
   
-    transformation_left = MyGeom.transformation_axes(
-      ORIGIN,
-      X_AXIS,
-      Geom::Vector3d.new(-Math.tan(@end_angles[0]), 1, 0),
-      Z_AXIS,
-      true,
-      true
-    )
+    if @back_along_path
+      delta_y = -(@template.depth || Template::FALLBACK_DEPTH)
+      transformation_left = MyGeom.transformation_axes(
+        Geom::Point3d.new(
+          - Math.tan(@end_angles[1])*delta_y,
+          delta_y,
+          0
+        ),
+        X_AXIS,
+        Geom::Vector3d.new(-Math.tan(@end_angles[1]), 1, 0),
+        Z_AXIS,
+        true,
+        true
+      )
+      transformation_right = MyGeom.transformation_axes(
+        Geom::Point3d.new(
+          @path[0].distance(@path[1]) - Math.tan(@end_angles[0])*delta_y,
+          delta_y,
+          0
+        ),
+        X_AXIS.reverse,
+        Geom::Vector3d.new(-Math.tan(@end_angles[0]), 1, 0),
+        Z_AXIS,
+        true,
+        true
+      )
+    else
+      transformation_left = MyGeom.transformation_axes(
+        ORIGIN,
+        X_AXIS,
+        Geom::Vector3d.new(-Math.tan(@end_angles[0]), 1, 0),
+        Z_AXIS,
+        true,
+        true
+      )
+      transformation_right = MyGeom.transformation_axes(
+        Geom::Point3d.new(@path[-1].distance(@path[-2]), 0, 0),
+        X_AXIS.reverse,
+        Geom::Vector3d.new(-Math.tan(@end_angles[1]), 1, 0),
+        Z_AXIS,
+        true,
+        true
+      )
+    end
     
-    transformation_right = MyGeom.transformation_axes(
-      Geom::Point3d.new(@path[-1].distance(@path[-2]), 0, 0),
-      X_AXIS.reverse,
-      Geom::Vector3d.new(-Math.tan(@end_angles[1]), 1, 0),
-      Z_AXIS,
-      true,
-      true
-    )
+    # TODO: FIXME: Adapt transformations for back along path.
     
     parts_data = list_available_gables
     
@@ -1154,29 +1152,12 @@ class Building
   #
   # Return nothing.
   def draw_parts
-  
-  
-=begin
-    available_gables = list_available_gables
-    gable_settings = @gables[@template.id] || {}
-    left_gables = []
-    right_gables = []
-    available_gables.each do |potential_gable|
-      next unless a = gable_settings[potential_gable[:name]]
-      left_gables << potential_gable if a[0]
-      right_gables << potential_gable if a[1]
-    end
-    gable_transformations = calculate_gable_transformations
-=end
-    
-    
     
     # TODO: Use largest width of currently used gables as margin when listing parts in between
     
     part_data = list_available_replacable
     part_data += list_used_gables
    
-    # TODO: CORNERS: Maybe sort these out from corners, if corners lie in @group root.
     segment_groups = @group.entities.to_a
 
     # Loop path segments.
@@ -1190,28 +1171,6 @@ class Building
       # calling draw_volume.
       instances = segment_ents.select { |e| [Sketchup::Group, Sketchup::ComponentInstance].include? e.class }
       segment_ents.erase_entities instances
-      
-      
-      
-=begin
-      # Place gables if this is an end segment.
-      if segment_index == 0
-        left_gables.each do |gable|
-          trans = gable_transformations[0]
-          original = gable[:original_instance]
-          EneBuildings.copy_instance original, segment_ents, trans
-        end
-      end
-      if segment_index == @path.size - 2
-        right_gables.each do |gable|
-          trans = gable_transformations[1]
-          original = gable[:original_instance]
-          EneBuildings.copy_instance original, segment_ents, trans
-        end
-      end
-=end
-      
-      
       
       # Place instances of all spread or aligned parts that has transformations
       # for this segment.
