@@ -258,213 +258,6 @@ class Building
 
   end
 
-  # Public: List data for all gables available for building (based on current
-  # Template).
-  #
-  # Returns Array of Hash objects corresponding to each gable.
-  # Hash has reference to definition, name, original_instance and width.
-  def list_gable_parts
-  
-    parts_data = []
-    
-    @template.component_def.entities.each do |e|
-      next unless e.get_attribute(Template::ATTR_DICT_PART, "gable")
-      next unless e.get_attribute(Template::ATTR_DICT_PART, "name")
-      
-      part_data = {
-        :defintion => e.definition,
-        :original_instance => e,
-        :name => e.get_attribute(Template::ATTR_DICT_PART, "name"),
-        :width => e.get_attribute(Template::ATTR_DICT_PART, "gable_width")
-      }
-      parts_data << part_data
-    end
-    
-    parts_data
-    
-  end
-  
-  # Public: List data for replaceable parts (based on current @path and
-  # Template).
-  # List contains arrayed, aligned and centered parts but not gables, corners
-  # and replacements.
-  #
-  # Return Array of Hash objects corresponding to each part.
-  # Hash has reference to definition, name, original_instance and
-  # transformations Array.
-  # Transformations Array has one element for each segment in building.
-  # Each element is an Array of Transformation objects.
-  # Transformation is in the local coordinate system of the relevant segment
-  # group.
-  def list_replacable_parts# TODO: Rename or document better: Only those of these with a name is considered replaceable. This lists all ghat are spread or aligned.
-
-    # Prepare path.
-  
-    # RVIWEW: Make Path class and move some of this stuff there instead of
-    # just having same code copied here from draw_basic.
-    
-    # Transform path to local building coordinates.
-    trans_inverse = @group.transformation.inverse
-    path = @path.map { |p| p.transform trans_inverse }
-
-    # Get tangent for each point in path.
-    # Tangents point in the positive direction of path.
-    tangents = []
-    tangents << path[1] - path[0]
-    if path.size > 2
-      (1..path.size - 2).each do |corner|
-        p_prev = path[corner - 1]
-        p_here = path[corner]
-        p_next = path[corner + 1]
-        v_prev = p_here - p_prev
-        v_next = p_next - p_here
-        tangents << Geom.linear_combination(0.5, v_prev, 0.5, v_next)
-      end
-    end
-    tangents << path[-1] - path[-2]
-
-    # Rotate first and last tangent according to @end_angles.
-    tangents.first.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.first
-    tangents.last.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.last
-    
-    # If building should be drawn with it back along the path instead of its
-    # front, reverse the path and tangents.
-    # The terms left and right relates to the building front side.
-    if @back_along_path
-      path.reverse!
-      tangents.reverse!
-      tangents.each { |t| t.reverse! }
-    end
-    
-    # Collect parts data.
-    
-    parts_data = []
-    
-    # Loop parts in Template's ComponentDefinition.
-    @template.component_def.entities.each do |e|
-      next unless [Sketchup::Group, Sketchup::ComponentInstance].include? e.class
-      next unless ad = e.attribute_dictionary(Template::ATTR_DICT_PART)
-      
-      part_data = {
-        :defintion => e.definition,
-        :name => ad["name"],
-        :original_instance => e,
-        :transformations => []
-      }
-      parts_data << part_data
-      
-      transformation_original = e.transformation
-      
-      # If building is drawn with its back along path, adapt transformation.
-      if @back_along_path
-        delta_y = -(@template.depth || Template::FALLBACK_DEPTH)
-        translation = Geom::Transformation.translation([0, delta_y, 0])
-        transformation_original = translation * transformation_original
-      end
-
-      origin      = transformation_original.origin
-      line_origin = [origin, X_AXIS]
-      t_array     = transformation_original.to_a
-      
-      # Loop path segments.
-      (0..path.size - 2).each do |segment_index|
-      
-        transformations = []
-        part_data[:transformations] << transformations
-      
-        # Values in main building @group's coordinates.
-        corner_left    = path[segment_index]
-        corner_right   = path[segment_index + 1]
-        segment_vector = corner_right - corner_left
-        segment_length = segment_vector.length
-        tangent_left   = tangents[segment_index]
-        tangent_right  = tangents[segment_index + 1]
-        segment_trans  = Geom::Transformation.axes(
-          corner_left,
-          segment_vector,
-          Z_AXIS * segment_vector,
-          Z_AXIS
-        )
-        
-        # Values in local segment group's coordinates.
-        plane_left       = [ORIGIN, tangent_left.reverse.transform(segment_trans.inverse)]
-        plane_right      = [[segment_length, 0, 0], tangent_right.transform(segment_trans.inverse)]
-        origin_leftmost  = Geom.intersect_line_plane line_origin, plane_left
-        origin_rightmost = Geom.intersect_line_plane line_origin, plane_right
-        
-        # Create Transformation objects from current Transformation, path
-        # segment and attribute data.
-        if ad["align"]
-          # Align one instance
-          # Either "left", "right", "center" or percentage (float between 0 and
-          # 1).
-          
-          new_origin =
-            if ad["align"] == "left"
-              origin_leftmost
-            elsif ad["align"] == "right"
-             origin_rightmost
-            elsif ad["align"] == "center"
-              Geom.linear_combination 0.5, origin_leftmost, 0.5, origin_rightmost
-            elsif ad["align"].is_a? Float
-              Geom.linear_combination(1-ad["align"], origin_leftmost, ad["align"], origin_rightmost)
-            end
-          t_array[12] = new_origin.x
-          transformations << Geom::Transformation.new(t_array)
-
-        elsif ad["spread"]
-          # Spread multiple groups/components.
-          # Either Fixnum telling number of copies or float/length telling
-          # approximate distance between (in inches). This distance will adapt
-          # to fit available space.
-          
-          available_distance = origin_leftmost.distance origin_rightmost
-          margin_l = ad["margin_left"] || ad["margin"] || 0
-          margin_r = ad["margin_right"] || ad["margin"] || 0
-          available_distance -= (margin_l + margin_r)
-          if ad["spread"].is_a?(Fixnum)
-            total_number = ad["spread"]
-            raise "If 'spread' is a Fuxnum it must be zero or more." if total_number < 0
-          else
-            total_number = available_distance/ad["spread"]
-            raise "If 'spread' is a Length it must bigger than zero." unless ad["spread"] > 0
-            # Round total_number to closets Int or force to odd/even.
-            #(If rounding is set to anything else than "force_odd" it's used as "force_even".)
-            total_number =
-              if ad["rounding"]
-                fraction = total_number%2
-                (ad["rounding"] == "force_odd") && fraction > 1 ? total_number.floor : total_number.ceil
-              else
-                total_number.round
-              end
-          end
-          distance_between = available_distance/total_number
-          # Each copy has its origin at x = margin_l + (n + 0.5)*distance_between
-          e_def = e.definition
-          (0..total_number-1).each do |n|
-            x = origin_leftmost.x + margin_l + (n + 0.5) * distance_between
-            t_array[12] = x
-            trans = Geom::Transformation.new t_array
-            # Don't place anything with its bounding box outside the segment if
-            # not specifically told to do so.
-            unless ad["override_cut_planes"]
-              corners = MyGeom.bb_corners(e_def.bounds)
-              corners.each { |c| c.transform! trans }
-              next if corners.any? { |c| MyGeom.front_of_plane?(plane_left, c) || MyGeom.front_of_plane?(plane_right, c) }
-            end
-            transformations << trans
-          end
-          
-        end
-
-      end
-    
-    end
-    
-    parts_data
-    
-  end
-  
   # Public: List replaceable materials (based o template).
   # Materials directly in segment groups are listed. Materials in nested groups
   # are also listed if the group has an attribute specifically saying so.
@@ -608,7 +401,7 @@ class Building
       # Gables.
       js << "var has_gables = #{has_gables?};"
       if has_gables?
-        gable_list = list_gable_parts.map do |g|
+        gable_list = list_available_gables.map do |g|
           #gable_is_used = @gables[@template.id][g[:name]]
           gable_is_used = @gables.fetch(@template.id, {}).fetch(g[:name], [false, false])
           {
@@ -865,6 +658,10 @@ class Building
 
   end
 
+  
+  
+  
+  
   # Internal: Calculate the Transformation objects used when placing gables.
   def calculate_gable_transformations
   
@@ -886,6 +683,270 @@ class Building
         true
       )
     ]
+    
+  end
+
+  
+  
+  
+  # Internal: List gables available for building.
+  # Based on Template.
+  #
+  # Returns Array of Hash objects corresponding to each gable.
+  # Hash has reference to definition, name, original_instance and width.
+  def list_available_gables
+  
+    parts_data = []
+    
+    @template.component_def.entities.each do |e|
+      next unless e.get_attribute(Template::ATTR_DICT_PART, "gable")
+      next unless e.get_attribute(Template::ATTR_DICT_PART, "name")
+      
+      part_data = {
+        :defintion => e.definition,
+        :original_instance => e,
+        :name => e.get_attribute(Template::ATTR_DICT_PART, "name"),
+        :width => e.get_attribute(Template::ATTR_DICT_PART, "gable_width")
+      }
+      parts_data << part_data
+    end
+    
+    parts_data
+    
+  end
+  
+  # Internal: List replaceable parts (those with positioning set to spread or
+  # align) available for this building.
+  # Also list the Transformation objects how they could be placed.
+  # Based on Template and @path. # TODO: Should also be based on used gables.
+  #
+  # Return Array of Hash objects corresponding to each part.
+  # Hash has reference to definition, name, original_instance and
+  # transformations Array.
+  # Transformations Array has one element for each segment in building.
+  # Each element is an Array of Transformation objects.
+  # Transformation is in the local coordinate system of the relevant segment
+  # group.
+  def list_available_replacable# TODO: Rename or document better: Only those of these with a name is considered replaceable. This lists all ghat are spread or aligned.
+
+    # Prepare path.
+  
+    # RVIWEW: Make Path class and move some of this stuff there instead of
+    # just having same code copied here from draw_basic.
+    
+    # Transform path to local building coordinates.
+    trans_inverse = @group.transformation.inverse
+    path = @path.map { |p| p.transform trans_inverse }
+
+    # Get tangent for each point in path.
+    # Tangents point in the positive direction of path.
+    tangents = []
+    tangents << path[1] - path[0]
+    if path.size > 2
+      (1..path.size - 2).each do |corner|
+        p_prev = path[corner - 1]
+        p_here = path[corner]
+        p_next = path[corner + 1]
+        v_prev = p_here - p_prev
+        v_next = p_next - p_here
+        tangents << Geom.linear_combination(0.5, v_prev, 0.5, v_next)
+      end
+    end
+    tangents << path[-1] - path[-2]
+
+    # Rotate first and last tangent according to @end_angles.
+    tangents.first.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.first
+    tangents.last.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.last
+    
+    # If building should be drawn with it back along the path instead of its
+    # front, reverse the path and tangents.
+    # The terms left and right relates to the building front side.
+    if @back_along_path
+      path.reverse!
+      tangents.reverse!
+      tangents.each { |t| t.reverse! }
+    end
+    
+    # Collect parts data.
+    
+    parts_data = []
+    
+    # Loop parts in Template's ComponentDefinition.
+    @template.component_def.entities.each do |e|
+      next unless [Sketchup::Group, Sketchup::ComponentInstance].include? e.class
+      next unless ad = e.attribute_dictionary(Template::ATTR_DICT_PART)
+      
+      part_data = {
+        :defintion => e.definition,
+        :name => ad["name"],
+        :original_instance => e,
+        :transformations => []
+      }
+      parts_data << part_data
+      
+      transformation_original = e.transformation
+      
+      # If building is drawn with its back along path, adapt transformation.
+      if @back_along_path
+        delta_y = -(@template.depth || Template::FALLBACK_DEPTH)
+        translation = Geom::Transformation.translation([0, delta_y, 0])
+        transformation_original = translation * transformation_original
+      end
+
+      origin      = transformation_original.origin
+      line_origin = [origin, X_AXIS]
+      t_array     = transformation_original.to_a
+      
+      # Loop path segments.
+      (0..path.size - 2).each do |segment_index|
+      
+        transformations = []
+        part_data[:transformations] << transformations
+      
+        # Values in main building @group's coordinates.
+        corner_left    = path[segment_index]
+        corner_right   = path[segment_index + 1]
+        segment_vector = corner_right - corner_left
+        segment_length = segment_vector.length
+        tangent_left   = tangents[segment_index]
+        tangent_right  = tangents[segment_index + 1]
+        segment_trans  = Geom::Transformation.axes(
+          corner_left,
+          segment_vector,
+          Z_AXIS * segment_vector,
+          Z_AXIS
+        )
+        
+        # Values in local segment group's coordinates.
+        plane_left       = [ORIGIN, tangent_left.reverse.transform(segment_trans.inverse)]
+        plane_right      = [[segment_length, 0, 0], tangent_right.transform(segment_trans.inverse)]
+        origin_leftmost  = Geom.intersect_line_plane line_origin, plane_left
+        origin_rightmost = Geom.intersect_line_plane line_origin, plane_right
+        
+        # Create Transformation objects from current Transformation, path
+        # segment and attribute data.
+        if ad["align"]
+          # Align one instance
+          # Either "left", "right", "center" or percentage (float between 0 and
+          # 1).
+          
+          new_origin =
+            if ad["align"] == "left"
+              origin_leftmost
+            elsif ad["align"] == "right"
+             origin_rightmost
+            elsif ad["align"] == "center"
+              Geom.linear_combination 0.5, origin_leftmost, 0.5, origin_rightmost
+            elsif ad["align"].is_a? Float
+              Geom.linear_combination(1-ad["align"], origin_leftmost, ad["align"], origin_rightmost)
+            end
+          t_array[12] = new_origin.x
+          transformations << Geom::Transformation.new(t_array)
+
+        elsif ad["spread"]
+          # Spread multiple groups/components.
+          # Either Fixnum telling number of copies or float/length telling
+          # approximate distance between (in inches). This distance will adapt
+          # to fit available space.
+          
+          available_distance = origin_leftmost.distance origin_rightmost
+          margin_l = ad["margin_left"] || ad["margin"] || 0
+          margin_r = ad["margin_right"] || ad["margin"] || 0
+          available_distance -= (margin_l + margin_r)
+          if ad["spread"].is_a?(Fixnum)
+            total_number = ad["spread"]
+            raise "If 'spread' is a Fuxnum it must be zero or more." if total_number < 0
+          else
+            total_number = available_distance/ad["spread"]
+            raise "If 'spread' is a Length it must bigger than zero." unless ad["spread"] > 0
+            # Round total_number to closets Int or force to odd/even.
+            #(If rounding is set to anything else than "force_odd" it's used as "force_even".)
+            total_number =
+              if ad["rounding"]
+                fraction = total_number%2
+                (ad["rounding"] == "force_odd") && fraction > 1 ? total_number.floor : total_number.ceil
+              else
+                total_number.round
+              end
+          end
+          distance_between = available_distance/total_number
+          # Each copy has its origin at x = margin_l + (n + 0.5)*distance_between
+          e_def = e.definition
+          (0..total_number-1).each do |n|
+            x = origin_leftmost.x + margin_l + (n + 0.5) * distance_between
+            t_array[12] = x
+            trans = Geom::Transformation.new t_array
+            # Don't place anything with its bounding box outside the segment if
+            # not specifically told to do so.
+            unless ad["override_cut_planes"]
+              corners = MyGeom.bb_corners(e_def.bounds)
+              corners.each { |c| c.transform! trans }
+              next if corners.any? { |c| MyGeom.front_of_plane?(plane_left, c) || MyGeom.front_of_plane?(plane_right, c) }
+            end
+            transformations << trans
+          end
+          
+        end
+
+      end
+    
+    end
+    
+    parts_data
+    
+  end
+  
+  # Internal: List gables currently used in building.
+  # Based on Template and @gables.
+  #
+  # Return Array of Hash objects corresponding to each gable.
+  # Hash has reference to definition, name, original_instance and
+  # transformations Array.
+  # Transformations Array has one element for each segment in building.
+  # Each element is an Array of Transformation objects.
+  # Transformation is in the local coordinate system of the relevant segment
+  # group.
+  def list_used_gables
+  
+    transformation_left = MyGeom.transformation_axes(
+      ORIGIN,
+      X_AXIS,
+      Geom::Vector3d.new(-Math.tan(@end_angles[0]), 1, 0),
+      Z_AXIS,
+      true,
+      true
+    )
+    
+    transformation_right = MyGeom.transformation_axes(
+      Geom::Point3d.new(@path[-1].distance(@path[-2]), 0, 0),
+      X_AXIS.reverse,
+      Geom::Vector3d.new(-Math.tan(@end_angles[1]), 1, 0),
+      Z_AXIS,
+      true,
+      true
+    )
+    
+    parts_data = list_available_gables
+    
+    gable_settings = @gables[@template.id] || {}
+    parts_data.map! do |part_data|
+      part_data = part_data.dup
+      
+      next unless a = gable_settings[part_data[:name]]
+      next unless a.include? true
+      part_data[:transformations] = (0..@path.length-2).map { [] }
+      if a[0]
+        part_data[:transformations][0] << transformation_left
+      end
+      if a[1]
+        part_data[:transformations][-1] << transformation_right
+      end
+
+      part_data
+    end
+    parts_data.compact!
+    
+    parts_data
     
   end
   
@@ -1092,87 +1153,99 @@ class Building
   # new groups/components get the right materials.
   #
   # Return nothing.
- def draw_parts
+  def draw_parts
   
-  available_gables = list_gable_parts
-  gable_settings = @gables[@template.id] || {}
-  left_gables = []
-  right_gables = []
-  available_gables.each do |potential_gable|
-    next unless a = gable_settings[potential_gable[:name]]
-    left_gables << potential_gable if a[0]
-    right_gables << potential_gable if a[1]
-  end
-  gable_transformations = calculate_gable_transformations
   
-  # TODO: Use largest width of currently used gables as margin when listing parts in between
-  
-  part_data = list_replacable_parts
- 
-  # TODO: CORNERS: Maybe sort these out from corners, if corners lie in @group root.
-  segment_groups = @group.entities.to_a
+=begin
+    available_gables = list_available_gables
+    gable_settings = @gables[@template.id] || {}
+    left_gables = []
+    right_gables = []
+    available_gables.each do |potential_gable|
+      next unless a = gable_settings[potential_gable[:name]]
+      left_gables << potential_gable if a[0]
+      right_gables << potential_gable if a[1]
+    end
+    gable_transformations = calculate_gable_transformations
+=end
+    
+    
+    
+    # TODO: Use largest width of currently used gables as margin when listing parts in between
+    
+    part_data = list_available_replacable
+    part_data += list_used_gables
+   
+    # TODO: CORNERS: Maybe sort these out from corners, if corners lie in @group root.
+    segment_groups = @group.entities.to_a
 
-  # Loop path segments.
-  (0..path.size - 2).each do |segment_index|
-    
-    segment_group = segment_groups[segment_index]
-    segment_ents  = segment_group.entities
-    
-    # Purge all existing parts in segment.
-    # This method can be called if part settings are changed without first
-    # calling draw_volume.
-    instances = segment_ents.select { |e| [Sketchup::Group, Sketchup::ComponentInstance].include? e.class }
-    segment_ents.erase_entities instances
-    
-    # Place gables if this is an end segment.
-    if segment_index == 0
-      left_gables.each do |gable|
-        trans = gable_transformations[0]
-        original = gable[:original_instance]
-        EneBuildings.copy_instance original, segment_ents, trans
+    # Loop path segments.
+    (0..path.size - 2).each do |segment_index|
+      
+      segment_group = segment_groups[segment_index]
+      segment_ents  = segment_group.entities
+      
+      # Purge all existing parts in segment.
+      # This method can be called if part settings are changed without first
+      # calling draw_volume.
+      instances = segment_ents.select { |e| [Sketchup::Group, Sketchup::ComponentInstance].include? e.class }
+      segment_ents.erase_entities instances
+      
+      
+      
+=begin
+      # Place gables if this is an end segment.
+      if segment_index == 0
+        left_gables.each do |gable|
+          trans = gable_transformations[0]
+          original = gable[:original_instance]
+          EneBuildings.copy_instance original, segment_ents, trans
+        end
       end
-    end
-    if segment_index == @path.size - 2
-      right_gables.each do |gable|
-        trans = gable_transformations[1]
-        original = gable[:original_instance]
-        EneBuildings.copy_instance original, segment_ents, trans
+      if segment_index == @path.size - 2
+        right_gables.each do |gable|
+          trans = gable_transformations[1]
+          original = gable[:original_instance]
+          EneBuildings.copy_instance original, segment_ents, trans
+        end
       end
+=end
+      
+      
+      
+      # Place instances of all spread or aligned parts that has transformations
+      # for this segment.
+      part_data.each do |part|
+        part[:transformations][segment_index].each do |trans|
+          original = part[:original_instance]
+          EneBuildings.copy_instance original, segment_ents, trans
+        end
+      end
+      
+      # Glue all components to the face they are located on.
+      valid_cps = [
+        Sketchup::Face::PointInside,
+        Sketchup::Face::PointOnEdge,
+        Sketchup::Face::PointOnVertex
+      ]
+      segment_ents.to_a.each do |f|
+        next unless f.is_a? Sketchup::Face
+        segment_ents.to_a.each do |c|
+          next unless c.respond_to? :glued_to
+          next if c.glued_to
+          t = c.transformation
+          next unless f.normal.parallel? t.zaxis
+          cp = f.classify_point t.origin
+          next unless valid_cps.include? cp
+          c.glued_to = f
+        end
+      end
+      
     end
     
-    # Place instances of all spread or aligned parts that has transformations
-    # for this segment.
-    part_data.each do |part|
-      part[:transformations][segment_index].each do |trans|
-        original = part[:original_instance]
-        EneBuildings.copy_instance original, segment_ents, trans
-      end
-    end
-    
-    # Glue all components to the face they are located on.
-    valid_cps = [
-      Sketchup::Face::PointInside,
-      Sketchup::Face::PointOnEdge,
-      Sketchup::Face::PointOnVertex
-    ]
-    segment_ents.to_a.each do |f|
-      next unless f.is_a? Sketchup::Face
-      segment_ents.to_a.each do |c|
-        next unless c.respond_to? :glued_to
-        next if c.glued_to
-        t = c.transformation
-        next unless f.normal.parallel? t.zaxis
-        cp = f.classify_point t.origin
-        next unless valid_cps.include? cp
-        c.glued_to = f
-      end
-    end
-    
-  end
-  
-  nil
+    nil
  
- end
+  end
   
   # Internal: Perform solid operations on Building if @perform_solid_operations is
   # true.
