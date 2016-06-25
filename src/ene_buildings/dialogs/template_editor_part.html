@@ -237,7 +237,7 @@
                 <!-- "Replacement (for any of the above)"-->
                 <option disabled>──────────</option>
                 <option value="gable">Gable</option>
-                <!--TODO: COMPONENT REPLACMENT: add, corners and replacements here.-->
+                <!--"Corner"-->
               </select>
             </td>
           </tr>
@@ -289,8 +289,8 @@
             <td><input type="text" style="visibility: hidden;" /></td><!--Hidden dummy input to fill out table so relation field has same width as other fields.-->
           </tr>
           <tr data-category="gable">
-            <td><label for="gable_width">Width</label></td>
-            <td><input name="gable_width" id="gable_width" type="text" /></td>
+            <td><label for="gable_margin">Width</label></td>
+            <td><input name="gable_margin" id="gable_margin" type="text" /></td>
             <td>&nbsp;</td>
             <td><input type="text" style="visibility: hidden;" /></td><!--Hidden dummy input to fill out table so gable width field has same width as other fields.-->
           </tr>
@@ -335,7 +335,7 @@
                 <option value="union">Union</option>
                 <option value="subtract">Subtract</option>
                 <option disabled>──────────</option>
-                <option value="cut_multiple_faces">Cut Multiple Faces</option><!--TODO: Document that this tsrictly isn't a solid operation!-->
+                <option value="cut_multiple_faces">Cut Multiple Faces</option>
               </select>
             </td>
             <td><label for="solid_index">Index:</label></td>

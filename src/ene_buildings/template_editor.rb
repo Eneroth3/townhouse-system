@@ -322,7 +322,7 @@ module TemplateEditor
       rounding                = data["rounding"]                || ""
       override_cut_planes     = data["override_cut_planes"]     || false
       replace_nested_mateials = data["replace_nested_mateials"] || false
-      gable_width             = data["gable_width"]             || 0.to_l
+      gable_margin             = data["gable_margin"]             || 0.to_l
       solid                   = data["solid"]                   || ""
       solid_index             = data["solid_index"]             || 0
 
@@ -338,7 +338,7 @@ module TemplateEditor
       js << "document.getElementById('rounding').value=#{rounding.inspect};"
       js << "document.getElementById('align_percentage').value=#{percentage};"
       js << "override_cut_planes(#{override_cut_planes});"
-      js << "document.getElementById('gable_width').value=#{gable_width.to_s.inspect};"
+      js << "document.getElementById('gable_margin').value=#{gable_margin.to_s.inspect};"
       js << "replace_nested_mateials(#{replace_nested_mateials});"
       js << "is_group(#{@@part.is_a? Sketchup::Group});"
       js << "document.getElementById('solid').value=#{solid.inspect};"
@@ -918,17 +918,17 @@ module TemplateEditor
       data["align"] = @@dlg_part.get_element_value("align_percentage").gsub(",",".").to_f
     when "gable"
       data["gable"] = true
-      gable_width = @@dlg_part.get_element_value("gable_width")
+      gable_margin = @@dlg_part.get_element_value("gable_margin")
       begin
-        gable_width = gable_width.start_with?("~") ? old_data["gable_width"] : gable_width.to_l
+        gable_margin = gable_margin.start_with?("~") ? old_data["gable_margin"] : gable_margin.to_l
       rescue ArgumentError
         msg =
-          "'#{gable_width}' could not be parsed as length.\n"\
+          "'#{gable_margin}' could not be parsed as length.\n"\
           "Keeping old value for margin."
         UI.messagebox msg
-        gable_width = old_data["gable_width"] || 0
+        gable_margin = old_data["gable_margin"] || 0
       end
-      data["gable_width"] = gable_width unless gable_width == 0
+      data["gable_margin"] = gable_margin unless gable_margin == 0
       unless data["name"]
          data["name"] = unique_part_name(@@part, "Gable")
          msg = "Gable must have a name.\nUsing '#{data["name"]}."

@@ -98,15 +98,24 @@ class Building
   # replacement (array of replacement of each slot, also string identifier).
   attr_accessor :componet_replacement
 
+  # Public: Gets/sets what corner parts should be drawn to building.
+  # Variable is Hash indexed by Template id String.
+  # Each value is a Hash indexed by corner name String.
+  # Each such value is an Array of Booleans corresponding to each building
+  # corner (from left to tight) telling whether given corner part should be
+  # drawn to that corner.
+  attr_accessor :corners
+  
   # Public: Gets/sets rotation of gables.
   # Array containing 2 angels in radians cc seen from above.
   attr_accessor :end_angles
 
-  # Public: Gets/sets what gables should be drawn to building.
-  # Hash indexed by String template id where each value is:
-  # hash indexed by String gable name where each value is Array of two booleans.
-  # First boolean tells if gable is used on the left end and second if it's 
-  # used on the right end.
+  # Public: Gets/sets what gable parts should be drawn to building.
+  # Variable is Hash indexed by Template id String.
+  # Each value is a Hash indexed by gable name String.
+  # Each such value is an Array of Booleans corresponding to the building
+  # end (left, tight) telling whether given gable part should be
+  # drawn at that end.
   attr_reader :gables
   
   # Public: Returns Group Building is drawn to.
@@ -160,6 +169,8 @@ class Building
 
       # End angles in radians.
       @end_angles = [0, 0]
+      
+      @corners = {}
       
       @gables = {}
 
@@ -232,11 +243,24 @@ class Building
 
   end
 
-  # Public: Tells if pre-modeled gable can be added to building (based on
-  # template).
+  # Public: Tells if pre-modeled corners can be added to building
+  # (based on template).
   #
   # Called when opening properties dialog to enable or disable the setting for
-  # selecting gables.
+  # drawing corners.
+  #
+  # Returns true or false.
+  def has_corners?
+  
+    @template.has_corners?
+    
+  end
+  
+  # Public: Tells if pre-modeled gable can be added to building
+  # (based on template).
+  #
+  # Called when opening properties dialog to enable or disable the setting for
+  # drawing gables.
   #
   # Returns true or false.
   def has_gables?
@@ -245,8 +269,8 @@ class Building
 
   end
 
-  # Public: Tells if any solid operations can be performed on Building (based on
-  # template).
+  # Public: Tells if any solid operations can be performed on Building
+  # (based on template).
   #
   # Called when opening properties dialog to enable or disable the setting for
   # performing solid operations.
@@ -647,6 +671,9 @@ class Building
     # Override template object reference with string.
     @group.set_attribute ATTR_DICT, "template", @template ? @template.id : nil
 
+    # Override corner Hash with JSON String.
+    @group.set_attribute ATTR_DICT, "corners", JSON.generate(@corners)
+    
     # Override gable Hash with JSON String.
     @group.set_attribute ATTR_DICT, "gables", JSON.generate(@gables)
     
@@ -658,6 +685,27 @@ class Building
 
   end
 
+  def list_available_corners
+  
+    parts_data = []
+    
+    @template.component_def.entities.each do |e|
+      next unless e.get_attribute(Template::ATTR_DICT_PART, "corner")
+      next unless e.get_attribute(Template::ATTR_DICT_PART, "name")
+      
+      part_data = {
+        :defintion => e.definition,
+        :original_instance => e,
+        :name => e.get_attribute(Template::ATTR_DICT_PART, "name"),
+        :width => e.get_attribute(Template::ATTR_DICT_PART, "corner_margin")
+      }
+      parts_data << part_data
+    end
+    
+    parts_data
+    
+  end
+  
   # Internal: List gables available for building.
   # Based on Template.
   #
@@ -675,7 +723,7 @@ class Building
         :defintion => e.definition,
         :original_instance => e,
         :name => e.get_attribute(Template::ATTR_DICT_PART, "name"),
-        :width => e.get_attribute(Template::ATTR_DICT_PART, "gable_width")
+        :width => e.get_attribute(Template::ATTR_DICT_PART, "gable_margin")
       }
       parts_data << part_data
     end
@@ -687,7 +735,7 @@ class Building
   # Internal: List replaceable parts (spread and aligned parts) available for
   # this building.
   # Also list the Transformation objects for each part.
-  # Based on Template and @path. # TODO: Should also be based on used gables.
+  # Based on Template and @path. # TODO: Should also be based on used gables or separate margin-array.
   #
   # Return Array of Hash objects corresponding to each part.
   # Hash has reference to definition, name, original_instance and
@@ -865,6 +913,143 @@ class Building
     
   end
   
+  # Internal: List corner parts currently used in building.
+  # Based on Template and @corners.
+  #
+  # Return Array of Hash objects corresponding to each corner part.
+  # Hash has reference to definition, name, original_instance and
+  # transformations Array.
+  # Transformations Array has one element for each segment in building.
+  # Each element is an Array of Transformation objects.
+  # Transformation is in the local coordinate system of the relevant segment
+  # group.
+  def list_used_corners
+
+    # Prepare path.
+  
+    # RVIWEW: Make Path class and move some of this stuff there instead of
+    # just having same code copied here from list_available_replacable.
+    
+    # Transform path to local building coordinates.
+    trans_inverse = @group.transformation.inverse
+    path = @path.map { |p| p.transform trans_inverse }
+
+    # Get tangent for each point in path.
+    # Tangents point in the positive direction of path.
+    tangents = []
+    tangents << path[1] - path[0]
+    if path.size > 2
+      (1..path.size - 2).each do |corner|
+        p_prev = path[corner - 1]
+        p_here = path[corner]
+        p_next = path[corner + 1]
+        v_prev = p_here - p_prev
+        v_next = p_next - p_here
+        tangents << Geom.linear_combination(0.5, v_prev, 0.5, v_next)
+      end
+    end
+    tangents << path[-1] - path[-2]
+
+    # Rotate first and last tangent according to @end_angles.
+    tangents.first.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.first
+    tangents.last.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.last
+    
+    # If building should be drawn with it back along the path instead of its
+    # front, reverse the path and tangents.
+    # The terms left and right relates to the building front side.
+    if @back_along_path
+      path.reverse!
+      tangents.reverse!
+      tangents.each { |t| t.reverse! }
+    end
+    
+    # Collect parts data.
+    
+    parts_data = list_available_corners
+    
+    corner_settings = @corners[@template.id] || {}
+    parts_data.map! do |part_data|
+      part_data = part_data.dup
+
+      next unless a = corner_settings[part_data[:name]]
+      next unless a.include? true
+
+      transformation_original = part_data[:original_instance].transformation
+      
+      # If building is drawn with its back along path, adapt transformation.
+      # REVIEW: Only transform origin Point3d. Transformation isn't used.
+      if @back_along_path
+        delta_y = -(@template.depth || Template::FALLBACK_DEPTH)
+        translation = Geom::Transformation.translation([0, delta_y, 0])
+        transformation_original = translation * transformation_original
+      end
+
+      origin      = transformation_original.origin
+      line_origin = [origin, X_AXIS]
+      
+      part_data[:transformations] ||= []
+      
+      # Loop path segments.
+      (0..path.size - 2).each do |segment_index|
+      
+        transformations = []
+        part_data[:transformations] << transformations
+        
+        # Values in main building @group's coordinates.
+        corner_left    = path[segment_index]
+        corner_right   = path[segment_index + 1]
+        segment_vector = corner_right - corner_left
+        segment_length = segment_vector.length
+        tangent_left   = tangents[segment_index]
+        tangent_right  = tangents[segment_index + 1]
+        segment_trans  = Geom::Transformation.axes(
+          corner_left,
+          segment_vector,
+          Z_AXIS * segment_vector,
+          Z_AXIS
+        )
+        
+        # Values in local segment group's coordinates.
+        tangent_left     = tangent_left.transform(segment_trans.inverse)
+        tangent_right    = tangent_right.transform(segment_trans.inverse)
+        plane_left       = [ORIGIN, tangent_left.reverse]
+        plane_right      = [[segment_length, 0, 0], tangent_right]
+        origin_leftmost  = Geom.intersect_line_plane line_origin, plane_left
+        origin_rightmost = Geom.intersect_line_plane line_origin, plane_right
+        
+        # All corner parts expect for that of the last corner is drawn at the
+        # left side of the segment group by the same index.
+        if a[segment_index]
+          transformations << Geom::Transformation.axes(
+            origin_leftmost,
+            tangent_left,
+            Z_AXIS*tangent_left,
+            Z_AXIS
+          )
+        end
+        
+        # The rightmost corner part is drawn at the right side of the last
+        # segment group. This group is the only one that may contain two
+        # corner parts.
+        if segment_index == (@path.size - 1) && a[segment_index + 1]
+          transformations << Geom::Transformation.axes(
+            origin_rightmost,
+            tangent_right,
+            Z_AXIS*tangent_right,
+            Z_AXIS
+          )
+        end
+        
+      end
+
+      part_data
+    end
+    parts_data.compact!
+    
+    parts_data
+    
+  end
+  
   # Internal: List gables currently used in building.
   # Based on Template and @gables.
   #
@@ -922,8 +1107,6 @@ class Building
       )
     end
     
-    # TODO: FIXME: Adapt transformations for back along path.
-    
     parts_data = list_available_gables
     
     gable_settings = @gables[@template.id] || {}
@@ -967,6 +1150,10 @@ class Building
     # Nil if not found.
     h[:template] = Template.get_from_id h[:template]
     
+    # Override corner JSON String with actual Hash object.
+    # Backward compatibility: Set corners to empty Hash if not already set.
+    h[:corners] = h[:corners] ? JSON.parse(h[:corners]) : {}
+
     # Override gable JSON String with actual Hash object.
     # Backward compatibility: Set gables to empty Hash if not already set.
     h[:gables] = h[:gables] ? JSON.parse(h[:gables]) : {}
@@ -1119,7 +1306,7 @@ class Building
       x_min       = face_left.vertices.first.position.x
       x_max       = face_right.vertices.first.position.x
       edges       = segment_ents.select { |e| e.is_a? Sketchup::Edge }
-      edges_left  = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_min } }# TODO: why not just use face_*.edges instead of this select code? Because Landshövdingehus äldre has a stupränna lying loose in it. Should that be allowed? It prevents solid operations from working. However it would be nice to have stuprännething in "Landshövdingehus" reveterat too that is also cut by certain parts.
+      edges_left  = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_min } } # All these edges may not bound the left face. For instance Landshövdingehus äldre has a rainwater pipe thingy.
       edges_right = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_max } }
       
       trans_a = Geom::Transformation.new.to_a
@@ -1157,6 +1344,7 @@ class Building
     
     part_data = list_available_replacable
     part_data += list_used_gables
+    part_data += list_used_corners
    
     segment_groups = @group.entities.to_a
 
@@ -1223,7 +1411,6 @@ class Building
     return unless @perform_solid_operations
     
     segment_groups = @group.entities.select { |e| e.is_a? Sketchup::Group }
-    #TODO: future version: only include segments, not hörntorn, gables etc.
 
     ops = []
     hidden = []

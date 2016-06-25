@@ -64,7 +64,7 @@ model.skp
   gable:
     Set to truthy when part represents a gable.
     Requires name to be set.
-  gable_width:
+  gable_margin:
     The margin for any spread or aligned part to leave space for this gable.
     Only applies to gables.
     May be left out.
