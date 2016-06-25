@@ -58,7 +58,7 @@
           }
         }
         
-        //TODO: FUTURE VERSION: exclude solids for gables and corners.
+        //TODO: FUTURE VERSION: exclude solids for corners.
       
       }
       
@@ -159,7 +159,7 @@
 
       }
 
-      //Toggle solid_index depending on what solid.
+      //Toggle solid_index depending on what solid is set to.
       //Called when selection changes or drop down changes.
       function toggle_solid(solid){
       
@@ -203,7 +203,21 @@
     <div id="warning"></div>
     <div class="main_scrollable_container" id="form_content">
 
-      <!--TODO: COMPONENT REPLACMENT: separate field "name" used for both replaced, replacing, gables and corner-stuff. Add [?] with title text saying name is only relevant for replacements, those being replaced, corners and gables, not ordinary parts. Also validate this.-->
+      <div class="section" id="general">
+        <b>General</b>
+        <hr />
+        <p class="warning"></p>
+        <table>
+          <tr>
+            <td><label for="name">Name:</label></td>
+            <td>
+              <abbr class="right" title="Only relevant for gables.">[?]</abbr><!--TODO: COMPONENT REPLACMENT, CORNERS: relevant for those too-->
+              <span class="fill-rest"><input name="name" id="name" type="text" /></span>
+            </td>
+          </tr>
+        </table>
+      </div>
+      
       <div class="section" id="positioning">
         <b>Positioning</b>
         <hr />
@@ -218,7 +232,12 @@
                 <option value="left">Align left</option>
                 <option value="right">Align right</option>
                 <option value="center">Center</option>
-                <option value="percentage">Relative</option><!--TODO: COMPONENT REPLACMENT: add replacements, corners and gables here.-->
+                <option value="percentage">Relative</option>
+                <!--──────────-->
+                <!-- "Replacement (for any of the above)"-->
+                <option disabled>──────────</option>
+                <option value="gable">Gable</option>
+                <!--TODO: COMPONENT REPLACMENT: add, corners and replacements here.-->
               </select>
             </td>
           </tr>
@@ -269,6 +288,12 @@
             <td>&nbsp;</td>
             <td><input type="text" style="visibility: hidden;" /></td><!--Hidden dummy input to fill out table so relation field has same width as other fields.-->
           </tr>
+          <tr data-category="gable">
+            <td><label for="gable_width">Width</label></td>
+            <td><input name="gable_width" id="gable_width" type="text" /></td>
+            <td>&nbsp;</td>
+            <td><input type="text" style="visibility: hidden;" /></td><!--Hidden dummy input to fill out table so gable width field has same width as other fields.-->
+          </tr>
 
         </table>
         <input type="hidden" name="spread_fix_number" id="spread_fix_number" />
@@ -306,10 +331,10 @@
             <td>
               <select name="solid" id="solid" onchange="toggle_solid(this.value);">
                 <option value="">None</option>
-				<option disabled>──────────</option>
+                <option disabled>──────────</option>
                 <option value="union">Union</option>
                 <option value="subtract">Subtract</option>
-				<option disabled>──────────</option>
+                <option disabled>──────────</option>
                 <option value="cut_multiple_faces">Cut Multiple Faces</option><!--TODO: Document that this tsrictly isn't a solid operation!-->
               </select>
             </td>

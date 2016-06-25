@@ -546,7 +546,17 @@ class Template
   end
   
   # Public: Checks if there are any groups/components that can be used to
-  # perform solid operations on building, e.g. make an opening to the courtyard.
+  # as gables.
+  def has_gables?
+
+    component_def.entities.any? do |e|
+      e.get_attribute(ATTR_DICT_PART, "gable") && e.get_attribute(ATTR_DICT_PART, "name")
+    end
+
+  end
+
+  # Public: Checks if there are any groups/components that can be used to
+  # perform solid operations on building, e.g. cut an opening to the courtyard.
   def has_solids?
 
     component_def.entities.any? do |e|
