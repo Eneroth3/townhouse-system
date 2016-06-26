@@ -330,7 +330,7 @@ class Template
     faces_r = ents.select { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?([1,0,0]) }
     
     # TODO: check if all other loose faces are perpendicular to these /has normal x == 0)
-    # Check if is solid (stupränna in Landshövdingehus must be part (group/component) with its placement set to stretch).
+    # Check if main volume is solid when using solids (stupränna in Landshövdingehus must be part (group/component) with its placement set to stretch).
     # Part names must be unique!
     
     faces_l.size == 1 && faces_r.size == 1
@@ -545,8 +545,18 @@ class Template
     
   end
   
-  # Public: Checks if there are any groups/components that can be used to
-  # as gables.
+  # Public: Checks if there are any groups/components that can be used as
+  # corners in building.
+  def has_corners?
+
+    component_def.entities.any? do |e|
+      e.get_attribute(ATTR_DICT_PART, "corner") && e.get_attribute(ATTR_DICT_PART, "name")
+    end
+
+  end
+
+  # Public: Checks if there are any groups/components that can be used as
+  # gables in building.
   def has_gables?
 
     component_def.entities.any? do |e|
