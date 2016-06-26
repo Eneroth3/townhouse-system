@@ -5,11 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
     <title>TITLE</title>
     <script type="text/javascript">
-    
-      // Fucking boilerplate code to properly display javascript errors as they occur.
-      // TODO: Remove once I've found how to properly turn the built in error message back on.
-      window.onerror = function(errorMsg, url, lineNumber){ alert(errorMsg + "\n\n" + lineNumber); };
-      
+      "use strict";
       
       //Initialize each section.
       //Runs when showing dialog and when template has changed.
@@ -22,7 +18,7 @@
 
         //div innerHTML.
         //List all labels and corresponding keys to show in table here.
-        pairs = [
+        var pairs = [
           ['Modeler', 'modeler'],
           ['Architect', 'architect'],
           ['Country', 'country'],
@@ -30,12 +26,12 @@
           ['Stories', 'stories'],
           ['Source', 'source']
         ]
-        html = '<span class="name">'+template_info['name']+'</span>';
+        var html = '<span class="name">'+template_info['name']+'</span>';
         html += '<table>';
         for(var i=0;i<pairs.length;i++){
-          label = pairs[i][0];
-          key = pairs[i][1];
-          value = template_info[key];
+          var label = pairs[i][0];
+          var key = pairs[i][1];
+          var value = template_info[key];
           if(!value) continue;
           //Turn value into link for source if source_url is defined.
           if(key == 'source' && template_info['source_url']){
@@ -44,7 +40,7 @@
           html += '<tr><td>'+label+':</td><td>'+value+'</td></tr>';
         }
         html += '</table>';
-        description = template_info['description'];
+        var description = template_info['description'];
         if(description) html += description;
         document.getElementById('template_info').innerHTML = html;
       }
@@ -110,22 +106,22 @@
           document.getElementById('material_replacement').style.display = 'none';
         }else{
           document.getElementById('material_replacement').style.display = '';
-          html = '';
+          var html = '';
           for(var i=0;i<material_pairs.length;i++){
-            pair = material_pairs[i];
-            original = pair[0];
-            replacement = pair[1];
+            var pair = material_pairs[i];
+            var original = pair[0];
+            var replacement = pair[1];
 
-            title = original['name'];
+            var title = original['name'];
             if(original['textured']) title += ' (Textured)';
-            tooltip = 'Replace '+original['name']+' with currently active material.';
+            var tooltip = 'Replace '+original['name']+' with currently active material.';
             if(replacement){
-              title_replacement = replacement['name'];
+              var title_replacement = replacement['name'];
               if(replacement['textured']) title_replacement += ' (Textured)';
-              background = replacement['css_string'];
+              var background = replacement['css_string'];
             }else{
-              title_replacement = 'No replacement.';
-              background = 'url(nil_material.png)';
+              var title_replacement = 'No replacement.';
+              var background = 'url(nil_material.png)';
             }
 
             html += '<div data-id="'+original['id']+'">';
@@ -141,23 +137,23 @@
         }
       }
       function update_material_replacment(id_original, replacement){
-        replacer_divs = document.getElementById('material_list').getElementsByTagName('div');
-        for(i=0;i<replacer_divs.length;i++){
-          replacer_div = replacer_divs[i]
+        var replacer_divs = document.getElementById('material_list').getElementsByTagName('div');
+        for(var i=0;i<replacer_divs.length;i++){
+          var replacer_div = replacer_divs[i]
           if(id_original != replacer_div.getAttribute('data-id')) continue;
 
           //Update appearance of replacer button.
           //Let material_pairs array be invalid, it's updated from ruby when
           //used the next time anyway.
           if(replacement){
-            title_replacement = replacement['name'];
+            var title_replacement = replacement['name'];
             if(replacement['textured']) title_replacement += ' (Textured)';
-            background = replacement['css_string'];
+            var background = replacement['css_string'];
           }else{
-            title_replacement = 'No replacement.';
-            background = 'url(nil_material.png)';
+            var title_replacement = 'No replacement.';
+            var background = 'url(nil_material.png)';
           }
-          preview = replacer_div.getElementsByTagName('button')[0].getElementsByTagName('div')[0];
+          var preview = replacer_div.getElementsByTagName('button')[0].getElementsByTagName('div')[0];
           preview.title = title_replacement;
           preview.style.background = background;
         }
@@ -175,12 +171,12 @@
       //Most input is handled by inline code in click attribute of input.
       
       function toggle_gable(name, side, status){
-        params = JSON.stringify([name, side, status]);
+        var params = JSON.stringify([name, side, status]);
         window.location='skp:toggle_gable@' + params;
       }
       
       function toggle_corner(name, index, status){
-        params = JSON.stringify([name, index, status]);
+        var params = JSON.stringify([name, index, status]);
         window.location='skp:toggle_corner@' + params;
       }
 
@@ -205,6 +201,11 @@
       table.leftmost-is-label tr td:nth-child(1){
         width: 80px;
         text-align: right;
+      }
+      td.label-header, table.leftmost-is-label tr td:nth-child(1).label-header {
+        text-align: left;
+        font-weight: bold;
+        color: gray;
       }
       
       #template img{
@@ -252,6 +253,27 @@
         width: 200px;
         margin-top: 10px;
       }
+      
+      /* Based on module 20px. Half module as margin between sections. */
+      #facade_elemnets input[type="text"] {
+        box-sizing: border-box;
+        width: 40px;
+      }
+      #facade_elemnets input[type="text"]:nth-child(even){
+        margin-right: 10px;
+      }
+      #facade_elemnets td > div {
+        display: inline-block;
+      }
+      #facade_elemnets td > div + div{
+        margin-left: 10px;
+      }
+      #facade_elemnets td > div > div{
+        display: inline-block;
+        width: 20px;
+        text-align: center;
+      }
+      
     </style>
    </head>
    <body>
@@ -290,53 +312,37 @@
           <!--Visibility is toggled depending on relevance of these settings.-->
           <b>Material Replacement</b>
           <hr />
-            <div id="material_list">
-              <!--Dynamically created content-->
-              <!--
-              <div>
-                <div style="background: LightGoldenRodYellow;"></div>
-                &rarr;
-                <button>
-                  <div style="background: LightCyan;"></div>
-                  Apply active
-                </button>
-              </div>
-              <div>
-                <div style="background: Beige;"></div>
-                &rarr;
-                <button>
-                  <div style="background: Azure;"></div>
-                  Apply active
-                </button>
-              </div>
-              <div>
-                <div style="background: PaleGoldenRod;"></div>
-                &rarr;
-                <button>
-                  <div style="background: Plum;"></div>
-                  Apply active
-                </button>
-              </div>
-              -->
-            </div>
-            <p style="clear: both;"></p>
-            <button id="material_browser_opener" onclick="window.location='skp:browse_materials';">Material browser...</button>
-          </div>
-
-        <div id="gables" class="section">
-          <!--Visibility is toggled depending on relevance of these settings.-->
-          <b>Gables</b>
-          <hr />
-          <div id="gable-settings">
+          <div id="material_list">
             <!--Dynamically created content-->
             <!--
-            <table class="leftmost-is-label">
-              <tr><td>Facade:</td><td><input type="checkbox" /><input type="checkbox" /></td></tr>
-              <tr><td>Portik:</td><td><input type="checkbox" /><input type="checkbox" /></td></tr>
-              <tr><td>Irregular Windows:</td><td><input type="checkbox" /></td><td><input type="checkbox" /></td></tr>
-            </table>
+            <div>
+              <div style="background: LightGoldenRodYellow;"></div>
+              &rarr;
+              <button>
+                <div style="background: LightCyan;"></div>
+                Apply active
+              </button>
+            </div>
+            <div>
+              <div style="background: Beige;"></div>
+              &rarr;
+              <button>
+                <div style="background: Azure;"></div>
+                Apply active
+              </button>
+            </div>
+            <div>
+              <div style="background: PaleGoldenRod;"></div>
+              &rarr;
+              <button>
+                <div style="background: Plum;"></div>
+                Apply active
+              </button>
+            </div>
             -->
           </div>
+          <p style="clear: both;"></p>
+          <button id="material_browser_opener" onclick="window.location='skp:browse_materials';">Material browser...</button>
         </div>
         
         <div id="corners" class="section">
@@ -354,7 +360,115 @@
           </div>
         </div>
 
-        <!--Part Replacement...-->
+        <div id="gables" class="section">
+          <!--Visibility is toggled depending on relevance of these settings.-->
+          <b>Gables</b>
+          <hr />
+          <div id="gable-settings">
+            <!--Dynamically created content-->
+            <!--
+            <table class="leftmost-is-label">
+              <tr><td>Facade:</td><td><input type="checkbox" /><input type="checkbox" /></td></tr>
+              <tr><td>Portik:</td><td><input type="checkbox" /><input type="checkbox" /></td></tr>
+              <tr><td>Irregular Windows:</td><td><input type="checkbox" /></td><td><input type="checkbox" /></td></tr>
+            </table>
+            -->
+          </div>
+        </div>
+
+        <div id="facade_elemnets" class="section">
+          <!--Visibility is toggled depending on relevance of these settings.-->
+          <b>Facade Elements</b>
+          <hr />
+          <table class="leftmost-is-label" style="width: 100%;">
+            <tr>
+              <td>Margin:</td>
+              <td>
+                <input type="text"  /><!--
+                --><input type="text"  /><!--
+                --><input type="text"  /><!--
+                --><input type="text"  />
+              </td>
+            </tr>
+            <tr>
+              <td><input type="checkbox" checked="checked" /></td>
+              <td>Suggest margin to match gables and corners</td>
+            </tr>
+            <tr>
+              <td colspan="2" class="label-header"><hr style="margin-left: 0;" /></td>
+            </tr>
+            <tr>
+              <td colspan="2" class="label-header">Window Front</td>
+            </tr>
+            <tr>
+              <td>Door Front:</td>
+              <td>
+                <div>
+                  <div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div><!--
+                --></div><!--
+                --><div><!--
+                  --><div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td>Balcony:</td>
+              <td>
+                <div>
+                  <div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div><!--
+                --></div><!--
+                --><div><!--
+                  --><div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2" class="label-header">Window Back</td>
+            </tr>
+            <tr>
+              <td>Door Back:</td>
+              <td>
+                <div>
+                  <div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div><!--
+                --></div><!--
+                --><div><!--
+                  --><div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div>
+                </div>
+              </td>
+            </tr>
+              <td>Wing:</td>
+              <td>
+                <div style="padding: 0 20px;">
+                  <div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div><!--
+                --></div><!--
+                --><div style="padding: 0 20px;"><!--
+                  --><div><input type="checkbox" /></div><!--
+                  --><div><input type="checkbox" /></div>
+                </div>
+                (3 Slots)
+              </td>
+            </tr>
+          </table>
+        </div>
 
         <div id="solids" class="section">
           <!--Visibility is toggled depending on relevance of these settings.-->
