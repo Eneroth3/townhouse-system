@@ -97,6 +97,7 @@
       }
       
       //Part replacements.
+      //...
       function update_facade_section(){
         // Toggle section visibility...
         // Create markup...
@@ -209,6 +210,45 @@
       // Runs on initialization and when checkboxes changes state.
       function toggle_part_replacement_enability(){
       
+        var section_div = document.getElementById('facade_elemnets');
+        var inputs = section_div.getElementsByTagName('input');
+        var checkboxes = [];
+        for (var i=0; i<inputs.length; i++) {
+          var input = inputs[i];
+          if (input.type == 'checkbox') checkboxes.push(input);
+        }
+        
+        for (var i=0; i<checkboxes.length; i++) {
+        
+          // A ticked checkbox is always enabled.
+          if (checkboxes[i].checked) continue;
+          
+          var i_start = parseInt(checkboxes[i].value);// Get from position within parentNode...
+          var i_slots = parseInt(checkboxes[i].parentNode.parentNode.parentNode.getAttribute('data-slots'));// Get from last row with data-value before this checkbox...
+          var i_end = i_start + i_slots - 1;
+
+          var occupied = false;
+          for (var j=0; j<checkboxes.length; j++) {// Loop checkboxes in same div and those in corresponding segment div for above row...
+          
+            if (!checkboxes[j].checked) continue;
+            
+            // Can't collide with self.
+            if (i == j) { continue; }
+          
+            var j_start = parseInt(checkboxes[j].value);
+            var j_slots = parseInt(checkboxes[j].parentNode.parentNode.parentNode.getAttribute('data-slots'));
+            var j_end = j_start + j_slots - 1;
+            
+            if (!(j_start > i_end || j_end < i_start)) {
+              occupied = true;
+              break;
+            }
+            
+          }
+          checkboxes[i].disabled = occupied;
+          
+        }
+        
       }
       
       //When a new dialog is created while other are opened it needs to
@@ -227,7 +267,6 @@
       }
       td.label-header, table.leftmost-is-label tr td:nth-child(1).label-header {
         text-align: left;
-        font-weight: bold;
         color: gray;
       }
       
@@ -283,13 +322,13 @@
         width: 40px;
       }
       #facade_elemnets input[type="text"]:nth-child(even){
-        margin-right: 10px;
+        margin-right: 20px;
       }
       #facade_elemnets td > div {
         display: inline-block;
       }
       #facade_elemnets td > div + div{
-        margin-left: 10px;
+        margin-left: 20px;
       }
       #facade_elemnets td > div > div{
         display: inline-block;
@@ -418,75 +457,75 @@
               <td>Suggest margin (based on gables and corners)</td>
             </tr>
             <tr>
-              <td colspan="2" class="label-header"><hr style="margin-left: 0;" /></td>
+              <td colspan="2"><hr style="margin-left: 0;" /></td>
             </tr>
             <tr>
-              <td colspan="2" class="label-header">Window Front</td>
+              <td data-original-name="Window Front" colspan="2" class="label-header">Replace Window Front</td>
             </tr>
-            <tr data-slots="1">
+            <tr data-replacement-name="Door Front" data-slots="1">
               <td>Door Front:</td>
               <td>
                 <div>
-                  <div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div><!--
+                  <div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
                 --></div><!--
                 --><div><!--
-                  --><div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div>
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div>
                 </div>
               </td>
             </tr>
-            <tr data-slots="1">
+            <tr data-replacement-name="Balcony" data-slots="1">
               <td>Balcony:</td>
               <td>
                 <div>
-                  <div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div><!--
+                  <div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
                 --></div><!--
                 --><div><!--
-                  --><div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div>
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div>
                 </div>
               </td>
             </tr>
             <tr>
-              <td colspan="2" class="label-header">Window Back</td>
+              <td data-original-name="Window Back" colspan="2" class="label-header">Replace Window Back</td>
             </tr>
-            <tr data-slots="1">
+            <tr data-replacement-name="Door Back" data-slots="1">
               <td>Door Back:</td>
               <td>
                 <div>
-                  <div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div><!--
+                  <div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
                 --></div><!--
                 --><div><!--
-                  --><div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div>
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div>
                 </div>
               </td>
             </tr>
-            <tr data-slots="3">
+            <tr data-replacement-name="Wing" data-slots="3">
               <td>Wing:</td>
               <td>
                 <div style="padding: 0 20px;">
-                  <div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div><!--
+                  <div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
                 --></div><!--
                 --><div style="padding: 0 20px;"><!--
-                  --><div><input type="checkbox" /></div><!--
-                  --><div><input type="checkbox" /></div>
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div><!--
+                  --><div><input type="checkbox" onclick="toggle_replacement()" /></div>
                 </div>
               </td>
             </tr>
