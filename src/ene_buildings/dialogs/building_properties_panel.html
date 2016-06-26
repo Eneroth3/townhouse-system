@@ -5,6 +5,12 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
     <title>TITLE</title>
     <script type="text/javascript">
+    
+      // Fucking boilerplate code to properly display javascript errors as they occur.
+      // TODO: Remove once I've found how to properly turn the built in error message back on.
+      window.onerror = function(errorMsg, url, lineNumber){ alert(errorMsg + "\n\n" + lineNumber); };
+      
+      
       //Initialize each section.
       //Runs when showing dialog and when template has changed.
 
@@ -49,6 +55,7 @@
       // name, used_left and used_right.
       function update_gable_section(){
         document.getElementById('gables').style.display = has_gables ? '' : 'none';
+        if(!has_gables) return(false);
         var html = '<table class="leftmost-is-label">';
         
         for(var i=0; i<gable_settings.length; i++) {
@@ -73,7 +80,7 @@
       // name and use. Use is an array of booleans.
       function update_corner_section(){
         document.getElementById('corners').style.display = has_corners ? '' : 'none';
-        //if !has_corners return();
+        if(!has_corners) return(false);
         var html = '<table class="leftmost-is-label">';
         
         for(var i=0; i<corner_settings.length; i++) {
