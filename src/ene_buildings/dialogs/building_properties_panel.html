@@ -97,7 +97,14 @@
       }
       
       //Part replacements.
-      //...
+      function update_facade_section(){
+        // Toggle section visibility...
+        // Create markup...
+        
+        // Disable checkboxes for part replacement if another replacement is
+        // already using that slot.
+        toggle_part_replacement_enability();
+      }
 
       //Material replacement.
       //var material_pairs = [array of material pairs];
@@ -180,6 +187,15 @@
         window.location='skp:toggle_corner@' + params;
       }
 
+      function toggle_replacement(){
+        // Get original name, replacement name, segment index and part index
+        // as arguments and save stuff...
+        
+        // Disable checkboxes for part replacement if another replacement is
+        // already using that slot.
+        toggle_part_replacement_enability();
+      }
+      
       //Misc/UI stuff.
 
       //Every time mouse enters document the style rule for hovered material
@@ -188,6 +204,13 @@
         window.location='skp:update_style_rule';
       }
 
+      // Enable/disable part replacement checkboxes depending on whether slot is
+      // available or used by another replacement.
+      // Runs on initialization and when checkboxes changes state.
+      function toggle_part_replacement_enability(){
+      
+      }
+      
       //When a new dialog is created while other are opened it needs to
       //be offset to not lie on top of the previous one.
       function offset_window(offset){
@@ -392,7 +415,7 @@
             </tr>
             <tr>
               <td><input type="checkbox" checked="checked" /></td>
-              <td>Suggest margin to match gables and corners</td>
+              <td>Suggest margin (based on gables and corners)</td>
             </tr>
             <tr>
               <td colspan="2" class="label-header"><hr style="margin-left: 0;" /></td>
@@ -400,7 +423,7 @@
             <tr>
               <td colspan="2" class="label-header">Window Front</td>
             </tr>
-            <tr>
+            <tr data-slots="1">
               <td>Door Front:</td>
               <td>
                 <div>
@@ -417,7 +440,7 @@
                 </div>
               </td>
             </tr>
-            <tr>
+            <tr data-slots="1">
               <td>Balcony:</td>
               <td>
                 <div>
@@ -437,7 +460,7 @@
             <tr>
               <td colspan="2" class="label-header">Window Back</td>
             </tr>
-            <tr>
+            <tr data-slots="1">
               <td>Door Back:</td>
               <td>
                 <div>
@@ -454,6 +477,7 @@
                 </div>
               </td>
             </tr>
+            <tr data-slots="3">
               <td>Wing:</td>
               <td>
                 <div style="padding: 0 20px;">
@@ -464,7 +488,6 @@
                   --><div><input type="checkbox" /></div><!--
                   --><div><input type="checkbox" /></div>
                 </div>
-                (3 Slots)
               </td>
             </tr>
           </table>
