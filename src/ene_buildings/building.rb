@@ -216,7 +216,8 @@ class Building
         has_solids? &&
         last_drawn_as[:perform_solid_operations] &&
         (
-          @gables != last_drawn_as[:gables] # ||
+          @gables  != last_drawn_as[:gables] ||
+          @corners != last_drawn_as[:corners] # ||
           # Add anything related to part placement here...
         )
       )
@@ -226,7 +227,8 @@ class Building
       draw_solids write_status
       draw_material_replacement
      elsif(
-      @gables != last_drawn_as[:gables] # ||
+      @gables  != last_drawn_as[:gables] ||
+      @corners != last_drawn_as[:corners] # ||
       # Add anything related to part placement here...
      )
        draw_parts
@@ -438,7 +440,21 @@ class Building
       end
       js << "update_gable_section();";
       
-      # Corners...
+      # Corners.
+      js << "var has_corners = #{has_corners?};"
+      js << "var corner_number = #{@path.size};"
+      if has_corners?
+        corner_list = list_available_corners.map do |g|
+          #corner_use = @corners[@template.id][g[:name]]
+          corner_use = @corners.fetch(@template.id, {}).fetch(g[:name], [])
+          {
+            :name       => g[:name],
+            :use  => corner_use
+          }
+        end
+        js << "var corner_settings = #{JSON.generate corner_list};"
+      end
+      js << "update_corner_section();";
 
       # Part replacements...
 
@@ -552,13 +568,24 @@ class Building
     
     # Toggling a gable.
     dlg.add_action_callback("toggle_gable") do |_, params|
-      gable_name, side, status = JSON.parse(params)
+      name, side, status = JSON.parse(params)
       @gables[@template.id] ||= {}
-      @gables[@template.id][gable_name] ||= []
-      @gables[@template.id][gable_name][side] = status
+      @gables[@template.id][name] ||= []
+      @gables[@template.id][name][side] = status
+      
+      @gables[@template.id].delete(name) unless @gables[@template.id][name].any?
     end
     
-    # Corners...
+    # Toggling a corner.
+    dlg.add_action_callback("toggle_corner") do |_, params|
+      name, index, status = JSON.parse(params)
+      @corners[@template.id] ||= {}
+      @corners[@template.id][name] ||= []
+      @corners[@template.id][name][index] = status
+      
+      @corners[@template.id].delete(name) unless @corners[@template.id][name].any?
+    end
+    
     # Part replacement...
 
     # Clicking material replacement button.
@@ -972,7 +999,7 @@ class Building
       part_data = part_data.dup
 
       next unless a = corner_settings[part_data[:name]]
-      next unless a.include? true
+      next unless a.any?
 
       transformation_original = part_data[:original_instance].transformation
       
@@ -1031,7 +1058,7 @@ class Building
         # The rightmost corner part is drawn at the right side of the last
         # segment group. This group is the only one that may contain two
         # corner parts.
-        if segment_index == (@path.size - 1) && a[segment_index + 1]
+        if segment_index == (@path.size - 2) && a[segment_index + 1]
           transformations << Geom::Transformation.axes(
             origin_rightmost,
             tangent_right,
@@ -1114,7 +1141,7 @@ class Building
       part_data = part_data.dup
       
       next unless a = gable_settings[part_data[:name]]
-      next unless a.include? true
+      next unless a.any?
       part_data[:transformations] = (0..@path.length-2).map { [] }
       if a[0]
         part_data[:transformations][0] << transformation_left

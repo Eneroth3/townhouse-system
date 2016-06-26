@@ -49,14 +49,16 @@
       // name, used_left and used_right.
       function update_gable_section(){
         document.getElementById('gables').style.display = has_gables ? '' : 'none';
-        html = '<table class="leftmost-is-label">';
+        var html = '<table class="leftmost-is-label">';
         
-        for(i=0; i<gable_settings.length; i++) {
+        for(var i=0; i<gable_settings.length; i++) {
           var gable_data = gable_settings[i];
           html += '<tr>';
           html += '<td>' + gable_data['name'] + ':</td>';
-          html += '<td><input type="checkbox" ' + (gable_data['used_left'] ? 'checked="checked"' : '') + ' onclick="toggle_gable(\'' + gable_data['name'] + '\', 0, this.checked);" /></td>';// FIXME: What if name contains quote or other special character?
-          html += '<td><input type="checkbox" ' + (gable_data['used_right'] ? 'checked="checked"' : '') + ' onclick="toggle_gable(\'' + gable_data['name'] + '\', 1, this.checked);"/></td>';
+          html += '<td>';
+          html += '<input type="checkbox" ' + (gable_data['used_left'] ? 'checked="checked"' : '') + ' onclick="toggle_gable(\'' + gable_data['name'] + '\', 0, this.checked);" />';
+          html += '<input type="checkbox" ' + (gable_data['used_right'] ? 'checked="checked"' : '') + ' onclick="toggle_gable(\'' + gable_data['name'] + '\', 1, this.checked);" />';
+          html += '</td>';
           html += '</tr>';
         }
         
@@ -65,7 +67,31 @@
       }
       
       //Corners.
-      //...
+      //var has_corners = <boolean>.
+      //var corner_number = <int>
+      //var corner_settings = <array>, each element is object with keys:
+      // name and use. Use is an array of booleans.
+      function update_corner_section(){
+        document.getElementById('corners').style.display = has_corners ? '' : 'none';
+        //if !has_corners return();
+        var html = '<table class="leftmost-is-label">';
+        
+        for(var i=0; i<corner_settings.length; i++) {
+          var corner_data = corner_settings[i];
+          html += '<tr>';
+          html += '<td>' + corner_data['name'] + ':</td>';
+          html += '<td>';
+          for(var j=0; j<corner_number; j++) {
+            var status = corner_data['use'][j];
+            html += '<input type="checkbox" ' + (status ? 'checked="checked"' : '') + ' onclick="toggle_corner(\'' + corner_data['name'] + '\', ' + j + ', this.checked);" />';
+          }
+          html += '</td>';
+          html += '</tr>';
+        }
+        
+        html += '</table>';
+        document.getElementById('corner-settings').innerHTML = html;
+      }
       
       //Part replacements.
       //...
@@ -141,9 +167,14 @@
       //Handle user input.
       //Most input is handled by inline code in click attribute of input.
       
-      function toggle_gable(gable_name, side, status){
-        params = JSON.stringify([gable_name, side, status]);
+      function toggle_gable(name, side, status){
+        params = JSON.stringify([name, side, status]);
         window.location='skp:toggle_gable@' + params;
+      }
+      
+      function toggle_corner(name, index, status){
+        params = JSON.stringify([name, index, status]);
+        window.location='skp:toggle_corner@' + params;
       }
 
       //Misc/UI stuff.
@@ -256,21 +287,30 @@
             <!--Dynamically created content-->
             <!--
             <table class="leftmost-is-label">
-              <tr><td>Facade:</td><td><input type="checkbox" /></td><td><input type="checkbox" /></td></tr>
-              <tr><td>Portik:</td><td><input type="checkbox" /></td><td><input type="checkbox" /></td></tr>
+              <tr><td>Facade:</td><td><input type="checkbox" /><input type="checkbox" /></td></tr>
+              <tr><td>Portik:</td><td><input type="checkbox" /><input type="checkbox" /></td></tr>
               <tr><td>Irregular Windows:</td><td><input type="checkbox" /></td><td><input type="checkbox" /></td></tr>
             </table>
             -->
           </div>
         </div>
         
-        <!--corners...-->
+        <div id="corners" class="section">
+          <!--Visibility is toggled depending on relevance of these settings.-->
+          <b>Corners</b>
+          <hr />
+          <div id="corner-settings">
+            <!--Dynamically created content-->
+            <!--
+            <table class="leftmost-is-label">
+              <tr><td>Turret:</td><td><input type="checkbox" /><input type="checkbox" /><input type="checkbox" /></td></tr>
+              <tr><td>Spire:</td><td><input type="checkbox" /><input type="checkbox" /><input type="checkbox" /></td></tr>
+            </table>
+            -->
+          </div>
+        </div>
 
-        <!--<div id="component_replacement" class="section">
-          <!- -Visibility is toggled depending on relevance of these settings.- ->
-          <b>Component Replacement</b>
-          <hr>
-        </div>-->
+        <!--Part Replacement...-->
 
         <div id="material_replacement" class="section">
           <!--Visibility is toggled depending on relevance of these settings.-->
