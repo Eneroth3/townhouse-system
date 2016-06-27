@@ -251,6 +251,8 @@
             var slots1 = parseInt(box1.getAttribute('data-slots'));
             var end1   = start1 + slots1 - 1;
             
+            var occupied_name = box1.getAttribute('data-replacement-name');
+            
             if (!(start1 > end0 || end1 < start0)) {
               occupied = true;
               break;
@@ -258,6 +260,7 @@
             
           }
           box0.disabled = occupied;
+          box0.title = occupied ? 'Slot occupied by '+occupied_name : '';
           
         }
         
@@ -273,6 +276,7 @@
     </script>
     <link href="style.css" rel="stylesheet" type="text/css">
     <style type="text/css">
+      
       table.leftmost-is-label tr td:nth-child(1){
         width: 80px;
         text-align: right;
@@ -281,6 +285,19 @@
         text-align: left;
         color: gray;
       }
+      
+      fieldset{
+        margin: 0.75em 0;
+        padding: 0.5em 0;
+        border: 1px solid ThreeDDarkShadow;
+      }
+      legend {
+        margin-left: 0.5em;
+      }
+      fieldset table {
+        margin-left: -1px;
+      }
+      
       
       #template img{
         width: 200px;
@@ -454,7 +471,7 @@
           <!--Visibility is toggled depending on relevance of these settings.-->
           <b>Facade Elements</b>
           <hr />
-          <table class="leftmost-is-label" style="width: 100%;">
+          <table class="leftmost-is-label">
             <tr>
               <td>Margin:</td>
               <td>
@@ -468,80 +485,96 @@
               <td><input type="checkbox" checked="checked" /></td>
               <td>Suggest margin (based on gables and corners)</td>
             </tr>
-            <tr>
-              <td colspan="2"><hr style="margin-left: 0;" /></td>
-            </tr>
-            <tr>
-              <td colspan="2" class="label-header">Replace Window Front</td>
-            </tr>
-            <tr>
-              <td>Door Front:</td>
-              <td>
-                <div>
-                  <div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="0", data-index="0" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="0", data-index="1" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="0", data-index="2" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="0", data-index="3" data-slots="1" /></div><!--
-                --></div><!--
-                --><div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="1", data-index="0" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="1", data-index="1" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="1", data-index="2" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="1", data-index="3" data-slots="1" /></div>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td>Balcony:</td>
-              <td>
-                <div>
-                  <div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="0" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="1" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="2" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="3" data-slots="1" /></div><!--
-                --></div><!--
-                --><div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="0" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="1" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="2" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="3" data-slots="1" /></div>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td colspan="2" class="label-header">Replace Window Back</td>
-            </tr>
-            <tr>
-              <td>Door Back:</td>
-              <td>
-                <div>
-                  <div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="0", data-index="0" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="0", data-index="1" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="0", data-index="2" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="0", data-index="3" data-slots="1" /></div><!--
-                --></div><!--
-                --><div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="1", data-index="0" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="1", data-index="1" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="1", data-index="2" data-slots="1" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="1", data-index="3" data-slots="1" /></div>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td>Wing:</td>
-              <td>
-                <div style="padding: 0 20px;">
-                  <div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Wing" data-segment="0", data-index="0" data-slots="3" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Wing" data-segment="0", data-index="1" data-slots="3" /></div><!--
-                --></div><!--
-                --><div style="padding: 0 20px;"><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Wing" data-segment="1", data-index="0" data-slots="3" /></div><!--
-                  --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Wing" data-segment="1", data-index="1" data-slots="3" /></div>
-                </div>
-              </td>
-            </tr>
           </table>
+          <fieldset>
+            <legend>Replace Window Front</legend>
+            <table class="leftmost-is-label">
+              <tr>
+                <td>Door Front:</td>
+                <td>
+                  <div>
+                    <div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="0", data-index="0" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="0", data-index="1" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="0", data-index="2" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="0", data-index="3" data-slots="1" /></div><!--
+                  --></div><!--
+                  --><div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="1", data-index="0" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="1", data-index="1" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="1", data-index="2" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="1", data-index="3" data-slots="1" /></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>Balcony:</td>
+                <td>
+                  <div>
+                    <div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="0" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="1" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="2" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="3" data-slots="1" /></div><!--
+                  --></div><!--
+                  --><div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="0" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="1" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="2" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="3" data-slots="1" /></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>Balcony Wide:</td>
+                <td>
+                  <div style="padding: 0 10px;">
+                    <div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="0" data-slots="2" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="1" data-slots="2" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="2" data-slots="2" /></div><!--
+                  --></div><!--
+                  --><div style="padding: 0 10px;"><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="0" data-slots="2" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="1" data-slots="2" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="2" data-slots="2" /></div>
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </fieldset>
+          <fieldset>
+            <legend>Replace Window Back</legend>
+            <table class="leftmost-is-label">
+              <tr>
+                <td>Door Back:</td>
+                <td>
+                  <div>
+                    <div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="0", data-index="0" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="0", data-index="1" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="0", data-index="2" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="0", data-index="3" data-slots="1" /></div><!--
+                  --></div><!--
+                  --><div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="1", data-index="0" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="1", data-index="1" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="1", data-index="2" data-slots="1" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="1", data-index="3" data-slots="1" /></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>Wing:</td>
+                <td>
+                  <div style="padding: 0 20px;">
+                    <div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Wing" data-segment="0", data-index="0" data-slots="3" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Wing" data-segment="0", data-index="1" data-slots="3" /></div><!--
+                  --></div><!--
+                  --><div style="padding: 0 20px;"><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Wing" data-segment="1", data-index="0" data-slots="3" /></div><!--
+                    --><div><input type="checkbox" onclick="toggle_replacement()" data-original-name="Window Back" data-replacement-name="Wing" data-segment="1", data-index="1" data-slots="3" /></div>
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </fieldset>
         </div>
 
         <div id="solids" class="section">

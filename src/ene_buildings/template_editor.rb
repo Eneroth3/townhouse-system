@@ -968,7 +968,7 @@ module TemplateEditor
     return if data == old_data
 
     model = @@part.model
-    model.start_operation "Saving Part Data", true# TODO: COMPONENT REPLACEMENT: when part gets a name, add name to operator name.
+    model.start_operation "Saving Part Data", true
 
     # Remove old dictionary in case a value was changed to default and therefore
     # shouldn't be present in new data.
