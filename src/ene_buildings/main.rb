@@ -40,7 +40,7 @@ module EneBuildings
     # Internal: Resolution of material thumbnails.
     THUMB_RES = 18
 
-    # Include all classes and modules.
+    # Load all classes and modules.
     Sketchup.require File.join(PLUGIN_DIR, "observers")
     Sketchup.require File.join(PLUGIN_DIR, "my_geom")
     Sketchup.require File.join(PLUGIN_DIR, "my_view")

@@ -762,7 +762,7 @@ class Building
   # Internal: List replaceable parts (spread and aligned parts) available for
   # this building.
   # Also list the Transformation objects for each part.
-  # Based on Template and @path. # TODO: Should also be based on used gables or separate margin-array.
+  # Based on Template and @path. # TODO: Should also be based on @facade_margins
   #
   # Return Array of Hash objects corresponding to each part.
   # Hash has reference to definition, name, original_instance and
@@ -1366,8 +1366,6 @@ class Building
   #
   # Return nothing.
   def draw_parts
-    
-    # TODO: Use largest width of currently used gables as margin when listing parts in between
     
     part_data = list_available_replacable
     part_data += list_used_gables
