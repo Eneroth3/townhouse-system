@@ -568,22 +568,12 @@ class Building
     
     # Toggling a gable.
     dlg.add_action_callback("toggle_gable") do |_, params|
-      name, side, status = JSON.parse(params)
-      @gables[@template.id] ||= {}
-      @gables[@template.id][name] ||= []
-      @gables[@template.id][name][side] = status
-      
-      @gables[@template.id].delete(name) unless @gables[@template.id][name].any?
+      set_gable *JSON.parse(params)
     end
     
     # Toggling a corner.
     dlg.add_action_callback("toggle_corner") do |_, params|
-      name, index, status = JSON.parse(params)
-      @corners[@template.id] ||= {}
-      @corners[@template.id][name] ||= []
-      @corners[@template.id][name][index] = status
-      
-      @corners[@template.id].delete(name) unless @corners[@template.id][name].any?
+      set_corner *JSON.parse(params)
     end
     
     # Part replacement...
@@ -712,6 +702,51 @@ class Building
 
   end
 
+  # Public: Sets whether a specific corner part should be drawn to a specific
+  # corner.
+  #
+  # name   - String name of the corner part.
+  # index  - Int index of the corner (counting from left).
+  # status - Boolean whether part should be used.
+  #
+  # Returns nothing.
+  def set_corner(name, index, status)
+  
+    @corners[@template.id] ||= {}
+    @corners[@template.id][name] ||= []
+    @corners[@template.id][name][index] = status
+    
+    @corners[@template.id].delete(name) unless @corners[@template.id][name].any?
+    
+    nil
+    
+  end
+  
+  # Public: Sets whether a specific gable part should be drawn to a specific
+  # side of building.
+  #
+  # name   - String name of the corner part.
+  # side   - Int, 0 being left and 1 right.
+  # status - Boolean whether part should be used.
+  #
+  # Returns nothing.
+  def set_gable(name, side, status)
+  
+    @gables[@template.id] ||= {}
+    @gables[@template.id][name] ||= []
+    @gables[@template.id][name][side] = status
+    
+    @gables[@template.id].delete(name) unless @gables[@template.id][name].any?
+    
+    nil
+    
+  end
+  
+  # Internal: List corner parts available for building.
+  # Based on Template.
+  #
+  # Returns Array of Hash objects corresponding to each corner.
+  # Hash has reference to definition, name, original_instance and margin.
   def list_available_corners
   
     parts_data = []
@@ -724,7 +759,7 @@ class Building
         :defintion => e.definition,
         :original_instance => e,
         :name => e.get_attribute(Template::ATTR_DICT_PART, "name"),
-        :width => e.get_attribute(Template::ATTR_DICT_PART, "corner_margin")
+        :margin => e.get_attribute(Template::ATTR_DICT_PART, "corner_margin")
       }
       parts_data << part_data
     end
@@ -737,7 +772,7 @@ class Building
   # Based on Template.
   #
   # Returns Array of Hash objects corresponding to each gable.
-  # Hash has reference to definition, name, original_instance and width.
+  # Hash has reference to definition, name, original_instance and margin.
   def list_available_gables
   
     parts_data = []
@@ -750,7 +785,7 @@ class Building
         :defintion => e.definition,
         :original_instance => e,
         :name => e.get_attribute(Template::ATTR_DICT_PART, "name"),
-        :width => e.get_attribute(Template::ATTR_DICT_PART, "gable_margin")
+        :margin => e.get_attribute(Template::ATTR_DICT_PART, "gable_margin")
       }
       parts_data << part_data
     end
