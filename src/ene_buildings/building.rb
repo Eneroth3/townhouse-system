@@ -601,7 +601,7 @@ class Building
     
     
     
-=begin
+if false
 # Attempt that relies on copying each instance. Kinda ugly but I had to try.
 #
 # Possible Improvements:
@@ -611,6 +611,7 @@ class Building
 # What I've learned:
 #   The importance of having welded edges when trying to cut interior hole.
 start_time = Time.now
+
 
       ops.each do |s|
         part, operation, part_segment_group = s
@@ -645,15 +646,16 @@ start_time = Time.now
       # Seems quite close to make it work now!
       # On back side of landshövdingehus reveterat everything lokks right.
       # On front side there are errors that seem to be created by the temp faces being faulty directed. This is quite easily changed,
-      
+    
+    
 p "Drew building in #{Time.now - start_time}s."
-=end
+end
     
     
     
     
     
-#=begin
+if false
 #  Attempt without intersect_with.
 #  The bottleneck is checking on_line? on each lots of edges with lots of points.
 #  Also has problem with not punching holes in facs.
@@ -663,7 +665,7 @@ p "Drew building in #{Time.now - start_time}s."
 #
 # + No ugly intersect_with
 # + Quite nicely written code
-# + Faulty results on some occasions, doesn't punch holes.
+# - Faulty results on some occasions, doesn't punch holes.
 # - Slow, almost as slow as intersect with.
 # - Doesn't remove inner faces when a pre-existing edge intersects cut edges. There's no reference to the split of part and it doesn't get added to the list of edges to seperate what to keep and what to cut away.
 start_time = Time.now
@@ -786,13 +788,142 @@ start_time = Time.now
       cut_away_edges.each { |f| f.hidden = true }
 
 p "Drew building in #{Time.now - start_time}s."
-#=end
+end
 
+if true
+#  Attempt without intersect_with.
+#
+#  Trying to use vertices
+#  instead of Point3ds as arguments to make them weld better. Maybe punches
+#  holes in faces.
+#
+#  The bottleneck is checking on_line? on each lots of edges with lots of points.
+#
+# Conclusion: It does punch holes!! :D
+start_time = Time.now
 
+      # Copy naked edges of cutting parts into a temporary group and explode it
+      # to merge and split them with pre-existing edges.
+      # Save point references to later be able to identify the cutting edges.
+      # Normalize point order to determine what face to keep and what to cut
+      # away.
+      
+      new_vertices = []
+      
+      naked_edge_points = []
+      cut_temp_group = segment_group.entities.add_group
+      ops.each do |s|
+        part, operation, part_segment_group = s
+        next unless part_segment_group == segment_group
+        next unless operation == "cut_multiple_faces"
+                
+        naked_edges = EneBuildings.naked_edges part.definition.entities
+        
+        naked_edges.each do |edge|
+          points = edge.vertices.map { |v| v.position }
+          points.each { |p| p.transform! part.transformation }
+          points.reverse! if edge.reversed_in?(edge.faces.first)
+          naked_edge_points << points
+          
+          vertices_or_points = points.map { |p| new_vertices.find{ |v| v.position == p } || p}
 
+          new_edge = cut_temp_group.entities.add_line vertices_or_points
+          new_edge.hidden = edge.hidden?
+          
+          new_vertices += new_edge.vertices
+          new_vertices.uniq!# Set might be faster. At least new vertices should be in front of Array.
+          
+          # Create temporary faces, if possible, to make Sketchup punch holes
+          # in existing faces.
+          new_edge.find_faces
+        end
+        
+      end
+      
+      # make sure the new temporary faces are directed so they later can be
+      # identified as faces to cut away.
+      cut_temp_group.entities.to_a.each do |f|
+        next unless f.is_a? Sketchup::Face
+        next unless f.edges.first.reversed_in?(f)
+        f.reverse!
+      end
+      
+      exploded = cut_temp_group.explode
+      exploded.each { |f| f.erase! if f.is_a?(Sketchup::Face) }
+      exploded_vertices = exploded.select { |v| v.is_a? Sketchup::Vertex }
+      
+      # Find the cutting edges. Edges may be split during explosion.
+      # Also start listing faces to cut away and faces to keep bound by these
+      # edges.
+      
+      cutting_edges  = []
+      cut_away_faces = []
+      faces_to_keep  = []
+      
+      # Limit upcoming loop of physical edges to edges that connects to
+      # what was exploded.
+      potential_cutting_edges = segment_group.entities.select do |e|
+        e.is_a?(Sketchup::Edge) &&
+        e.vertices.any? { |v| exploded_vertices.include? v }
+      end
+      
+      # Loop point pairs of the original naked edges.
+      naked_edge_points.each do |pts|
+        pts_bounds = Geom::BoundingBox.new
+        pts_bounds.add pts
+        
+        # Loop physical edges.
+        potential_cutting_edges.each do |e|
+          edge_pts = e.vertices.map { |v| v.position }
+          
+          next unless pts_bounds.contains? edge_pts[0]
+          next unless pts_bounds.contains? edge_pts[1]
+          next unless (pts[0] - pts[1]).parallel?(e.line[1])
+          next unless pts.all? { |p| p.on_line? e.line }
+                    
+          # If edge is inclusively between points, i.e. including edges split
+          # off from the original naked edge on explosion, add it to list
+          # of cutting edges.
+          l = pts[0].distance pts[1]
+          next unless pts.all? { |p| edge_pts.all? { |p1| p.distance(p1) <= l } }
+          cutting_edges << e
+          
+          # If edge is exactly defined by points, also determine what
+          # bounded face to keep and what to cut away from it.
+          matches_as_non_reversed = pts == edge_pts
+          matches_as_reversed     = pts == edge_pts.reverse
+          next unless matches_as_non_reversed || matches_as_reversed
+          next if matches_as_non_reversed && matches_as_reversed
+          
+          reversed = matches_as_reversed
+          e.faces.each do |f|
+            if e.reversed_in?(f) == reversed
+              cut_away_faces << f
+            else
+              faces_to_keep << f
+            end
+          end
+        
+        end
+      end
+      
+      # Traverse faces sharing a binding edge to list faces to cut away and to
+      # keep. If the loop of cutting edges doesn't lie tight onto the original
+      # mesh the cut away faces will leak out to the rest of the mesh but the
+      # faces to keep will also leak in, making it possible to ignore the
+      # invalid cuts.
+      cut_away_faces = EneBuildings.connected_faces cut_away_faces, cutting_edges
+      faces_to_keep = EneBuildings.connected_faces faces_to_keep, cutting_edges
+      cut_away_faces -= faces_to_keep
 
+      cut_away_edges = cut_away_faces.map { |f| f.edges }.flatten.uniq
+      cut_away_edges.keep_if { |e| (e.faces - cut_away_faces).empty? }
+      
+      cut_away_faces.each { |f| f.hidden = true }
+      cut_away_edges.each { |f| f.hidden = true }
 
-
+p "Drew building in #{Time.now - start_time}s."
+end
 
 
 
