@@ -1601,7 +1601,7 @@ class Building
       cut_away_faces.each { |f| f.hidden = true }
       cut_away_edges.each { |f| f.hidden = true }
       
-      end
+    end
 
     nil
 
