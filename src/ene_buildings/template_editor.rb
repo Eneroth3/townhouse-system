@@ -333,6 +333,10 @@ module TemplateEditor
       corner_margin           = data["corner_margin"]           || 0.to_l
       solid                   = data["solid"]                   || ""
       solid_index             = data["solid_index"]             || 0
+      
+      # Make name unique. If part was copied it may be duplicated.
+      # Assume user first selects the copy and not the original.
+      name = unique_part_name(@@part, name) unless name == ""
 
       # Add data to dialog.
       js = "warn(false);"
