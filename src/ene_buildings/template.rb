@@ -680,8 +680,12 @@ class Template
     # Clear model.
     entities.clear!
     
-    # Get building length from bounding box of template component.
-    length = component_def.bounds.width
+    # Get building length from main volume of template component.
+    face_left   = component_def.entities.find { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?(X_AXIS.reverse) }
+    face_right  = component_def.entities.find { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?(X_AXIS) }
+    point_left  = face_left.vertices.first.position
+    point_right = point_left.project_to_plane face_right.plane
+    length = point_left.distance point_right
     
     # Draw building with given template.
     p = [ORIGIN, Geom::Point3d.new(length, 0, 0)]
