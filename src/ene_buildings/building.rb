@@ -764,6 +764,8 @@ class Building
       parts_data << part_data
     end
     
+    parts_data.sort_by! { |p| p[:name] || "" }
+    
     parts_data
     
   end
@@ -789,6 +791,8 @@ class Building
       }
       parts_data << part_data
     end
+    
+    parts_data.sort_by! { |p| p[:name] || "" }
     
     parts_data
     
@@ -970,6 +974,8 @@ class Building
       end
     
     end
+    
+    parts_data.sort_by! { |p| p[:name] || "" }
     
     parts_data
     
