@@ -977,6 +977,9 @@ module TemplateEditor
     return if data == old_data
 
     model = @@part.model
+    
+    Observers.disable
+    
     model.start_operation "Saving Part Data", true
 
     # Remove old dictionary in case a value was changed to default and therefore
@@ -990,6 +993,9 @@ module TemplateEditor
     end
 
     model.commit_operation
+    
+    Observers.enable
+    onSelectionChange
 
     nil
 
