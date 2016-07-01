@@ -55,11 +55,15 @@ module TemplateEditor
 
     model = Sketchup.active_model
     component_inst = inside_template_component
-    selected = model.selection.first
-    if !component_inst &&
-    selected &&
-    selected.is_a?(Sketchup::ComponentInstance) &&
-    Template.component_is_template?(selected)
+    selection = model.selection
+    selected = selection.first
+    if(
+      !component_inst &&
+      selection.size == 1 &&
+      selected &&
+      selected.is_a?(Sketchup::ComponentInstance) &&
+      Template.component_is_template?(selected)
+    )
       component_inst = selected
     end
 
@@ -214,7 +218,7 @@ module TemplateEditor
     if !@@component_inst
       #No active template to edit.
       title = "No active template."
-      msg = "Please select a template component."
+      msg = "Please select a single template component."
       js = "warn(true, '#{title}', '#{msg}');"
       @@dlg.execute_script js
 
@@ -265,6 +269,7 @@ module TemplateEditor
       @@part = nil
     end
     @@part = nil unless inside_template_component
+    @@part = nil unless model.selection.length == 1
 
     if !inside_template_component
       # Active drawing context is not within a template defining component.
@@ -278,7 +283,7 @@ module TemplateEditor
       # Selection cannot be edited.
 
       title = "Not available for this selection."
-      msg = "Please select a group or component."
+      msg = "Please select a single group or component."
       js = "warn(true, '#{title}', '#{msg}');"
       @@dlg_part.execute_script js
 
