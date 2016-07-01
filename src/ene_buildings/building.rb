@@ -1512,6 +1512,7 @@ class Building
       # to merge and split them with pre-existing edges.
             
       naked_edge_points = []
+      hidden = []
       
       cut_temp_group = segment_group.entities.add_group
       ops.each do |s|
@@ -1520,6 +1521,7 @@ class Building
         next unless operation == "cut_multiple_faces"
                 
         naked_edges = EneBuildings.naked_edges part.definition.entities
+        original_mirrored = MyGeom.transformation_mirrored? part.transformation
         
         # TODO: wrap drawing welded edges into own method.
         new_vertices = []
@@ -1528,12 +1530,13 @@ class Building
           points = edge.vertices.map { |v| v.position }
           points.each { |p| p.transform! part.transformation }
           points.reverse! if edge.reversed_in?(edge.faces.first)
+          points.reverse! if original_mirrored 
           naked_edge_points << points
           
           vertices_or_points = points.map { |p| new_vertices.find{ |v| v.position == p } || p}
 
           new_edge = cut_temp_group.entities.add_line vertices_or_points
-          new_edge.hidden = edge.hidden?
+          hidden << new_edge.hidden = edge.hidden?
           
           new_vertices = new_edge.vertices + new_vertices
           new_vertices.uniq!
@@ -1555,8 +1558,12 @@ class Building
       
       # Draw cutting edges in segment group (before temp group is exploded onto
       # them).
+      i = 0
       cutting_edges = naked_edge_points.map do |pts|
-        segment_group.entities.add_line pts
+        edge = segment_group.entities.add_line pts
+        edge.hidden = hidden[i]
+        i += 1
+        edge
       end
       
       exploded = cut_temp_group.explode
