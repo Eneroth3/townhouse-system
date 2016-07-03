@@ -1328,10 +1328,8 @@ class Building
           next unless transformations
           next unless @part_replacements[@template.id][replaceable[:name]][segment]
 
-          slot = -1
-          transformations_copy = transformations.dup
-          transformations.delete_if do |tr_start|
-            slot += 1
+          to_delete = []
+          transformations.each_with_index do |tr_start, slot|
             replacement_name = @part_replacements[@template.id][replaceable[:name]][segment][slot]
             next unless replacement_name
 
@@ -1341,12 +1339,10 @@ class Building
               next
             end
             
-            
-            # TODO: remove transformations for later slots too if replacement is multi slot. Also have cleaner code without transformations_copy.
             if replacement_data[:slots] == 1
               tr = tr_start
             else
-              tr_end = transformations_copy[slot + replacement_data[:slots] -1]
+              tr_end = transformations[slot + replacement_data[:slots] -1]
               tr = Geom::Transformation.interpolate tr_start, tr_end, 0.5
             end
             
@@ -1354,15 +1350,14 @@ class Building
             replacement_data[:transformations][segment] ||= []
             replacement_data[:transformations][segment] << tr
 
-            true
+            to_delete += (slot..(slot + replacement_data[:slots] -1)).to_a
           end
+          to_delete.reverse_each { |i| transformations.delete_at i }
           
         end
         
       end
     end
-    
-    
     
     # Purge replacements that aren't used.
     replacements.keep_if { |r| r[:transformations] }
