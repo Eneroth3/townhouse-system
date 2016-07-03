@@ -320,6 +320,8 @@ module TemplateEditor
           "gable"
         elsif data["corner"]
           "corner"
+        elsif data["replacement"]
+          "replacement"
         else
           ""
         end
@@ -331,6 +333,8 @@ module TemplateEditor
       replace_nested_mateials = data["replace_nested_mateials"] || false
       gable_margin            = data["gable_margin"]            || 0.to_l
       corner_margin           = data["corner_margin"]           || 0.to_l
+      replaces                = data["replaces"]                || ""
+      slots                   = data["slots"]                   || 1
       solid                   = data["solid"]                   || ""
       solid_index             = data["solid_index"]             || 0
       
@@ -352,6 +356,8 @@ module TemplateEditor
       js << "override_cut_planes(#{override_cut_planes});"
       js << "document.getElementById('gable_margin').value=#{gable_margin.to_s.inspect};"
       js << "document.getElementById('corner_margin').value=#{corner_margin.to_s.inspect};"
+      js << "document.getElementById('replaces').value=#{replaces.inspect};"
+      js << "document.getElementById('slots').value=#{slots};"
       js << "replace_nested_mateials(#{replace_nested_mateials});"
       js << "is_group(#{@@part.is_a? Sketchup::Group});"
       js << "document.getElementById('solid').value=#{solid.inspect};"
@@ -963,6 +969,14 @@ module TemplateEditor
       unless data["name"]
          data["name"] = unique_part_name(@@part, "Corner")
          msg = "Corner must have a name.\nUsing '#{data["name"]}."
+         UI.messagebox msg
+      end
+    when "replacement"
+      data["replacement"] = true
+      data["replaces"] = @@dlg_part.get_element_value("replaces")# TODO: PART REPLACEMENTS: Validate.
+      unless data["name"]
+         data["name"] = unique_part_name(@@part, "Replacement")
+         msg = "Replacement must have a name.\nUsing '#{data["name"]}."
          UI.messagebox msg
       end
     end

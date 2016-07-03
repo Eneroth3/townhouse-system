@@ -229,7 +229,7 @@
           <tr>
             <td><label for="name">Name:</label></td>
             <td>
-              <abbr class="right" title="Only relevant for gables and corners.">[?]</abbr><!--TODO: COMPONENT REPLACMENT: relevant for that too-->
+              <abbr class="right" title="Required for gables, corners, replacements and replacable parts.">[?]</abbr>
               <span class="fill-rest"><input name="name" id="name" type="text" /></span>
             </td>
           </tr>
@@ -251,8 +251,8 @@
                 <option value="right">Align right</option>
                 <option value="center">Center</option>
                 <option value="percentage">Relative</option>
-                <!--──────────-->
-                <!-- "Replacement (for any of the above)"-->
+                <option disabled>──────────</option>
+                <option value="replacement">Replacement (for any of the above)</option>
                 <option disabled>──────────</option>
                 <option value="gable">Gable</option>
                 <option value="corner">Corner</option>
@@ -317,6 +317,12 @@
             <td><input name="corner_margin" id="corner_margin" type="text" /></td>
             <td>&nbsp;</td>
             <td><input type="text" style="visibility: hidden;" /></td><!--Hidden dummy input to fill out table so corner margin field has same width as other fields.-->
+          </tr>
+          <tr data-category="replacement">
+            <td><label for="replaces">Replaces</label></td>
+            <td><input name="replaces" id="replaces" type="text" /></td><!--TODO: PART REPLACEMENTS: make dropdown menu-->
+            <td><label for="slots">Slots</label></td>
+            <td><input name="slots" id="slots" type="text" /></td>
           </tr>
 
         </table>

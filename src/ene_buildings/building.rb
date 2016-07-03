@@ -97,26 +97,10 @@ class Building
   # Array where each element is array of original (string identifier) and
   # replacement (array of replacement of each slot, also string identifier).
   attr_accessor :componet_replacement
-
-  # Public: Gets/sets what corner parts should be drawn to building.
-  # Variable is Hash indexed by Template id String.
-  # Each value is a Hash indexed by corner name String.
-  # Each such value is an Array of Booleans corresponding to each building
-  # corner (from left to tight) telling whether given corner part should be
-  # drawn to that corner.
-  attr_accessor :corners
   
   # Public: Gets/sets rotation of gables.
   # Array containing 2 angels in radians cc seen from above.
   attr_accessor :end_angles
-
-  # Public: Gets/sets what gable parts should be drawn to building.
-  # Variable is Hash indexed by Template id String.
-  # Each value is a Hash indexed by gable name String.
-  # Each such value is an Array of Booleans corresponding to the building
-  # end (left, tight) telling whether given gable part should be
-  # drawn at that end.
-  attr_reader :gables
   
   # Public: Returns Group Building is drawn to.
   attr_reader :group
@@ -170,9 +154,32 @@ class Building
       # End angles in radians.
       @end_angles = [0, 0]
       
+      # Defines what corner parts should be drawn to building.
+      # Variable is Hash indexed by Template id String.
+      # Each value is a Hash indexed by corner name String.
+      # Each such value is an Array of Booleans corresponding to each building
+      # corner (from left to tight) telling whether given corner part should be
+      # drawn to that corner.
       @corners = {}
       
+      # Defines what gable parts should be drawn to building.
+      # Variable is Hash indexed by Template id String.
+      # Each value is a Hash indexed by gable name String.
+      # Each such value is an Array of Booleans corresponding to the building
+      # end (left, right) telling whether given gable part should be
+      # drawn at that end.
       @gables = {}
+      
+      # Defines how to replace facade elements when drawing buidling.
+      # Variable is Hash indexed by Template id String.
+      # Each value is a Hash indexed by original part name.
+      # Each such value is an Array where each element corresponds to a building
+      # segment (what is between 2 adjacent corners).
+      # Each element is an Array where each each element corresponds to a slot
+      # (an instance of the original part that can be replaced).
+      # A slot either contains nil when not replaced or the name of the
+      # replacing part.
+      @part_replacements = {}
 
       # Array of Materials to replace and replacement.
       # Each element is an array containing the original and the replacement
@@ -283,7 +290,94 @@ class Building
     @template.has_solids?
 
   end
+  
+  # Public: Find what part replacment currently uses a specific slot.
+  #
+  # original_name - String name of the original part being replace.
+  # segment       - Int segment index (counting from left, starting at 0).
+  # index         - Int slot index for leftmost slot to be checked
+  #                 (counting from left, starting at 0).
+  # slots         - How many slots to check (default: 1).
+  #
+  # Example:
+  #
+  #   my_building.slot_use("Window", 0, 0)
+  #   # -> []
+  #   # The first Winow from the left in the first segment from the left is
+  #   # not being replaced.
+  #
+  #   my_building.slot_use("Window", 0, 0, 4)
+  #   # -> []
+  #   # The first 4 Winow from the left in the first segment from the left are
+  #   # not being replaced.
+  #
+  #   my_building.slot_use("Window", 0, 1)
+  #   # -> [["Door", 1, true]]
+  #   # The second Window from the left in the first segment is being replaced
+  #   # by a Door.
+  #
+  #   my_building.slot_use("Window", 0, 3)
+  #   # -> [["Balcony", 2, true]]
+  #   # The fourth Window from the left in the first segment is being replaced
+  #   # by a Balcony. The leftmost (start) slot of the balcony is the third slot
+  #   # in the same section, meaning the balcony must span at least 2 slots.
+  #
+  #   my_building.slot_use("Window", 1, 2)
+  #   # -> [["Balcony Wide", 0, false]]
+  #   # The third Window in the second segment is being replaced by a Balcony
+  #   # Wide. The Balcony Wide is invalid and will not be drawn.
+  #   # Either the Balcony Wide uses slots that doesn't exist because segment is
+  #   # too short or "Balcony Wide" isn't the name of a replacement that is
+  #   # available for thye current template.
+  #
+  # Returns Array listing replacements using giving slots or nil when any of the
+  # slots doesn't exist.
+  # Each Array element is another Array containg String name of replacement using
+  # slot, it's leftmost (start) slot index and a boolean telling if its valid.
+  # A replacement isn't valid when there isn't any available replacement by that
+  # name or when it uses slots that doesn't exist.
+  def inspect_slots(original_name, segment, index, slots = 1)# TODO: Under construction.
+    
+    # Check if given segment even exists.
+    # TODO: return nil when segment doesn't exist (compare to path)...
+  
+    last_slot = index + slots - 1
+  
+    part_replacements      = (@part_replacements[@template.id] ||= {})
+    available_replacements = list_available_replacements
+    #available_replacable = list_available_replacable...
+    
+    # Check if all given slots exists within segment.
+    # TODO: return nul if last_slot doesn't exist...
+        
+    uses_slot = []
+    
+    segment_array = part_replacements[original_name][segment]
+    return [] unless segment_array
+    segment_array.each_with_index do |v, other_i|
+    
+      next unless v
+      valid = true
+      using_slot = available_replacements.find { |r| r[:name] == v }
+      unless using_slot
+        valid = false
+        using_slot = {}
+      end
+      other_slots = using_slot[:slots] || 1
+      other_last_slot = other_i + other_slots - 1
+      
+      # TODO: valid = false if other_last_slot is greater than the index of the last available slot.
 
+      next if other_i > last_slot || other_last_slot < index
+      
+      uses_slot << [v, other_i, valid]
+      
+    end
+    
+    uses_slot
+    
+  end
+  
   # Public: List replaceable materials (based o template).
   # Materials directly in segment groups are listed. Materials in nested groups
   # are also listed if the group has an attribute specifically saying so.
@@ -456,7 +550,9 @@ class Building
       end
       js << "update_corner_section();";
 
-      # Part replacements...
+      # Part replacements.
+      #js << the relevant data...
+      js << "update_facade_section();"
 
       # Material replacement options (based on template component) and current
       # preferences (saved to building).
@@ -576,7 +672,12 @@ class Building
       set_corner *JSON.parse(params)
     end
     
-    # Part replacement...
+    # Setting part replacement
+    dlg.add_action_callback("toggle_replacement") do |_, params|
+      original, replacement, segment, index, status = *JSON.parse(params)
+      replacement = status ? replacement : nil
+      set_replacement original, segment, index, replacement
+    end
 
     # Clicking material replacement button.
     dlg.add_action_callback("replace_material") do |_, original_string|
@@ -694,6 +795,9 @@ class Building
     # Override gable Hash with JSON String.
     @group.set_attribute ATTR_DICT, "gables", JSON.generate(@gables)
     
+    # Override part_replacements Hash with JSON String.
+    @group.set_attribute ATTR_DICT, "part_replacements", JSON.generate(@part_replacements)
+    
     # Override material replacements wit string identifiers.
     array = @material_replacement.map { |e| e.map{ |m| m.name } }
     @group.set_attribute ATTR_DICT, "material_replacement", array
@@ -703,10 +807,13 @@ class Building
   end
 
   # Public: Sets whether a specific corner part should be drawn to a specific
-  # corner.
+  # corner of building.
   #
   # name   - String name of the corner part.
-  # index  - Int index of the corner (counting from left).
+  # index  - Int index of the corner (counting from left, starting at 0).
+  #          If index is too high to represent a currently existing corner,
+  #          setting will be kept but not affect how buidling is drawn until the
+  #          corner exists.
   # status - Boolean whether part should be used.
   #
   # Returns nothing.
@@ -725,7 +832,7 @@ class Building
   # Public: Sets whether a specific gable part should be drawn to a specific
   # side of building.
   #
-  # name   - String name of the corner part.
+  # name   - String name of the gable part.
   # side   - Int, 0 being left and 1 right.
   # status - Boolean whether part should be used.
   #
@@ -742,6 +849,66 @@ class Building
     
   end
   
+  # Public: Sets replacement for a replaceable part on a given slot by a
+  # with a given replacing part.
+  #
+  # original_name   - String name of the original part to replace.
+  # segment         - Int segment index (counting from left, starting at 0).
+  #                   If segment index is to high to represent a currently
+  #                   existing segment, setting will be kept but not affect how
+  #                   buidling is drawn until the segment exists.
+  # index           - Int slot index (counting from left, starting at 0).
+  #                   If replacment uses several slots, index is of the leftmost
+  #                   one. If slot index is to high to represent a currently
+  #                   existing slot, setting will be kept but not affect how
+  #                   buidling is drawn until the slot exists.
+  # replacement     - String name of replacing part or nil when resetting to no
+  #                   replacement.
+  # purge_colliding - Wether potential colliding replacements (those taking up
+  #                   the same slot(s)) should be purged to make space for this
+  #                   replacment. A collding replacement that currently wouldn't
+  #                   be drawn anyway because it requires slots that doesnn't_array
+  #                   currently exist is always purged. (default: false)
+  #
+  # Returns nothing.
+  # Raises RuntimeError if replcement is invalid.
+  # Raises RuntimeError if there is a slot collision and purge_colliding is
+  # false.
+  def set_replacement(original, segment, index, replacement, purge_colliding = false)
+  
+    # TODO: raise error if slots doesn't even exist.
+  
+    #if replacement# TODO: Under construction.
+    #
+    #  replacments = list_available_replacements
+    #  replacement_data = replacments.find { |r| r[:name] == replacement }
+    #  raise "Unknow replacement '#{replacement}." unless replacement_data
+    #  slots = replacement_data[:slots]
+    #  collisions = inspect_slots original, segment, index, slots
+    #  
+    #  # Invalid colldiding replacements (those that aren't drawn anyway because they replaces
+    #  # slots that doesn't exist or because they aren't defined by the template)
+    #  # can safely be purged.
+    #  # TODO: purge...
+    #  
+    #  # If colliding replacements are either purged or raises error depending on
+    #  # purge_colliding
+    #  # TODO: implement...
+    #  
+    #end
+        
+    part_replacements = (@part_replacements[@template.id] ||= {})
+    part_replacements[original] ||= []
+    part_replacements[original][segment] ||= []
+    part_replacements[original][segment][index] = replacement
+    
+    part_replacements[original][segment] = nil unless part_replacements[original][segment].any?
+    part_replacements.delete(original) unless part_replacements[original].any?
+    
+    nil
+    
+  end
+
   # Internal: List corner parts available for building.
   # Based on Template.
   #
@@ -973,6 +1140,36 @@ class Building
 
       end
     
+    end
+    
+    parts_data.sort_by! { |p| p[:name] || "" }
+    
+    parts_data
+    
+  end
+  
+  # Internal: List replacments available for building.
+  # Based on Template.
+  #
+  # Returns Array of Hash objects corresponding to each replacement part.
+  # Hash has reference to definition, name, original_instance and slots it uses.
+  def list_available_replacements
+  
+    parts_data = []
+    
+    @template.component_def.entities.each do |e|
+      next unless e.get_attribute(Template::ATTR_DICT_PART, "replacement")
+      next unless e.get_attribute(Template::ATTR_DICT_PART, "name")
+      next unless e.get_attribute(Template::ATTR_DICT_PART, "replaces")
+      
+      part_data = {
+        :defintion => e.definition,
+        :original_instance => e,
+        :name => e.get_attribute(Template::ATTR_DICT_PART, "name"),
+        :replaces => e.get_attribute(Template::ATTR_DICT_PART, "replaces"),
+        :slots => e.get_attribute(Template::ATTR_DICT_PART, "slots", 1)
+      }
+      parts_data << part_data
     end
     
     parts_data.sort_by! { |p| p[:name] || "" }
@@ -1225,6 +1422,11 @@ class Building
     # Override gable JSON String with actual Hash object.
     # Backward compatibility: Set gables to empty Hash if not already set.
     h[:gables] = h[:gables] ? JSON.parse(h[:gables]) : {}
+    
+    # Override part replacements JSON String with actual Hash object.
+    # Backward compatibility: Set part replacements to empty Hash if not already
+    # set.
+    h[:part_replacements] = h[:part_replacements] ? JSON.parse(h[:part_replacements]) : {}
 
     # Override material replacement string identifiers with actual material
     # references.
