@@ -224,8 +224,8 @@ class Building
         last_drawn_as[:perform_solid_operations] &&
         (
           @gables  != last_drawn_as[:gables] ||
-          @corners != last_drawn_as[:corners] # ||
-          # Add anything related to part placement here...
+          @corners != last_drawn_as[:corners] ||
+          @part_replacements != last_drawn_as[:part_replacements]
         )
       )
     )
@@ -235,8 +235,8 @@ class Building
       draw_material_replacement
      elsif(
       @gables  != last_drawn_as[:gables] ||
-      @corners != last_drawn_as[:corners] # ||
-      # Add anything related to part placement here...
+      @corners != last_drawn_as[:corners] ||
+      @part_replacements != last_drawn_as[:part_replacements]
      )
        draw_parts
        draw_material_replacement
@@ -1137,7 +1137,7 @@ class Building
     
   end
   
-  # Internal: List replacments available for building.
+  # Internal: List replacements available for building.
   # Based on Template.
   #
   # Returns Array of Hash objects corresponding to each replacement part.
@@ -1302,6 +1302,109 @@ class Building
     
     parts_data
     
+  end
+  
+  # Internal: List facade elements (replaceable and replacements parts) currently
+  # used for this building.
+  # Based on list_available_replacable and @part_replacements.
+  #
+  # Return Array of Hash objects corresponding to each part.
+  # Hash has reference to definition, name, original_instance and
+  # transformations Array.
+  # Transformations Array has one element for each segment in building.
+  # Each element is an Array of Transformation objects.
+  # Transformation is in the local coordinate system of the relevant segment
+  # group.
+  def list_used_facade_elements# TODO: Under construction.
+  
+    replaceables  = list_available_replacable
+    replacements = list_available_replacements
+    
+    
+=begin
+    # Loop replaceable parts.
+    if @part_replacements[@template.id]
+      replaceables.each do |replaceable|
+        next unless @part_replacements[@template.id][replaceable[:name]]
+        
+        # Loop replacement parts.
+        replacements.each do |replacement|
+          next unless replacement[:replaces] == replaceable[:name]
+          
+          # Loop instances of replaceable part.
+          replaceable[:transformations].each_with_index do |transformations, segment|
+            next unless transformations
+                   
+            # FIXME: Endless loop :( . Also doesn't support multi slot replacements
+            #slot = 0
+            #while slot < transformations.length do
+            #  if @part_replacements[@template.id][replaceable[:name]][segment][slot] == replacement[:name]
+            #  
+            #    # If 
+            #    tr = transformations.delete_at slot
+            #    replaceable[:transformations] ||= []
+            #    replaceable[:transformations][segment] ||= []
+            #    replaceable[:transformations][segment] << tr
+            #    
+            #    
+            #  else
+            #    slot += 1
+            #  end
+            #end
+            
+            
+            
+          end
+        
+        end
+      end
+    end
+=end
+    
+    
+    
+    
+    if @part_replacements[@template.id]
+      replaceables.each do |replaceable|
+        next unless @part_replacements[@template.id][replaceable[:name]]
+        
+        replaceable[:transformations].each_with_index do |transformations, segment|
+          next unless transformations
+          next unless @part_replacements[@template.id][replaceable[:name]][segment]
+
+          slot = -1
+          transformations.delete_if do |tr_start|
+            slot += 1
+            replacement_name = @part_replacements[@template.id][replaceable[:name]][segment][slot]
+            next unless replacement_name
+
+            replacement_data = replacements.find { |r| r[:name] == replacement_name }
+            unless replacement_data
+              WARN "Unknown replacement '#{replacement_data}'."
+              next
+            end
+            
+            # TODO: create multi slot transformations
+            
+            replacement_data[:transformations] ||= []
+            replacement_data[:transformations][segment] ||= []
+            replacement_data[:transformations][segment] << tr_start
+            
+            true
+          end
+          
+        end
+        
+      end
+    end
+    
+    
+    
+    # Purge replacements that aren't used.
+    replacements.keep_if { |r| r[:transformations] }
+    
+    replaceables + replacements
+  
   end
   
   # Internal: List gables currently used in building.
@@ -1599,7 +1702,7 @@ class Building
   # Return nothing.
   def draw_parts
     
-    part_data = list_available_replacable
+    part_data = list_used_facade_elements
     part_data += list_used_gables
     part_data += list_used_corners
    
