@@ -1315,55 +1315,11 @@ class Building
   # Each element is an Array of Transformation objects.
   # Transformation is in the local coordinate system of the relevant segment
   # group.
-  def list_used_facade_elements# TODO: Under construction.
+  def list_used_facade_elements
   
     replaceables  = list_available_replacable
     replacements = list_available_replacements
-    
-    
-=begin
-    # Loop replaceable parts.
-    if @part_replacements[@template.id]
-      replaceables.each do |replaceable|
-        next unless @part_replacements[@template.id][replaceable[:name]]
-        
-        # Loop replacement parts.
-        replacements.each do |replacement|
-          next unless replacement[:replaces] == replaceable[:name]
-          
-          # Loop instances of replaceable part.
-          replaceable[:transformations].each_with_index do |transformations, segment|
-            next unless transformations
-                   
-            # FIXME: Endless loop :( . Also doesn't support multi slot replacements
-            #slot = 0
-            #while slot < transformations.length do
-            #  if @part_replacements[@template.id][replaceable[:name]][segment][slot] == replacement[:name]
-            #  
-            #    # If 
-            #    tr = transformations.delete_at slot
-            #    replaceable[:transformations] ||= []
-            #    replaceable[:transformations][segment] ||= []
-            #    replaceable[:transformations][segment] << tr
-            #    
-            #    
-            #  else
-            #    slot += 1
-            #  end
-            #end
-            
-            
-            
-          end
-        
-        end
-      end
-    end
-=end
-    
-    
-    
-    
+
     if @part_replacements[@template.id]
       replaceables.each do |replaceable|
         next unless @part_replacements[@template.id][replaceable[:name]]
@@ -1373,6 +1329,7 @@ class Building
           next unless @part_replacements[@template.id][replaceable[:name]][segment]
 
           slot = -1
+          transformations_copy = transformations.dup
           transformations.delete_if do |tr_start|
             slot += 1
             replacement_name = @part_replacements[@template.id][replaceable[:name]][segment][slot]
@@ -1384,12 +1341,19 @@ class Building
               next
             end
             
-            # TODO: create multi slot transformations
+            
+            # TODO: remove transformations for later slots too if replacement is multi slot. Also have cleaner code without transformations_copy.
+            if replacement_data[:slots] == 1
+              tr = tr_start
+            else
+              tr_end = transformations_copy[slot + replacement_data[:slots] -1]
+              tr = Geom::Transformation.interpolate tr_start, tr_end, 0.5
+            end
             
             replacement_data[:transformations] ||= []
             replacement_data[:transformations][segment] ||= []
-            replacement_data[:transformations][segment] << tr_start
-            
+            replacement_data[:transformations][segment] << tr
+
             true
           end
           
