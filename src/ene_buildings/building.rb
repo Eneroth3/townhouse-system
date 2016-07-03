@@ -220,7 +220,7 @@ class Building
       @end_angles               != last_drawn_as[:end_angles] ||
       @perform_solid_operations != last_drawn_as[:perform_solid_operations] ||
       (
-        has_solids? &&
+        @template.has_solids? &&
         last_drawn_as[:perform_solid_operations] &&
         (
           @gables  != last_drawn_as[:gables] ||
@@ -252,45 +252,6 @@ class Building
 
   end
 
-  # Public: Tells if pre-modeled corners can be added to building
-  # (based on template).
-  #
-  # Called when opening properties dialog to enable or disable the setting for
-  # drawing corners.
-  #
-  # Returns true or false.
-  def has_corners?
-  
-    @template.has_corners?
-    
-  end
-  
-  # Public: Tells if pre-modeled gable can be added to building
-  # (based on template).
-  #
-  # Called when opening properties dialog to enable or disable the setting for
-  # drawing gables.
-  #
-  # Returns true or false.
-  def has_gables?
-
-    @template.has_gables?
-
-  end
-
-  # Public: Tells if any solid operations can be performed on Building
-  # (based on template).
-  #
-  # Called when opening properties dialog to enable or disable the setting for
-  # performing solid operations.
-  #
-  # Returns true or false.
-  def has_solids?
-
-    @template.has_solids?
-
-  end
-  
   # Public: Find what part replacment currently uses a specific slot.
   #
   # original_name - String name of the original part being replace.
@@ -519,8 +480,8 @@ class Building
       js << "update_template_section();";
 
       # Gables.
-      js << "var has_gables = #{has_gables?};"
-      if has_gables?
+      js << "var has_gables = #{@template.has_gables?};"
+      if @template.has_gables?
         gable_list = list_available_gables.map do |g|
           #gable_is_used = @gables[@template.id][g[:name]]
           gable_is_used = @gables.fetch(@template.id, {}).fetch(g[:name], [false, false])
@@ -535,9 +496,9 @@ class Building
       js << "update_gable_section();";
       
       # Corners.
-      js << "var has_corners = #{has_corners?};"
+      js << "var has_corners = #{@template.has_corners?};"
       js << "var corner_number = #{@path.size};"
-      if has_corners?
+      if @template.has_corners?
         corner_list = list_available_corners.map do |g|
           #corner_use = @corners[@template.id][g[:name]]
           corner_use = @corners.fetch(@template.id, {}).fetch(g[:name], [])
@@ -579,7 +540,7 @@ class Building
       js << "update_material_section();";
 
       # Solids.
-      js << "var has_solids = #{has_solids?};"
+      js << "var has_solids = #{@template.has_solids?};"
       js << "var perform_solids = #{@perform_solid_operations};"
       js << "update_solids_section();";
 
