@@ -512,7 +512,35 @@ class Building
       js << "update_corner_section();";
 
       # Part replacements.
-      #js << the relevant data...
+      available_replacable   = list_available_replacable
+      available_replacements = list_available_replacements
+      replacement_info = available_replacable.map do |r_able|
+        r_ments = available_replacements.select { |r| r[:replaces] == r_able[:name] }
+        next if r_ments.empty?
+        original_name = r_able[:name]
+        available_slots = r_able[:transformations].map { |a| a.size }
+      
+        replacements = r_ments.map do |r_ment|
+          slots = r_ment[:slots]
+          next if slots > available_slots.max
+          replacement_name = r_ment[:name]
+          use = @part_replacements.fetch(@template.id, {}).fetch(original_name, {}).map { |s| (s||[]).map { |v| v  == replacement_name } }
+          {
+            :replacement_name => replacement_name,
+            :slots => slots,
+            :use => use
+          }
+        end
+        replacements.compact!
+      
+        {
+          :original_name => original_name,
+          :available_slots => available_slots,
+          :replacements => replacements
+        }
+      end
+      replacement_info.compact!
+      js << "var replacement_info=#{JSON.generate(replacement_info)};"
       js << "update_facade_section();"
 
       # Material replacement options (based on template component) and current
