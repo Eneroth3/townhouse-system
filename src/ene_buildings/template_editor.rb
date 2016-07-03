@@ -974,6 +974,9 @@ module TemplateEditor
     when "replacement"
       data["replacement"] = true
       data["replaces"] = @@dlg_part.get_element_value("replaces")# TODO: PART REPLACEMENTS: Validate.
+      slots = @@dlg_part.get_element_value("slots").to_i
+      slots = [slots, 1].max
+      data["slots"] = slots
       unless data["name"]
          data["name"] = unique_part_name(@@part, "Replacement")
          msg = "Replacement must have a name.\nUsing '#{data["name"]}."
