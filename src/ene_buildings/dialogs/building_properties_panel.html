@@ -292,12 +292,12 @@
       
       function toggle_gable(name, side, status){
         var params = JSON.stringify([name, side, status]);
-        window.location='skp:toggle_gable@' + params;
+        window.location='skp:toggle_gable@' + encodeURIComponent(params);
       }
       
       function toggle_corner(name, index, status){
         var params = JSON.stringify([name, index, status]);
-        window.location='skp:toggle_corner@' + params;
+        window.location='skp:toggle_corner@' + encodeURIComponent(params);
       }
 
       function toggle_replacement(checkbox){
@@ -306,10 +306,10 @@
         var segment          = parseInt(checkbox.getAttribute('data-segment'));
         var index            = parseInt(checkbox.getAttribute('data-index'));
         var status           = checkbox.checked;
-        
+
         var params = JSON.stringify([original_name, replacement_name, segment, index, status]);
-        window.location='skp:toggle_replacement@' + params;
-        
+        window.location='skp:toggle_replacement@' + encodeURIComponent(params);
+
         // Disable checkboxes for part replacement if another replacement is
         // already using slot.
         toggle_part_replacement_enability();

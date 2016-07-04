@@ -114,7 +114,7 @@ class Building
   # property). When group is manually moved in SU the path will be transformed
   # along with it and be updated next time an object is loaded from it.
   # Make sure all points have same z value.
-  attr_accessor :path
+  attr_accessor :path# TODO: PART REPLACEMENTS: BEFORE PUBLISHING: Handle @part_replacement when @path changes (or @back_along_path). Purge it or do something. anything.
 
   # Public: Gets/set whether solid operations should e performed, boolean.
   attr_accessor :perform_solid_operations
@@ -252,7 +252,7 @@ class Building
 
   end
 
-  # Public: Find what part replacment currently uses a specific slot.
+  # Public: Find what part replacement currently uses a specific slot.
   #
   # original_name - String name of the original part being replace.
   # segment       - Int segment index (counting from left, starting at 0).
@@ -510,6 +510,8 @@ class Building
         js << "var corner_settings = #{JSON.generate corner_list};"
       end
       js << "update_corner_section();";
+      
+      # TODO: BEFORE PUBLISHING: Implement facade margins.
 
       # Part replacements.
       available_replacable   = list_available_replacable
@@ -1335,7 +1337,7 @@ class Building
 
             replacement_data = replacements.find { |r| r[:name] == replacement_name }
             unless replacement_data
-              WARN "Unknown replacement '#{replacement_data}'."
+              warn "Unknown replacement '#{replacement_name}'."
               next
             end
             
@@ -1682,7 +1684,7 @@ class Building
       # Place instances of all spread or aligned parts that has transformations
       # for this segment.
       part_data.each do |part|
-        part[:transformations][segment_index].each do |trans|
+        (part[:transformations][segment_index] || []).each do |trans|
           original = part[:original_instance]
           EneBuildings.copy_instance original, segment_ents, trans
         end
@@ -1744,6 +1746,7 @@ class Building
         hidden << e if e.hidden?
         next unless [Sketchup::Group, Sketchup::ComponentInstance].include? e.class
         next unless ad = e.attribute_dictionary(Template::ATTR_DICT_PART)
+# FIXME: ad is sometimes an edge :S .
         next unless operation = ad["solid"]
         ops << [e, operation, segment_group]
       end
@@ -1899,6 +1902,8 @@ class Building
       
       cut_away_faces.each { |f| f.hidden = true }
       cut_away_edges.each { |f| f.hidden = true }
+      
+      segment_group.entities.erase_entities cut_away_faces.map { |f| f.get_glued_instances }.flatten
       
     end
 

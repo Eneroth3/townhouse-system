@@ -703,6 +703,7 @@ class Template
     new_ro["DrawUnderground"] = false
     new_ro["GroundColor"] = white
     new_ro["GroundTransparency"] = 0
+    new_ro["SkyColor"] = white # There is no option to disable sky.
     old_ro = {}
     new_ro.each_pair do |k, v|
       old_ro[k] = ro[k]

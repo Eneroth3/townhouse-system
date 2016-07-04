@@ -44,7 +44,11 @@
     </p>
     <p>
       The side of the volume towards <span class="axis-negative y">negative Y</span> is considered the front side.
-      The facade plane should intersect default ground level along the <span class="axis x">X axis</span>
+      The facade plane should intersect default ground level along the <span class="axis x">X axis</span>.
+    </p>
+    <p>
+      The volume can extend below the origin to make sure the building meets the ground when drawn on an un-even terrain (I typically extend it 3 m downwards).
+      When volume extends down the side edges of the front facade can be split on the <span class="axis x">X axis</span> to get an Endpoint to snap to when drawing neighboring buildings.
     </p>
 
     <h2 id="dlg_template_info">2 Template Info <img src="../toolbar_icons/template_info.png" /></h2>
@@ -123,7 +127,7 @@
       This is useful when a group has multiple materials to replace so painting the group/component itself doesn't work.
     </p>
     <p>
-      This option is only available for groups.<!--TODO: if not in root all parents must be groups with this set to true as well. check for that in ruby.-->
+      This option is only available for groups.
       Automatically modifying individual components would clutter the component browser with multiple versions of it.
       However the plugin allows you to easily convert a component to a group.
     </p>
@@ -135,6 +139,11 @@
       Cannot be combined with solid operations.
      Internal Corner (Formerly "hörntorn")
       Cannot be combined with solid operations.
+      
+      
+      
+      
+      TODO: BEFORE PUBLISHING: Document Corner, gable and part replacement!
     -->
     <h3>3.3 Solid Operations</h3>
     <p>
