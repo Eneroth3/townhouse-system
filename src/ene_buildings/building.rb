@@ -1945,7 +1945,7 @@ class Building
       # faces. Would be much much very much faster if the geometry merger
       # that runs after each tool operation in SU could be called directly.
       #
-      # Also use attributes for referencing cutting edges since attributes
+      # Use attributes for referencing cutting edges since attributes
       # are kept on both sides when an edge is split.
       # Life would be easier if the internal geometry merger thing could be
       # called as somehow return the relationship between new entities
@@ -1962,7 +1962,7 @@ class Building
       cutting_edges.keep_if { |e| e.valid? }
       cutting_edges += segment_group.entities.select { |e| e.get_attribute ID, "cutting_edges" }
       cutting_edges.uniq!
-      
+
       # MUCH HACK: Do the freaking thing again if some of the cutting edges are
       # still free standing. When some cutting objects touches the outer loops
       # of a face somehow the the intersect method fucks up with finding inside
@@ -1981,12 +1981,12 @@ class Building
         cutting_edges += segment_group.entities.select { |e| e.get_attribute ID, "cutting_edges" }
         cutting_edges.uniq!
       end
-     
+
       # Loop cutting edges an look for bounded faces that are "inside" the
       # cutting edge.
       cut_away_faces = []
+      faces_to_keep  = []
       cutting_edges.each do |e|
-      
         # Edge can be marked as deleted if merged with another edge.
         next unless e.valid?
         
@@ -2002,24 +2002,36 @@ class Building
         
         reversed = matches_as_reversed
         e.faces.each do |face|
-          cut_away_faces << face if e.reversed_in?(face) == reversed
+          if e.reversed_in?(face) == reversed
+            cut_away_faces << face
+          else
+            faces_to_keep << face
+          end
         end
       end
       
-      # REVIEW: If cutting edges doesn't form closed loops on the existing
-      # mesh the whole mesh gets cut away. Also happens if any face is faulty
-      # oriented along loop. Loop should be validated and face crawler thing
-      # must be more stable.
-      
-      # Traverse faces by shared binding edge that isn't a cut edge to find
-      # all faces inside a loop and hide them.
+      # Traverse faces sharing a binding edge to list faces to cut away and to
+      # keep.
+      #
+      # If the loop of cutting edges doesn't lie tight onto the original
+      # mesh the cut away faces will leak out to the rest of the mesh but the
+      # faces to keep will also leak in. That is why faces to keep are also
+      # listed.
+      #
+      # If a face is listed both as a face to keep and a face to remove it is
+      # because cutting loops overlap. Delete those faces.
+      faces_to_keep -= cut_away_faces
       cut_away_faces = EneBuildings.connected_faces cut_away_faces, cutting_edges
+      faces_to_keep = EneBuildings.connected_faces faces_to_keep, cutting_edges
+      cut_away_faces -= faces_to_keep
 
       cut_away_edges = cut_away_faces.map { |f| f.edges }.flatten.uniq
       cut_away_edges.keep_if { |e| (e.faces - cut_away_faces).empty? }
       
       cut_away_faces.each { |f| f.hidden = true }
       cut_away_edges.each { |f| f.hidden = true }
+      
+      segment_group.entities.erase_entities cut_away_faces.map { |f| f.get_glued_instances }.flatten
       
     end
     
