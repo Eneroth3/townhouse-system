@@ -1800,7 +1800,7 @@ class Building
     # Done after solid operations since it's not strictly a solid operation.
     
     Sketchup.status_text = STATUS_CUTTING if write_status
-    
+=begin
     segment_groups.each do |segment_group|
 
       # Copy naked edges of cutting parts into a temporary group and explode it
@@ -1906,6 +1906,126 @@ class Building
       segment_group.entities.erase_entities cut_away_faces.map { |f| f.get_glued_instances }.flatten
       
     end
+=end
+
+
+    segment_groups.each do |segment_group|
+    
+      # Copy naked edges on cutting parts into parent drawing context and keep
+      # reference to new edges.
+      # Also keep references to the end points of each edge, in normalized
+      # order, to later determine which faces are inside the cutting edges.
+      cutting_edges = []
+      cutting_edge_points = []
+      ops.each do |s|
+        part, operation, part_segment_group = s
+        next unless part_segment_group == segment_group
+        next unless operation == "cut_multiple_faces"
+        
+        Sketchup.status_text = STATUS_CUTTING if write_status
+        
+        naked_edges = EneBuildings.naked_edges part.definition.entities
+        original_mirrored = MyGeom.transformation_mirrored? part.transformation
+        
+        naked_edges.each do |edge|
+          points = edge.vertices.map { |v| v.position }
+          points.each { |p| p.transform! part.transformation }
+          points.reverse! if edge.reversed_in?(edge.faces.first)
+          points.reverse! if original_mirrored
+          cutting_edge_points << points
+          
+          new_edge = segment_group.entities.add_line points
+          new_edge.hidden = edge.hidden?
+          cutting_edges << new_edge
+        end
+        
+      end
+      
+      # HACK: Run intersect to split edges where they cross and punch holes in
+      # faces. Would be much much very much faster if the geometry merger
+      # that runs after each tool operation in SU could be called directly.
+      #
+      # Also use attributes for referencing cutting edges since attributes
+      # are kept on both sides when an edge is split.
+      # Life would be easier if the internal geometry merger thing could be
+      # called as somehow return the relationship between new entities
+      # and the entities they are split off from.
+      cutting_edges.each { |e| e.set_attribute ID, "cutting_edges", true }
+      cutting_edges += segment_group.entities.intersect_with(
+        false,
+        Geom::Transformation.new,
+        segment_group.entities,
+        Geom::Transformation.new,
+        true,
+        cutting_edges
+      )
+      cutting_edges.keep_if { |e| e.valid? }
+      cutting_edges += segment_group.entities.select { |e| e.get_attribute ID, "cutting_edges" }
+      cutting_edges.uniq!
+      
+      # MUCH HACK: Do the freaking thing again if some of the cutting edges are
+      # still free standing. When some cutting objects touches the outer loops
+      # of a face somehow the the intersect method fucks up with finding inside
+      # loops for that face.
+      free_cutting_edges = cutting_edges.select { |e| e.faces.empty? }
+      unless free_cutting_edges.empty?
+        cutting_edges += segment_group.entities.intersect_with(
+          false,
+          Geom::Transformation.new,
+          segment_group.entities,
+          Geom::Transformation.new,
+          true,
+          free_cutting_edges
+        )
+        cutting_edges.keep_if { |e| e.valid? }
+        cutting_edges += segment_group.entities.select { |e| e.get_attribute ID, "cutting_edges" }
+        cutting_edges.uniq!
+      end
+     
+      # Loop cutting edges an look for bounded faces that are "inside" the
+      # cutting edge.
+      cut_away_faces = []
+      cutting_edges.each do |e|
+      
+        # Edge can be marked as deleted if merged with another edge.
+        next unless e.valid?
+        
+        edge_points = e.vertices.map { |v| v.position }
+        matches_as_non_reversed = cutting_edge_points.include?(edge_points)
+        matches_as_reversed = cutting_edge_points.include?(edge_points.reverse)
+        
+        # If edge has been split it doesn't match any pair of points and no
+        # face can be found from it. If any of the edges of a loop is intact
+        # all faces inside will be found later on.
+        next unless matches_as_non_reversed || matches_as_reversed
+        next if matches_as_non_reversed && matches_as_reversed
+        
+        reversed = matches_as_reversed
+        e.faces.each do |face|
+          cut_away_faces << face if e.reversed_in?(face) == reversed
+        end
+      end
+      
+      # REVIEW: If cutting edges doesn't form closed loops on the existing
+      # mesh the whole mesh gets cut away. Also happens if any face is faulty
+      # oriented along loop. Loop should be validated and face crawler thing
+      # must be more stable.
+      
+      # Traverse faces by shared binding edge that isn't a cut edge to find
+      # all faces inside a loop and hide them.
+      cut_away_faces = EneBuildings.connected_faces cut_away_faces, cutting_edges
+
+      cut_away_edges = cut_away_faces.map { |f| f.edges }.flatten.uniq
+      cut_away_edges.keep_if { |e| (e.faces - cut_away_faces).empty? }
+      
+      cut_away_faces.each { |f| f.hidden = true }
+      cut_away_edges.each { |f| f.hidden = true }
+      
+    end
+    
+    
+    
+    
 
     nil
 
