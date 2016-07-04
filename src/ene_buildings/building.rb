@@ -170,6 +170,12 @@ class Building
       # drawn at that end.
       @gables = {}
       
+      # Defines margins for spread and aligned parts on building segment.
+      # Variable is Hash indexed by Template id String.
+      # Each value is an array containing margin Lengths or nil where there is
+      # no margin.
+      @facade_margins = {}
+      
       # Defines how to replace facade elements when drawing buidling.
       # Variable is Hash indexed by Template id String.
       # Each value is a Hash indexed by original part name.
@@ -432,7 +438,7 @@ class Building
     
     # Only allow one properties dialog for each building at a time.
     # References to opened properties dialogs are saved as a hash indexed by the
-    # guid of the group.
+    # GUID of the group.
     @@opened_dialogs ||= {}
     dlg = @@opened_dialogs[@group.guid]
     if dlg
@@ -510,8 +516,10 @@ class Building
         js << "var corner_settings = #{JSON.generate corner_list};"
       end
       js << "update_corner_section();";
-      
-      # TODO: BEFORE PUBLISHING: Implement facade margins.
+
+      # Margins.
+      margins = (0..(@path.size*2-3)).map { |i| (@facade_margins[@template.id] || [])[i].to_s }
+      js << "var margins=#{JSON.generate(margins)};"
 
       # Part replacements.
       available_replacable   = list_available_replacable
@@ -663,6 +671,14 @@ class Building
       set_corner *JSON.parse(params)
     end
     
+    # Setting margin
+    dlg.add_action_callback("set_margin") do |_, params|
+      index, length = *JSON.parse(params)
+      length = length.to_l# TODO: rescue length
+      length = nil if length == 0
+      set_margin index, length
+    end
+    
     # Setting part replacement
     dlg.add_action_callback("toggle_replacement") do |_, params|
       original, replacement, segment, index, status = *JSON.parse(params)
@@ -786,6 +802,9 @@ class Building
     # Override gable Hash with JSON String.
     @group.set_attribute ATTR_DICT, "gables", JSON.generate(@gables)
     
+    # Override facade_margins Hash with Array.
+    @group.set_attribute ATTR_DICT, "facade_margins", @facade_margins.to_a
+    
     # Override part_replacements Hash with JSON String.
     @group.set_attribute ATTR_DICT, "part_replacements", JSON.generate(@part_replacements)
     
@@ -838,6 +857,22 @@ class Building
     
     nil
     
+  end
+  
+  # Public: Sets the margin used when aligning or spreading parts in segment.
+  #
+  # index  - Index of margin counting from left. Odd values represents the left
+  #          side of a segment and even the right side.
+  # length - A Length or nil when there shouldn't be any margin.
+  def set_margin(index, length)
+  
+    @facade_margins[@template.id] ||= []
+    @facade_margins[@template.id][index] = length
+    
+    @facade_margins[@template.id] = @facade_margins[@template.id].reverse.drop_while {|i| i.nil? }.reverse
+    
+    nil
+  
   end
   
   # Public: Sets replacement for a replaceable part on a given slot by a
@@ -1345,6 +1380,7 @@ class Building
               tr = tr_start
             else
               tr_end = transformations[slot + replacement_data[:slots] -1]
+              next unless tr_end
               tr = Geom::Transformation.interpolate tr_start, tr_end, 0.5
             end
             
@@ -1475,6 +1511,10 @@ class Building
     # Override gable JSON String with actual Hash object.
     # Backward compatibility: Set gables to empty Hash if not already set.
     h[:gables] = h[:gables] ? JSON.parse(h[:gables]) : {}
+    
+    # Override facade_margins Array with actual Array object.
+    # Backward compatibility: Set facade_margins to empty Hash if not already set.
+    h[:facade_margins] = h[:facade_margins] ? Hash[h[:facade_margins]] : {}
     
     # Override part replacements JSON String with actual Hash object.
     # Backward compatibility: Set part replacements to empty Hash if not already

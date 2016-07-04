@@ -98,8 +98,8 @@
       
       //Part replacements.
       //var margins = <array> of Strings representing formatted lengths.
-      var margins = ["", "", "", "1,00m"]
-      var replacement_info = [
+      var margins = ["", "", "", ""]
+      /*var replacement_info = [
         {
           "original_name": "Window",
           "available_slots": [4, 4],
@@ -148,7 +148,7 @@
             }
           ]
         }
-      ];
+      ];*/
       function update_facade_section(){
       
         // The width of one checkbox. Make sure it matches css.
@@ -160,12 +160,11 @@
         html += '<td>';
         for(var i=0; i<margins.length; i++) {
           var v = margins[i];
-          var name = 'facade-margin-' + i;
-          html += '<input type="text" name="' + name + '", id="' + name + '" value="' + v + '"  />';
+          html += '<input type="text" data-index="' + i + '" onchange="set_margin(this);" value="' + v + '"  />';
         }
         html += '</td>';
         html += '</tr>';
-        if(true) {
+        if(false) { // TODO: check if has gables or corners.
           html += '<tr>';
           html += '<td><input type="checkbox" checked="checked" /></td>';
           html += '<td>Suggest margin (based on gables and corners)</td>';
@@ -300,6 +299,13 @@
         window.location='skp:toggle_corner@' + encodeURIComponent(params);
       }
 
+      function set_margin(input) {
+        var index  = parseInt(input.getAttribute('data-index'));
+        var length = input.value;
+        var params = JSON.stringify([index, length]);
+        window.location='skp:set_margin@' + encodeURIComponent(params);
+      }
+      
       function toggle_replacement(checkbox){
         var original_name    = checkbox.getAttribute('data-original-name');
         var replacement_name = checkbox.getAttribute('data-replacement-name');
@@ -463,13 +469,16 @@
         margin-top: 10px;
       }
       
+      #facade_elemnets{
+        white-space: nowrap;
+      }
       /*
         Based on module 20px. Half module as margin between sections.
         Make sure this matches module var in javascript.
       */
       #facade_elemnets input[type="text"] {
         box-sizing: border-box;
-        width: 40px;
+        width: 50px;
       }
       #facade_elemnets input[type="text"]:nth-child(even){
         margin-right: 20px;
@@ -599,10 +608,10 @@
               <tr>
                 <td>Margin:</td>
                 <td>
-                  <input type="text"  /><!--
-                  -><input type="text"  /><!--
-                  -><input type="text"  /><!--
-                  -><input type="text"  />
+                  <input type="text" data-index="0" /><!--
+                  -><input type="text" data-index="0"  /><!--
+                  -><input type="text" data-index="0"  /><!--
+                  -><input type="text" data-index="0"  />
                 </td>
               </tr>
               <tr>
@@ -706,7 +715,7 @@
           <!--Visibility is toggled depending on relevance of these settings.-->
           <b>Solid Operations</b>
           <hr />
-          <p>Disabling solid operations can drastically decrease the drawing time for buildings and be used when testing other settings.</p>
+          <p>Disabling solid operations can drastically decrease the drawing time for buildings. Suitable when testing other settings.</p>
           <label><input type="checkbox" id="solids_checkbox" onchange="window.location='skp:perform_solids@'+this.checked;"/> Perform solid operations</label>
         </div>
 
