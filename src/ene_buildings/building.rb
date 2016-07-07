@@ -114,7 +114,7 @@ class Building
   # property). When group is manually moved in SU the path will be transformed
   # along with it and be updated next time an object is loaded from it.
   # Make sure all points have same z value.
-  attr_accessor :path# TODO: PART REPLACEMENTS: BEFORE PUBLISHING: Handle @part_replacement when @path changes (or @back_along_path). Purge it or do something. anything.
+  attr_accessor :path
 
   # Public: Gets/set whether solid operations should e performed, boolean.
   attr_accessor :perform_solid_operations
@@ -231,6 +231,7 @@ class Building
         (
           @gables  != last_drawn_as[:gables] ||
           @corners != last_drawn_as[:corners] ||
+          @facade_margins != last_drawn_as[:facade_margins] ||
           @part_replacements != last_drawn_as[:part_replacements]
         )
       )
@@ -242,6 +243,7 @@ class Building
      elsif(
       @gables  != last_drawn_as[:gables] ||
       @corners != last_drawn_as[:corners] ||
+      @facade_margins != last_drawn_as[:facade_margins] ||
       @part_replacements != last_drawn_as[:part_replacements]
      )
        draw_parts
@@ -303,7 +305,7 @@ class Building
   # slot, it's leftmost (start) slot index and a boolean telling if its valid.
   # A replacement isn't valid when there isn't any available replacement by that
   # name or when it uses slots that doesn't exist.
-  def inspect_slots(original_name, segment, index, slots = 1)# TODO: Under construction.
+  def inspect_slots(original_name, segment, index, slots = 1)# TODO: Under construction. Complete mess method. Remove completely?
     
     # Check if given segment even exists.
     # TODO: return nil when segment doesn't exist (compare to path)...
@@ -674,9 +676,15 @@ class Building
     # Setting margin
     dlg.add_action_callback("set_margin") do |_, params|
       index, length = *JSON.parse(params)
-      length = length.to_l# TODO: rescue length
-      length = nil if length == 0
-      set_margin index, length
+      begin
+        length = length.to_l
+      rescue ArgumentError
+        # Do nothing.
+      else
+        length = nil if length == 0
+        set_margin index, length
+        add_data.call
+      end
     end
     
     # Setting part replacement
@@ -902,31 +910,36 @@ class Building
   # false.
   def set_replacement(original, segment, index, replacement, purge_colliding = false)
   
-    # TODO: raise error if slots doesn't even exist.
-  
-    #if replacement# TODO: Under construction.
-    #
-    #  replacments = list_available_replacements
-    #  replacement_data = replacments.find { |r| r[:name] == replacement }
-    #  raise "Unknow replacement '#{replacement}." unless replacement_data
-    #  slots = replacement_data[:slots]
-    #  collisions = inspect_slots original, segment, index, slots
-    #  
-    #  # Invalid colldiding replacements (those that aren't drawn anyway because they replaces
-    #  # slots that doesn't exist or because they aren't defined by the template)
-    #  # can safely be purged.
-    #  # TODO: purge...
-    #  
-    #  # If colliding replacements are either purged or raises error depending on
-    #  # purge_colliding
-    #  # TODO: implement...
-    #  
-    #end
+    if replacement
+      available_replacements = list_available_replacements
+      replacement_info = available_replacements.find { |r| r[:name] == replacement }
+      unless replacement_info
+        raise ArgumentError "Unknown replacement '#{replacement}'."
+      end
+      slots = replacement_info[:slots]
+    else
+      slots = 1
+    end
         
     part_replacements = (@part_replacements[@template.id] ||= {})
     part_replacements[original] ||= []
     part_replacements[original][segment] ||= []
     part_replacements[original][segment][index] = replacement
+    
+    # HACK: Empty extra slots used if multi slot replacement.
+    # When called from the properties panel the javascript prevents collisions
+    # with replacements to the left. Those to the right however could use slots
+    # that doesn't exist with the current segment length and therefore aren't
+    # sent to the javascript side. For now collisions are prevented here only if
+    # they couldn't be prevented in javascript which gives this method an odd,
+    # asymmetric behavior that doesn't make much sense when called from the
+    # planned public API.
+    # TODO: API: Improve this behavior (or document better).
+    if slots > 1
+      (index+1..index+slots-1).each do |i|
+        part_replacements[original][segment][i] = nil
+      end
+    end
     
     part_replacements[original][segment] = nil unless part_replacements[original][segment].any?
     part_replacements.delete(original) unless part_replacements[original].any?
@@ -994,7 +1007,7 @@ class Building
   # Internal: List replaceable parts (spread and aligned parts) available for
   # this building.
   # Also list the Transformation objects for each part.
-  # Based on Template and @path. # TODO: Should also be based on @facade_margins
+  # Based on Template and @path.
   #
   # Return Array of Hash objects corresponding to each part.
   # Hash has reference to definition, name, original_instance and
@@ -1098,6 +1111,17 @@ class Building
         plane_right      = [[segment_length, 0, 0], tangent_right.transform(segment_trans.inverse)]
         origin_leftmost  = Geom.intersect_line_plane line_origin, plane_left
         origin_rightmost = Geom.intersect_line_plane line_origin, plane_right
+        
+        # Take facade margin into account.
+        margin_left  = (@facade_margins[@template.id] || [])[2*segment_index]
+        margin_right = (@facade_margins[@template.id] || [])[2*segment_index+1]
+        origin_leftmost.offset!(X_AXIS, margin_left) if margin_left
+        origin_rightmost.offset!(X_AXIS, -margin_right) if margin_right
+        
+        # Skip segment for this part if leftmost is to the right of rightmost.
+        unless (origin_rightmost-origin_leftmost).samedirection?(X_AXIS)
+          next
+        end
         
         # Create Transformation objects from current Transformation, path
         # segment and attribute data.
@@ -1786,7 +1810,8 @@ class Building
         hidden << e if e.hidden?
         next unless [Sketchup::Group, Sketchup::ComponentInstance].include? e.class
         next unless ad = e.attribute_dictionary(Template::ATTR_DICT_PART)
-# FIXME: ad is sometimes an edge :S .
+        # SU ISSUE: ad is sometimes an edge :S . seems to happen when invalid
+        # geometry has been produced earlier.
         next unless operation = ad["solid"]
         ops << [e, operation, segment_group]
       end
@@ -1840,6 +1865,15 @@ class Building
     # Done after solid operations since it's not strictly a solid operation.
     
     Sketchup.status_text = STATUS_CUTTING if write_status
+    
+    # Disabled own fast cut code in favor of old intersect_with code.
+    # New code caused invalid geometry which seems to have messed up object
+    # references (tested in SU2015).
+    #
+    # E.g. attribute_dictionary could return an edge.
+    #
+    # Test geometry valditity with:
+    #    Sketchup.send_action 21124
 =begin
     segment_groups.each do |segment_group|
 
@@ -2074,10 +2108,6 @@ class Building
       segment_group.entities.erase_entities cut_away_faces.map { |f| f.get_glued_instances }.flatten
       
     end
-    
-    
-    
-    
 
     nil
 
