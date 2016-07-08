@@ -692,10 +692,12 @@ class Building
       else
         length = nil if length == 0
         set_margin index, length
+        @suggest_margins = false
         add_data.call
       end
     end
     
+    # Toggle margin suggestions.
     dlg.add_action_callback("toggle_suggest_margins") do |_, params|
       status = params == "true"
       @suggest_margins = status

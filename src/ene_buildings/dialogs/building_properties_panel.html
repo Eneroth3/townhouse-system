@@ -41,7 +41,7 @@
         }
         html += '</table>';
         var description = template_info['description'];
-        if(description) html += description;
+        if(description) html += description.replace(/\n/g, '<br />');
         document.getElementById('template_info').innerHTML = html;
       }
       
@@ -96,7 +96,7 @@
         document.getElementById('corner-settings').innerHTML = html;
       }
       
-      //Part replacements.
+      //Part replacements and margins.
       //var margins = <array> of Strings representing formatted lengths.
       //var suggest_margins = <boolean>.
       /*var replacement_info = [
@@ -166,7 +166,7 @@
         html += '</tr>';
         if(has_gables || has_corners) {
           html += '<tr>';
-          html += '<td><input type="checkbox" onclick="toggle_suggest_margins(this);"';
+          html += '<td><input id="suggest_margins" type="checkbox" onclick="toggle_suggest_margins(this);"';
           if(suggest_margins) html += 'checked="checked" ';
           html += '/></td>';
           html += '<td>Suggest margins (based on gables and corners)</td>';
@@ -183,13 +183,15 @@
           for(var j=0; j<replacement_info[i]['replacements'].length; j++) {
             var replacement_name = replacement_info[i]['replacements'][j]['replacement_name'];
             var slots            = replacement_info[i]['replacements'][j]['slots'];
-            var padding          = (slots-1)/2*module;
-            var padding_string   = ' style="padding: 0 ' + padding + 'px;"';
             var use              = replacement_info[i]['replacements'][j]['use'];
             html += '<tr>';
             html += '<td>' + replacement_name + ':</td>';
             html += '<td>';
             for(var segment=0; segment<available_slots.length; segment++) {
+              if(available_slots[segment] == 0) continue;
+              var padding = (slots-1)/2*module; // Add padding to multi slot replacement to line up checkboxes properly.
+              padding = Math.min(padding, available_slots[segment]*module/2); // Limit padding to prevent checkboxes from misaligning when segment can contain less than zero replacements.
+              var padding_string = ' style="padding: 0 ' + padding + 'px;"';
               html += '<div' + padding_string + '>';
               for(var index=0; index<available_slots[segment]+1-slots; index++) {
                 html += '<div>';
