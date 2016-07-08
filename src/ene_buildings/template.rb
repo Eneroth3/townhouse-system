@@ -330,7 +330,7 @@ class Template
     faces_r = ents.select { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?([1,0,0]) }
     
     # TODO: check if all other loose faces are perpendicular to these /has normal x == 0)
-    # Check if main volume is solid when using solids (stupränna in Landshövdingehus must be part (group/component) with its placement set to stretch).
+    # Check if main volume is solid when using solid operations.
     # Part names must be unique!
     
     faces_l.size == 1 && faces_r.size == 1

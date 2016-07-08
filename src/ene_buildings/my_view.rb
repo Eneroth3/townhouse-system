@@ -9,7 +9,7 @@ module EneBuildings
 module MyView
 
   # Draw arrow tip.
-  # TODO: Currently can't point straight upwards or downwards.
+  # REVIEW: Currently can't point straight upwards or downwards.
   def self.draw_arrow_head(view, point, vector, width, depth, centered = false)
     
     path = [

@@ -176,6 +176,8 @@ class Building
       # no margin.
       @facade_margins = {}
       
+      @suggest_margins = true
+      
       # Defines how to replace facade elements when drawing buidling.
       # Variable is Hash indexed by Template id String.
       # Each value is a Hash indexed by original part name.
@@ -491,12 +493,10 @@ class Building
       js << "var has_gables = #{@template.has_gables?};"
       if @template.has_gables?
         gable_list = list_available_gables.map do |g|
-          #gable_is_used = @gables[@template.id][g[:name]]
           gable_is_used = @gables.fetch(@template.id, {}).fetch(g[:name], [false, false])
           {
-            :name       => g[:name],
-            :used_left  => gable_is_used[0],
-            :used_right => gable_is_used[1]
+            :name => g[:name],
+            :use  => gable_is_used
           }
         end
         js << "var gable_settings = #{JSON.generate gable_list};"
@@ -508,10 +508,9 @@ class Building
       js << "var corner_number = #{@path.size};"
       if @template.has_corners?
         corner_list = list_available_corners.map do |g|
-          #corner_use = @corners[@template.id][g[:name]]
           corner_use = @corners.fetch(@template.id, {}).fetch(g[:name], [])
           {
-            :name       => g[:name],
+            :name => g[:name],
             :use  => corner_use
           }
         end
@@ -522,6 +521,7 @@ class Building
       # Margins.
       margins = (0..(@path.size*2-3)).map { |i| (@facade_margins[@template.id] || [])[i].to_s }
       js << "var margins=#{JSON.generate(margins)};"
+      js << "var suggest_margins=#{@suggest_margins};"
 
       # Part replacements.
       available_replacable   = list_available_replacable
@@ -657,6 +657,7 @@ class Building
           @template = t
 
           # Update form.
+          suggest_margins if @suggest_margins
           add_data.call
           dlg.bring_to_front
         end
@@ -666,11 +667,19 @@ class Building
     # Toggling a gable.
     dlg.add_action_callback("toggle_gable") do |_, params|
       set_gable *JSON.parse(params)
+      if @suggest_margins
+        suggest_margins
+        add_data.call
+      end
     end
     
     # Toggling a corner.
     dlg.add_action_callback("toggle_corner") do |_, params|
       set_corner *JSON.parse(params)
+      if @suggest_margins
+        suggest_margins
+        add_data.call
+      end
     end
     
     # Setting margin
@@ -683,6 +692,15 @@ class Building
       else
         length = nil if length == 0
         set_margin index, length
+        add_data.call
+      end
+    end
+    
+    dlg.add_action_callback("toggle_suggest_margins") do |_, params|
+      status = params == "true"
+      @suggest_margins = status
+      if @suggest_margins
+        suggest_margins
         add_data.call
       end
     end
@@ -749,7 +767,6 @@ class Building
 
     # Open information website.
     dlg.add_action_callback("openUrl") do
-    p @template.source_url
       UI.openURL @template.source_url
     end
 
@@ -824,6 +841,35 @@ class Building
 
   end
 
+  # Public: Sets facade margins to whatever is the biggest suggested margin for
+  # an adjacent gable or corner part.
+  #
+  # returns nothing.
+  def suggest_margins
+  
+    corners = list_used_corners
+    gables  = list_used_gables
+  
+    @facade_margins[@template.id] = (0..(@path.size*2-3)).map do |i|
+      segment = i/2 # Integer division.
+      side    = i%2 # 0 = left, 1 = right.
+      corner  = segment + side
+      first   = i == 0
+      last    = i == @path.size*2-3
+    
+      margins = corners.select{ |c| c[:use][corner] }.map { |c| c[:margin] }
+      
+      if first || last
+        margins +=  gables.select{ |g| g[:use][side] }.map { |g| g[:margin] }
+      end
+    
+      margins.compact.max
+    end
+    
+    nil
+    
+  end
+  
   # Public: Sets whether a specific corner part should be drawn to a specific
   # corner of building.
   #
@@ -1286,13 +1332,13 @@ class Building
     parts_data.map! do |part_data|
       part_data = part_data.dup
 
-      next unless a = corner_settings[part_data[:name]]
-      next unless a.any?
+      use = corner_settings[part_data[:name]] || []# REVIEW: Move this to list_available_corners. Make one single list_corner_parts method that optionally calculate transformations too.
+      part_data[:use] = use
+      next unless use.any?
 
       transformation_original = part_data[:original_instance].transformation
       
       # If building is drawn with its back along path, adapt transformation.
-      # REVIEW: Only transform origin Point3d. Transformation isn't used.
       if @back_along_path
         delta_y = -(@template.depth || Template::FALLBACK_DEPTH)
         translation = Geom::Transformation.translation([0, delta_y, 0])
@@ -1334,7 +1380,7 @@ class Building
         
         # All corner parts expect for that of the last corner is drawn at the
         # left side of the segment group by the same index.
-        if a[segment_index]
+        if use[segment_index]
           transformations << Geom::Transformation.axes(
             origin_leftmost,
             tangent_left,
@@ -1346,7 +1392,7 @@ class Building
         # The rightmost corner part is drawn at the right side of the last
         # segment group. This group is the only one that may contain two
         # corner parts.
-        if segment_index == (@path.size - 2) && a[segment_index + 1]
+        if segment_index == (@path.size - 2) && use[segment_index + 1]
           transformations << Geom::Transformation.axes(
             origin_rightmost,
             tangent_right,
@@ -1491,13 +1537,15 @@ class Building
     parts_data.map! do |part_data|
       part_data = part_data.dup
       
-      next unless a = gable_settings[part_data[:name]]
-      next unless a.any?
+      use = gable_settings[part_data[:name]] || []# REVIEW: Move this to list_available_gables. Make one single list_gable_parts method that optionally calculate transformations too.
+      part_data[:use] = use
+      next unless use.any?
+      
       part_data[:transformations] = (0..@path.length-2).map { [] }
-      if a[0]
+      if use[0]
         part_data[:transformations][0] << transformation_left
       end
-      if a[1]
+      if use[1]
         part_data[:transformations][-1] << transformation_right
       end
 
@@ -1539,6 +1587,9 @@ class Building
     # Override facade_margins Array with actual Array object.
     # Backward compatibility: Set facade_margins to empty Hash if not already set.
     h[:facade_margins] = h[:facade_margins] ? Hash[h[:facade_margins]] : {}
+    
+    # Backward compatibility: Default suggest margins to true.
+    h[:suggest_margins] = true if h[:suggest_margins].nil?
     
     # Override part replacements JSON String with actual Hash object.
     # Backward compatibility: Set part replacements to empty Hash if not already
@@ -2105,7 +2156,9 @@ class Building
       cut_away_faces.each { |f| f.hidden = true }
       cut_away_edges.each { |f| f.hidden = true }
       
-      segment_group.entities.erase_entities cut_away_faces.map { |f| f.get_glued_instances }.flatten
+      # Also delete parts glued to faces cut away, except for parts with solid
+      # operations. That would risk deleting the part that cut the hole itself.
+      segment_group.entities.erase_entities cut_away_faces.map { |f| f.get_glued_instances }.flatten.select { |p| !p.get_attribute(Template::ATTR_DICT_PART, "solid") }
       
     end
 

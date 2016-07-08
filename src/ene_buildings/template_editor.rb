@@ -295,7 +295,7 @@ module TemplateEditor
 
       # Get variables to use in form.
       # Form differs slightly from attributes to be more user intuitive.
-      # TODO: CODE IMPROVEMENT: list default values both here and in save_attributes?
+      # REVIEW: list default values both here and in save_attributes?
       percentage = 0
       spread_fix_number = false
       spread_distance = ""
@@ -774,7 +774,7 @@ module TemplateEditor
     old_data = EneBuildings.attr_dict_to_hash(@@component_inst, ATTR_DICT_EDITING)
 
     # Get settings from dialog.
-    data = {}#TODO: CODE IMPROVEMENT:  use loop instead of repeating code.
+    data = {}#REVIEW:  use loop instead of repeating code.
     name = @@dlg.get_element_value "name"
     data["name"] = name unless name.empty?
     modeler = @@dlg.get_element_value "modeler"

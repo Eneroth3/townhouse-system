@@ -17,7 +17,7 @@ module EneBuildings
 
   # List required gems with both the name used to require and the name used to
   # install them.
-  required_gems = [
+  required_gems = [# TODO: BEFORE PUBLISHING: Include rubyzip and wrap under own namespace.
     ["zip", "rubyzip"]
   ]
 

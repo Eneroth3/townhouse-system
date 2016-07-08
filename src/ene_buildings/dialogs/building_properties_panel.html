@@ -59,8 +59,8 @@
           html += '<tr>';
           html += '<td>' + gable_data['name'] + ':</td>';
           html += '<td>';
-          html += '<input type="checkbox" ' + (gable_data['used_left'] ? 'checked="checked"' : '') + ' onclick="toggle_gable(\'' + gable_data['name'] + '\', 0, this.checked);" />';
-          html += '<input type="checkbox" ' + (gable_data['used_right'] ? 'checked="checked"' : '') + ' onclick="toggle_gable(\'' + gable_data['name'] + '\', 1, this.checked);" />';
+          html += '<input type="checkbox" ' + (gable_data['use'][0] ? 'checked="checked"' : '') + ' onclick="toggle_gable(\'' + gable_data['name'] + '\', 0, this.checked);" />';
+          html += '<input type="checkbox" ' + (gable_data['use'][1] ? 'checked="checked"' : '') + ' onclick="toggle_gable(\'' + gable_data['name'] + '\', 1, this.checked);" />';
           html += '</td>';
           html += '</tr>';
         }
@@ -98,7 +98,7 @@
       
       //Part replacements.
       //var margins = <array> of Strings representing formatted lengths.
-      var margins = ["", "", "", ""]
+      //var suggest_margins = <boolean>.
       /*var replacement_info = [
         {
           "original_name": "Window",
@@ -156,7 +156,7 @@
         
         var html = '<table class="leftmost-is-label">';
         html += '<tr>';
-        html += '<td>Margin:</td>';
+        html += '<td>Margins:</td>';
         html += '<td>';
         for(var i=0; i<margins.length; i++) {
           var v = margins[i];
@@ -164,10 +164,12 @@
         }
         html += '</td>';
         html += '</tr>';
-        if(false) { // TODO: check if has gables or corners.
+        if(has_gables || has_corners) {
           html += '<tr>';
-          html += '<td><input type="checkbox" checked="checked" /></td>';
-          html += '<td>Suggest margin (based on gables and corners)</td>';
+          html += '<td><input type="checkbox" onclick="toggle_suggest_margins(this);"';
+          if(suggest_margins) html += 'checked="checked" ';
+          html += '/></td>';
+          html += '<td>Suggest margins (based on gables and corners)</td>';
           html += '</tr>';
         }
         html += '</table>';
@@ -306,6 +308,12 @@
         window.location='skp:set_margin@' + encodeURIComponent(params);
       }
       
+      function toggle_suggest_margins(checkbox) {
+        var status = checkbox.checked;
+        var params = JSON.stringify(status);
+        window.location='skp:toggle_suggest_margins@' + params;
+      }
+      
       function toggle_replacement(checkbox){
         var original_name    = checkbox.getAttribute('data-original-name');
         var replacement_name = checkbox.getAttribute('data-replacement-name');
@@ -402,7 +410,7 @@
     <style type="text/css">
       
       table.leftmost-is-label tr td:nth-child(1){
-        width: 80px;
+        width: 100px;
         text-align: right;
       }
       td.label-header, table.leftmost-is-label tr td:nth-child(1).label-header {
@@ -469,9 +477,6 @@
         margin-top: 10px;
       }
       
-      #facade_elemnets{
-        white-space: nowrap;
-      }
       /*
         Based on module 20px. Half module as margin between sections.
         Make sure this matches module var in javascript.
@@ -493,6 +498,9 @@
         display: inline-block;
         width: 20px;
         text-align: center;
+      }
+      #facade_elemnets table.leftmost-is-label tr td:nth-child(n+2) {
+        white-space: nowrap;
       }
       
     </style>
