@@ -5,11 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
     <title>TITLE</title>
     <script type="text/javascript">
-    
-      // Fucking boilerplate code to properly display javascript errors as they occur.
-      // TODO: Remove once I've found how to properly turn the built in error message back on.
-      window.onerror = function(errorMsg, url, lineNumber){ alert(errorMsg + "\n\n" + lineNumber); };
-      
+      "use strict";
       
       //Initialize each section.
       //Runs when showing dialog and when template has changed.
@@ -22,7 +18,7 @@
 
         //div innerHTML.
         //List all labels and corresponding keys to show in table here.
-        pairs = [
+        var pairs = [
           ['Modeler', 'modeler'],
           ['Architect', 'architect'],
           ['Country', 'country'],
@@ -30,12 +26,12 @@
           ['Stories', 'stories'],
           ['Source', 'source']
         ]
-        html = '<span class="name">'+template_info['name']+'</span>';
+        var html = '<span class="name">'+template_info['name']+'</span>';
         html += '<table>';
         for(var i=0;i<pairs.length;i++){
-          label = pairs[i][0];
-          key = pairs[i][1];
-          value = template_info[key];
+          var label = pairs[i][0];
+          var key = pairs[i][1];
+          var value = template_info[key];
           if(!value) continue;
           //Turn value into link for source if source_url is defined.
           if(key == 'source' && template_info['source_url']){
@@ -44,8 +40,8 @@
           html += '<tr><td>'+label+':</td><td>'+value+'</td></tr>';
         }
         html += '</table>';
-        description = template_info['description'];
-        if(description) html += description;
+        var description = template_info['description'];
+        if(description) html += description.replace(/\n/g, '<br />');
         document.getElementById('template_info').innerHTML = html;
       }
       
@@ -63,8 +59,8 @@
           html += '<tr>';
           html += '<td>' + gable_data['name'] + ':</td>';
           html += '<td>';
-          html += '<input type="checkbox" ' + (gable_data['used_left'] ? 'checked="checked"' : '') + ' onclick="toggle_gable(\'' + gable_data['name'] + '\', 0, this.checked);" />';
-          html += '<input type="checkbox" ' + (gable_data['used_right'] ? 'checked="checked"' : '') + ' onclick="toggle_gable(\'' + gable_data['name'] + '\', 1, this.checked);" />';
+          html += '<input type="checkbox" ' + (gable_data['use'][0] ? 'checked="checked"' : '') + ' onclick="toggle_gable(\'' + gable_data['name'] + '\', 0, this.checked);" />';
+          html += '<input type="checkbox" ' + (gable_data['use'][1] ? 'checked="checked"' : '') + ' onclick="toggle_gable(\'' + gable_data['name'] + '\', 1, this.checked);" />';
           html += '</td>';
           html += '</tr>';
         }
@@ -100,8 +96,131 @@
         document.getElementById('corner-settings').innerHTML = html;
       }
       
-      //Part replacements.
-      //...
+      //Part replacements and margins.
+      //var margins = <array> of Strings representing formatted lengths.
+      //var suggest_margins = <boolean>.
+      /*var replacement_info = [
+        {
+          "original_name": "Window",
+          "available_slots": [4, 4],
+          "replacements": [
+            {
+              "replacement_name": "Bay Window",
+              "slots": 1,
+              "use": [[true, false, false, true]]
+            },
+            {
+              "replacement_name": "Balcony",
+              "slots": 2,
+              "use": [[false, true]]
+            }
+          ]
+        },
+        {
+          "original_name": "Window Ground Floor",
+          "available_slots": [5, 5],
+          "replacements": [
+            {
+              "replacement_name": "Entrance",
+              "slots": 1,
+              "use": [[true]]
+            },
+            {
+              "replacement_name": "Portik",
+              "slots": 1,
+              "use": [[false, false, false, false, true]]
+            }
+          ]
+        },
+        {
+          "original_name": "Window Back",
+          "available_slots": [4, 4],
+          "replacements": [
+            {
+              "replacement_name": "Balcony and Stairwell",
+              "slots": 3,
+              "use": [[true]]
+            },
+            {
+              "replacement_name": "Some Stuff",
+              "slots": 1,
+              "use": [null, [false, false, false, false, true]]
+            }
+          ]
+        }
+      ];*/
+      function update_facade_section(){
+      
+        // The width of one checkbox. Make sure it matches css.
+        var module = 20;
+        
+        var html = '<table class="leftmost-is-label">';
+        html += '<tr>';
+        html += '<td>Margins:</td>';
+        html += '<td>';
+        for(var i=0; i<margins.length; i++) {
+          var v = margins[i];
+          html += '<input type="text" data-index="' + i + '" onchange="set_margin(this);" value="' + v + '"  />';
+        }
+        html += '</td>';
+        html += '</tr>';
+        if(has_gables || has_corners) {
+          html += '<tr>';
+          html += '<td><input id="suggest_margins" type="checkbox" onclick="toggle_suggest_margins(this);"';
+          if(suggest_margins) html += 'checked="checked" ';
+          html += '/></td>';
+          html += '<td>Suggest margins (based on gables and corners)</td>';
+          html += '</tr>';
+        }
+        html += '</table>';
+        
+        for(var i=0; i<replacement_info.length; i++) {
+          var original_name   = replacement_info[i]['original_name'];
+          var available_slots = replacement_info[i]['available_slots'];
+          html += '<fieldset>';
+          html += '<legend>Replace ' + original_name + '</legend>';
+          html += '<table class="leftmost-is-label">';
+          for(var j=0; j<replacement_info[i]['replacements'].length; j++) {
+            var replacement_name = replacement_info[i]['replacements'][j]['replacement_name'];
+            var slots            = replacement_info[i]['replacements'][j]['slots'];
+            var use              = replacement_info[i]['replacements'][j]['use'];
+            html += '<tr>';
+            html += '<td>' + replacement_name + ':</td>';
+            html += '<td>';
+            for(var segment=0; segment<available_slots.length; segment++) {
+              if(available_slots[segment] == 0) continue;
+              var padding = (slots-1)/2*module; // Add padding to multi slot replacement to line up checkboxes properly.
+              padding = Math.min(padding, available_slots[segment]*module/2); // Limit padding to prevent checkboxes from misaligning when segment can contain less than zero replacements.
+              var padding_string = ' style="padding: 0 ' + padding + 'px;"';
+              html += '<div' + padding_string + '>';
+              for(var index=0; index<available_slots[segment]+1-slots; index++) {
+                html += '<div>';
+                html += '<input type="checkbox" onclick="toggle_replacement(this)" ';
+                html += 'data-original-name="' + original_name + '" ';
+                html += 'data-replacement-name="' + replacement_name + '" ';
+                html += 'data-segment="' + segment + '" ';
+                html += 'data-index="' + index + '" ';
+                html += 'data-slots="' + slots + '" ';
+                if ((use[segment] || [])[index]){
+                  html += 'checked="checked" ';
+                }
+                html += '/>';
+                html += '</div>';
+              }
+              html += '</div>';
+            }
+            html += '</td>';
+            html += '</tr>';
+          }
+          html += '</table>';
+          html += '</fieldset>';
+        }
+        document.getElementById('facade-settings').innerHTML = html;
+
+        // Disable checkboxes for part replacement if another replacement is
+        // already using that slot.
+        toggle_part_replacement_enability();
+      }
 
       //Material replacement.
       //var material_pairs = [array of material pairs];
@@ -110,22 +229,22 @@
           document.getElementById('material_replacement').style.display = 'none';
         }else{
           document.getElementById('material_replacement').style.display = '';
-          html = '';
+          var html = '';
           for(var i=0;i<material_pairs.length;i++){
-            pair = material_pairs[i];
-            original = pair[0];
-            replacement = pair[1];
+            var pair = material_pairs[i];
+            var original = pair[0];
+            var replacement = pair[1];
 
-            title = original['name'];
+            var title = original['name'];
             if(original['textured']) title += ' (Textured)';
-            tooltip = 'Replace '+original['name']+' with currently active material.';
+            var tooltip = 'Replace '+original['name']+' with currently active material.';
             if(replacement){
-              title_replacement = replacement['name'];
+              var title_replacement = replacement['name'];
               if(replacement['textured']) title_replacement += ' (Textured)';
-              background = replacement['css_string'];
+              var background = replacement['css_string'];
             }else{
-              title_replacement = 'No replacement.';
-              background = 'url(nil_material.png)';
+              var title_replacement = 'No replacement.';
+              var background = 'url(nil_material.png)';
             }
 
             html += '<div data-id="'+original['id']+'">';
@@ -141,23 +260,23 @@
         }
       }
       function update_material_replacment(id_original, replacement){
-        replacer_divs = document.getElementById('material_list').getElementsByTagName('div');
-        for(i=0;i<replacer_divs.length;i++){
-          replacer_div = replacer_divs[i]
+        var replacer_divs = document.getElementById('material_list').getElementsByTagName('div');
+        for(var i=0;i<replacer_divs.length;i++){
+          var replacer_div = replacer_divs[i]
           if(id_original != replacer_div.getAttribute('data-id')) continue;
 
           //Update appearance of replacer button.
           //Let material_pairs array be invalid, it's updated from ruby when
           //used the next time anyway.
           if(replacement){
-            title_replacement = replacement['name'];
+            var title_replacement = replacement['name'];
             if(replacement['textured']) title_replacement += ' (Textured)';
-            background = replacement['css_string'];
+            var background = replacement['css_string'];
           }else{
-            title_replacement = 'No replacement.';
-            background = 'url(nil_material.png)';
+            var title_replacement = 'No replacement.';
+            var background = 'url(nil_material.png)';
           }
-          preview = replacer_div.getElementsByTagName('button')[0].getElementsByTagName('div')[0];
+          var preview = replacer_div.getElementsByTagName('button')[0].getElementsByTagName('div')[0];
           preview.title = title_replacement;
           preview.style.background = background;
         }
@@ -175,15 +294,43 @@
       //Most input is handled by inline code in click attribute of input.
       
       function toggle_gable(name, side, status){
-        params = JSON.stringify([name, side, status]);
-        window.location='skp:toggle_gable@' + params;
+        var params = JSON.stringify([name, side, status]);
+        window.location='skp:toggle_gable@' + encodeURIComponent(params);
       }
       
       function toggle_corner(name, index, status){
-        params = JSON.stringify([name, index, status]);
-        window.location='skp:toggle_corner@' + params;
+        var params = JSON.stringify([name, index, status]);
+        window.location='skp:toggle_corner@' + encodeURIComponent(params);
       }
 
+      function set_margin(input) {
+        var index  = parseInt(input.getAttribute('data-index'));
+        var length = input.value;
+        var params = JSON.stringify([index, length]);
+        window.location='skp:set_margin@' + encodeURIComponent(params);
+      }
+      
+      function toggle_suggest_margins(checkbox) {
+        var status = checkbox.checked;
+        var params = JSON.stringify(status);
+        window.location='skp:toggle_suggest_margins@' + params;
+      }
+      
+      function toggle_replacement(checkbox){
+        var original_name    = checkbox.getAttribute('data-original-name');
+        var replacement_name = checkbox.getAttribute('data-replacement-name');
+        var segment          = parseInt(checkbox.getAttribute('data-segment'));
+        var index            = parseInt(checkbox.getAttribute('data-index'));
+        var status           = checkbox.checked;
+
+        var params = JSON.stringify([original_name, replacement_name, segment, index, status]);
+        window.location='skp:toggle_replacement@' + encodeURIComponent(params);
+
+        // Disable checkboxes for part replacement if another replacement is
+        // already using slot.
+        toggle_part_replacement_enability();
+      }
+      
       //Misc/UI stuff.
 
       //Every time mouse enters document the style rule for hovered material
@@ -192,6 +339,67 @@
         window.location='skp:update_style_rule';
       }
 
+      // Enable/disable part replacement checkboxes depending on whether slot is
+      // available or used by another replacement.
+      // Runs on initialization and when checkboxes changes state.
+      function toggle_part_replacement_enability(){
+      
+        var section_div = document.getElementById('facade_elemnets');
+        var inputs = section_div.getElementsByTagName('input');
+        var checkboxes = [];
+        for (var i=0; i<inputs.length; i++) {
+          var input = inputs[i];
+          if (input.type == 'checkbox') checkboxes.push(input);
+        }
+        
+        for (var i=0; i<checkboxes.length; i++) {
+        
+          var box0 = checkboxes[i];
+        
+          // A ticked checkbox is always enabled.
+          if (box0.checked) continue;
+          
+          var replaces0 = box0.getAttribute('data-original-name');
+          var segment0  = parseInt(box0.getAttribute('data-segment'));
+          
+          var start0 = parseInt(box0.getAttribute('data-index'));
+          var slots0 = parseInt(box0.getAttribute('data-slots'));
+          var end0   = start0 + slots0 - 1;
+
+          var occupied = false;
+          for (var j=0; j<checkboxes.length; j++) {
+          
+            var box1 = checkboxes[j];
+          
+            if (!box1.checked) continue;
+            
+            // Can't collide with self.
+            if (i == j) continue;
+            
+            // Only compare to those that replaces the same part in the same segment.
+            var replaces1 = box1.getAttribute('data-original-name');
+            var segment1  = parseInt(box1.getAttribute('data-segment'));
+            if(replaces1 != replaces0 || segment1 != segment0) continue;
+          
+            var start1 = parseInt(box1.getAttribute('data-index'));
+            var slots1 = parseInt(box1.getAttribute('data-slots'));
+            var end1   = start1 + slots1 - 1;
+            
+            var occupied_name = box1.getAttribute('data-replacement-name');
+            
+            if (!(start1 > end0 || end1 < start0)) {
+              occupied = true;
+              break;
+            }
+            
+          }
+          box0.disabled = occupied;
+          box0.title = occupied ? 'Slot occupied by '+occupied_name : '';
+          
+        }
+        
+      }
+      
       //When a new dialog is created while other are opened it needs to
       //be offset to not lie on top of the previous one.
       function offset_window(offset){
@@ -202,10 +410,28 @@
     </script>
     <link href="style.css" rel="stylesheet" type="text/css">
     <style type="text/css">
+      
       table.leftmost-is-label tr td:nth-child(1){
-        width: 80px;
+        width: 100px;
         text-align: right;
       }
+      td.label-header, table.leftmost-is-label tr td:nth-child(1).label-header {
+        text-align: left;
+        color: gray;
+      }
+      
+      fieldset{
+        margin: 0.75em 0;
+        padding: 0.5em 0;
+        border: 1px solid ThreeDDarkShadow;
+      }
+      legend {
+        margin-left: 0.5em;
+      }
+      fieldset table {
+        margin-left: -1px;
+      }
+      
       
       #template img{
         width: 200px;
@@ -252,6 +478,33 @@
         width: 200px;
         margin-top: 10px;
       }
+      
+      /*
+        Based on module 20px. Half module as margin between sections.
+        Make sure this matches module var in javascript.
+      */
+      #facade_elemnets input[type="text"] {
+        box-sizing: border-box;
+        width: 50px;
+      }
+      #facade_elemnets input[type="text"]:nth-child(even){
+        margin-right: 20px;
+      }
+      #facade_elemnets td > div {
+        display: inline-block;
+      }
+      #facade_elemnets td > div + div{
+        margin-left: 20px;
+      }
+      #facade_elemnets td > div > div{
+        display: inline-block;
+        width: 20px;
+        text-align: center;
+      }
+      #facade_elemnets table.leftmost-is-label tr td:nth-child(n+2) {
+        white-space: nowrap;
+      }
+      
     </style>
    </head>
    <body>
@@ -290,53 +543,37 @@
           <!--Visibility is toggled depending on relevance of these settings.-->
           <b>Material Replacement</b>
           <hr />
-            <div id="material_list">
-              <!--Dynamically created content-->
-              <!--
-              <div>
-                <div style="background: LightGoldenRodYellow;"></div>
-                &rarr;
-                <button>
-                  <div style="background: LightCyan;"></div>
-                  Apply active
-                </button>
-              </div>
-              <div>
-                <div style="background: Beige;"></div>
-                &rarr;
-                <button>
-                  <div style="background: Azure;"></div>
-                  Apply active
-                </button>
-              </div>
-              <div>
-                <div style="background: PaleGoldenRod;"></div>
-                &rarr;
-                <button>
-                  <div style="background: Plum;"></div>
-                  Apply active
-                </button>
-              </div>
-              -->
-            </div>
-            <p style="clear: both;"></p>
-            <button id="material_browser_opener" onclick="window.location='skp:browse_materials';">Material browser...</button>
-          </div>
-
-        <div id="gables" class="section">
-          <!--Visibility is toggled depending on relevance of these settings.-->
-          <b>Gables</b>
-          <hr />
-          <div id="gable-settings">
+          <div id="material_list">
             <!--Dynamically created content-->
             <!--
-            <table class="leftmost-is-label">
-              <tr><td>Facade:</td><td><input type="checkbox" /><input type="checkbox" /></td></tr>
-              <tr><td>Portik:</td><td><input type="checkbox" /><input type="checkbox" /></td></tr>
-              <tr><td>Irregular Windows:</td><td><input type="checkbox" /></td><td><input type="checkbox" /></td></tr>
-            </table>
+            <div>
+              <div style="background: LightGoldenRodYellow;"></div>
+              &rarr;
+              <button>
+                <div style="background: LightCyan;"></div>
+                Apply active
+              </button>
+            </div>
+            <div>
+              <div style="background: Beige;"></div>
+              &rarr;
+              <button>
+                <div style="background: Azure;"></div>
+                Apply active
+              </button>
+            </div>
+            <div>
+              <div style="background: PaleGoldenRod;"></div>
+              &rarr;
+              <button>
+                <div style="background: Plum;"></div>
+                Apply active
+              </button>
+            </div>
             -->
           </div>
+          <p style="clear: both;"></p>
+          <button id="material_browser_opener" onclick="window.location='skp:browse_materials';">Material browser...</button>
         </div>
         
         <div id="corners" class="section">
@@ -354,13 +591,141 @@
           </div>
         </div>
 
-        <!--Part Replacement...-->
+        <div id="gables" class="section">
+          <!--Visibility is toggled depending on relevance of these settings.-->
+          <b>Gables</b>
+          <hr />
+          <div id="gable-settings">
+            <!--Dynamically created content-->
+            <!--
+            <table class="leftmost-is-label">
+              <tr><td>Facade:</td><td><input type="checkbox" /><input type="checkbox" /></td></tr>
+              <tr><td>Portik:</td><td><input type="checkbox" /><input type="checkbox" /></td></tr>
+              <tr><td>Irregular Windows:</td><td><input type="checkbox" /></td><td><input type="checkbox" /></td></tr>
+            </table>
+            -->
+          </div>
+        </div>
+
+        <div id="facade_elemnets" class="section">
+          <!--Visibility is toggled depending on relevance of these settings.-->
+          <b>Facade Elements</b>
+          <hr />
+          <div id="facade-settings">
+            <!--Dynamically created content-->
+            <!--
+            <table class="leftmost-is-label">
+              <tr>
+                <td>Margin:</td>
+                <td>
+                  <input type="text" data-index="0" /><!--
+                  -><input type="text" data-index="0"  /><!--
+                  -><input type="text" data-index="0"  /><!--
+                  -><input type="text" data-index="0"  />
+                </td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" checked="checked" /></td>
+                <td>Suggest margin (based on gables and corners)</td>
+              </tr>
+            </table>
+            <fieldset>
+              <legend>Replace Window Front</legend>
+              <table class="leftmost-is-label">
+                <tr>
+                  <td>Door Front:</td>
+                  <td>
+                    <div>
+                      <div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="0", data-index="0" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="0", data-index="1" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="0", data-index="2" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="0", data-index="3" data-slots="1" /></div><!--
+                    -></div><!--
+                    -><div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="1", data-index="0" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="1", data-index="1" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="1", data-index="2" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Door Front" data-segment="1", data-index="3" data-slots="1" /></div>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Balcony:</td>
+                  <td>
+                    <div>
+                      <div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="0" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="1" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="2" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="3" data-slots="1" /></div><!--
+                    -></div><!--
+                    -><div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="0" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="1" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="2" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="3" data-slots="1" /></div>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Balcony Wide:</td>
+                  <td>
+                    <div style="padding: 0 10px;">
+                      <div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="0" data-slots="2" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="1" data-slots="2" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="0", data-index="2" data-slots="2" /></div><!--
+                    -></div><!--
+                    -><div style="padding: 0 10px;"><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="0" data-slots="2" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="1" data-slots="2" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Front" data-replacement-name="Balcony" data-segment="1", data-index="2" data-slots="2" /></div>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </fieldset>
+            <fieldset>
+              <legend>Replace Window Back</legend>
+              <table class="leftmost-is-label">
+                <tr>
+                  <td>Door Back:</td>
+                  <td>
+                    <div>
+                      <div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="0", data-index="0" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="0", data-index="1" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="0", data-index="2" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="0", data-index="3" data-slots="1" /></div><!--
+                    -></div><!--
+                    -><div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="1", data-index="0" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="1", data-index="1" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="1", data-index="2" data-slots="1" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Back" data-replacement-name="Door Back" data-segment="1", data-index="3" data-slots="1" /></div>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Wing:</td>
+                  <td>
+                    <div style="padding: 0 20px;">
+                      <div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Back" data-replacement-name="Wing" data-segment="0", data-index="0" data-slots="3" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Back" data-replacement-name="Wing" data-segment="0", data-index="1" data-slots="3" /></div><!--
+                    -></div><!--
+                    -><div style="padding: 0 20px;"><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Back" data-replacement-name="Wing" data-segment="1", data-index="0" data-slots="3" /></div><!--
+                      -><div><input type="checkbox" onclick="toggle_replacement(this)" data-original-name="Window Back" data-replacement-name="Wing" data-segment="1", data-index="1" data-slots="3" /></div>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </fieldset>-->
+          </div>
+        </div>
 
         <div id="solids" class="section">
           <!--Visibility is toggled depending on relevance of these settings.-->
           <b>Solid Operations</b>
           <hr />
-          <p>Disabling solid operations can drastically decrease the drawing time for buildings and be used when testing other settings.</p>
+          <p>Disabling solid operations can drastically decrease the drawing time for buildings. Suitable when testing other settings.</p>
           <label><input type="checkbox" id="solids_checkbox" onchange="window.location='skp:perform_solids@'+this.checked;"/> Perform solid operations</label>
         </div>
 

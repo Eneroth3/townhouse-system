@@ -36,6 +36,10 @@
 #   Component replacement. E.g. a certain windows can be replaced by doors.
 #   More buildings!
 
+# Known issues
+#  In SU 2015 template parts cannot be copied while Part Info dialog is opened
+#    due to dark observer magic.
+
 # Load support files.
 require "extensions.rb"
 require "sketchup.rb"

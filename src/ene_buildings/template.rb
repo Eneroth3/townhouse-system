@@ -330,7 +330,7 @@ class Template
     faces_r = ents.select { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?([1,0,0]) }
     
     # TODO: check if all other loose faces are perpendicular to these /has normal x == 0)
-    # Check if main volume is solid when using solids (stupränna in Landshövdingehus must be part (group/component) with its placement set to stretch).
+    # Check if main volume is solid when using solid operations.
     # Part names must be unique!
     
     faces_l.size == 1 && faces_r.size == 1
@@ -680,8 +680,12 @@ class Template
     # Clear model.
     entities.clear!
     
-    # Get building length from bounding box of template component.
-    length = component_def.bounds.width
+    # Get building length from main volume of template component.
+    face_left   = component_def.entities.find { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?(X_AXIS.reverse) }
+    face_right  = component_def.entities.find { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?(X_AXIS) }
+    point_left  = face_left.vertices.first.position
+    point_right = point_left.project_to_plane face_right.plane
+    length = point_left.distance point_right
     
     # Draw building with given template.
     p = [ORIGIN, Geom::Point3d.new(length, 0, 0)]
@@ -699,6 +703,7 @@ class Template
     new_ro["DrawUnderground"] = false
     new_ro["GroundColor"] = white
     new_ro["GroundTransparency"] = 0
+    new_ro["SkyColor"] = white # There is no option to disable sky.
     old_ro = {}
     new_ro.each_pair do |k, v|
       old_ro[k] = ro[k]

@@ -55,11 +55,15 @@ module TemplateEditor
 
     model = Sketchup.active_model
     component_inst = inside_template_component
-    selected = model.selection.first
-    if !component_inst &&
-    selected &&
-    selected.is_a?(Sketchup::ComponentInstance) &&
-    Template.component_is_template?(selected)
+    selection = model.selection
+    selected = selection.first
+    if(
+      !component_inst &&
+      selection.size == 1 &&
+      selected &&
+      selected.is_a?(Sketchup::ComponentInstance) &&
+      Template.component_is_template?(selected)
+    )
       component_inst = selected
     end
 
@@ -214,7 +218,7 @@ module TemplateEditor
     if !@@component_inst
       #No active template to edit.
       title = "No active template."
-      msg = "Please select a template component."
+      msg = "Please select a single template component."
       js = "warn(true, '#{title}', '#{msg}');"
       @@dlg.execute_script js
 
@@ -265,6 +269,7 @@ module TemplateEditor
       @@part = nil
     end
     @@part = nil unless inside_template_component
+    @@part = nil unless model.selection.length == 1
 
     if !inside_template_component
       # Active drawing context is not within a template defining component.
@@ -278,7 +283,7 @@ module TemplateEditor
       # Selection cannot be edited.
 
       title = "Not available for this selection."
-      msg = "Please select a group or component."
+      msg = "Please select a single group or component."
       js = "warn(true, '#{title}', '#{msg}');"
       @@dlg_part.execute_script js
 
@@ -290,7 +295,7 @@ module TemplateEditor
 
       # Get variables to use in form.
       # Form differs slightly from attributes to be more user intuitive.
-      # TODO: CODE IMPROVEMENT: list default values both here and in save_attributes?
+      # REVIEW: list default values both here and in save_attributes?
       percentage = 0
       spread_fix_number = false
       spread_distance = ""
@@ -315,6 +320,8 @@ module TemplateEditor
           "gable"
         elsif data["corner"]
           "corner"
+        elsif data["replacement"]
+          "replacement"
         else
           ""
         end
@@ -326,8 +333,14 @@ module TemplateEditor
       replace_nested_mateials = data["replace_nested_mateials"] || false
       gable_margin            = data["gable_margin"]            || 0.to_l
       corner_margin           = data["corner_margin"]           || 0.to_l
+      replaces                = data["replaces"]                || ""
+      slots                   = data["slots"]                   || 1
       solid                   = data["solid"]                   || ""
       solid_index             = data["solid_index"]             || 0
+      
+      # Make name unique. If part was copied it may be duplicated.
+      # Assume user first selects the copy and not the original.
+      name = unique_part_name(@@part, name) unless name == ""
 
       # Add data to dialog.
       js = "warn(false);"
@@ -343,6 +356,8 @@ module TemplateEditor
       js << "override_cut_planes(#{override_cut_planes});"
       js << "document.getElementById('gable_margin').value=#{gable_margin.to_s.inspect};"
       js << "document.getElementById('corner_margin').value=#{corner_margin.to_s.inspect};"
+      js << "document.getElementById('replaces').value=#{replaces.inspect};"
+      js << "document.getElementById('slots').value=#{slots};"
       js << "replace_nested_mateials(#{replace_nested_mateials});"
       js << "is_group(#{@@part.is_a? Sketchup::Group});"
       js << "document.getElementById('solid').value=#{solid.inspect};"
@@ -759,7 +774,7 @@ module TemplateEditor
     old_data = EneBuildings.attr_dict_to_hash(@@component_inst, ATTR_DICT_EDITING)
 
     # Get settings from dialog.
-    data = {}#TODO: CODE IMPROVEMENT:  use loop instead of repeating code.
+    data = {}#REVIEW:  use loop instead of repeating code.
     name = @@dlg.get_element_value "name"
     data["name"] = name unless name.empty?
     modeler = @@dlg.get_element_value "modeler"
@@ -956,6 +971,17 @@ module TemplateEditor
          msg = "Corner must have a name.\nUsing '#{data["name"]}."
          UI.messagebox msg
       end
+    when "replacement"
+      data["replacement"] = true
+      data["replaces"] = @@dlg_part.get_element_value("replaces")# TODO: PART REPLACEMENTS: Validate.
+      slots = @@dlg_part.get_element_value("slots").to_i
+      slots = [slots, 1].max
+      data["slots"] = slots
+      unless data["name"]
+         data["name"] = unique_part_name(@@part, "Replacement")
+         msg = "Replacement must have a name.\nUsing '#{data["name"]}."
+         UI.messagebox msg
+      end
     end
     data["override_cut_planes"] = true if @@dlg_part.get_element_value("override_cut_planes") == "true"
     data["replace_nested_mateials"] = true if @@dlg_part.get_element_value("replace_nested_mateials") == "true"
@@ -968,7 +994,10 @@ module TemplateEditor
     return if data == old_data
 
     model = @@part.model
-    model.start_operation "Saving Part Data", true# TODO: COMPONENT REPLACEMENT: when part gets a name, add name to operator name.
+    
+    Observers.disable
+    
+    model.start_operation "Saving Part Data", true
 
     # Remove old dictionary in case a value was changed to default and therefore
     # shouldn't be present in new data.
@@ -981,6 +1010,9 @@ module TemplateEditor
     end
 
     model.commit_operation
+    
+    Observers.enable
+    onSelectionChange
 
     nil
 

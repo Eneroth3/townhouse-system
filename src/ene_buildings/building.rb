@@ -97,26 +97,10 @@ class Building
   # Array where each element is array of original (string identifier) and
   # replacement (array of replacement of each slot, also string identifier).
   attr_accessor :componet_replacement
-
-  # Public: Gets/sets what corner parts should be drawn to building.
-  # Variable is Hash indexed by Template id String.
-  # Each value is a Hash indexed by corner name String.
-  # Each such value is an Array of Booleans corresponding to each building
-  # corner (from left to tight) telling whether given corner part should be
-  # drawn to that corner.
-  attr_accessor :corners
   
   # Public: Gets/sets rotation of gables.
   # Array containing 2 angels in radians cc seen from above.
   attr_accessor :end_angles
-
-  # Public: Gets/sets what gable parts should be drawn to building.
-  # Variable is Hash indexed by Template id String.
-  # Each value is a Hash indexed by gable name String.
-  # Each such value is an Array of Booleans corresponding to the building
-  # end (left, tight) telling whether given gable part should be
-  # drawn at that end.
-  attr_reader :gables
   
   # Public: Returns Group Building is drawn to.
   attr_reader :group
@@ -170,9 +154,40 @@ class Building
       # End angles in radians.
       @end_angles = [0, 0]
       
+      # Defines what corner parts should be drawn to building.
+      # Variable is Hash indexed by Template id String.
+      # Each value is a Hash indexed by corner name String.
+      # Each such value is an Array of Booleans corresponding to each building
+      # corner (from left to tight) telling whether given corner part should be
+      # drawn to that corner.
       @corners = {}
       
+      # Defines what gable parts should be drawn to building.
+      # Variable is Hash indexed by Template id String.
+      # Each value is a Hash indexed by gable name String.
+      # Each such value is an Array of Booleans corresponding to the building
+      # end (left, right) telling whether given gable part should be
+      # drawn at that end.
       @gables = {}
+      
+      # Defines margins for spread and aligned parts on building segment.
+      # Variable is Hash indexed by Template id String.
+      # Each value is an array containing margin Lengths or nil where there is
+      # no margin.
+      @facade_margins = {}
+      
+      @suggest_margins = true
+      
+      # Defines how to replace facade elements when drawing buidling.
+      # Variable is Hash indexed by Template id String.
+      # Each value is a Hash indexed by original part name.
+      # Each such value is an Array where each element corresponds to a building
+      # segment (what is between 2 adjacent corners).
+      # Each element is an Array where each each element corresponds to a slot
+      # (an instance of the original part that can be replaced).
+      # A slot either contains nil when not replaced or the name of the
+      # replacing part.
+      @part_replacements = {}
 
       # Array of Materials to replace and replacement.
       # Each element is an array containing the original and the replacement
@@ -213,12 +228,13 @@ class Building
       @end_angles               != last_drawn_as[:end_angles] ||
       @perform_solid_operations != last_drawn_as[:perform_solid_operations] ||
       (
-        has_solids? &&
+        @template.has_solids? &&
         last_drawn_as[:perform_solid_operations] &&
         (
           @gables  != last_drawn_as[:gables] ||
-          @corners != last_drawn_as[:corners] # ||
-          # Add anything related to part placement here...
+          @corners != last_drawn_as[:corners] ||
+          @facade_margins != last_drawn_as[:facade_margins] ||
+          @part_replacements != last_drawn_as[:part_replacements]
         )
       )
     )
@@ -228,8 +244,9 @@ class Building
       draw_material_replacement
      elsif(
       @gables  != last_drawn_as[:gables] ||
-      @corners != last_drawn_as[:corners] # ||
-      # Add anything related to part placement here...
+      @corners != last_drawn_as[:corners] ||
+      @facade_margins != last_drawn_as[:facade_margins] ||
+      @part_replacements != last_drawn_as[:part_replacements]
      )
        draw_parts
        draw_material_replacement
@@ -245,45 +262,93 @@ class Building
 
   end
 
-  # Public: Tells if pre-modeled corners can be added to building
-  # (based on template).
+  # Public: Find what part replacement currently uses a specific slot.
   #
-  # Called when opening properties dialog to enable or disable the setting for
-  # drawing corners.
+  # original_name - String name of the original part being replace.
+  # segment       - Int segment index (counting from left, starting at 0).
+  # index         - Int slot index for leftmost slot to be checked
+  #                 (counting from left, starting at 0).
+  # slots         - How many slots to check (default: 1).
   #
-  # Returns true or false.
-  def has_corners?
+  # Example:
+  #
+  #   my_building.slot_use("Window", 0, 0)
+  #   # -> []
+  #   # The first Winow from the left in the first segment from the left is
+  #   # not being replaced.
+  #
+  #   my_building.slot_use("Window", 0, 0, 4)
+  #   # -> []
+  #   # The first 4 Winow from the left in the first segment from the left are
+  #   # not being replaced.
+  #
+  #   my_building.slot_use("Window", 0, 1)
+  #   # -> [["Door", 1, true]]
+  #   # The second Window from the left in the first segment is being replaced
+  #   # by a Door.
+  #
+  #   my_building.slot_use("Window", 0, 3)
+  #   # -> [["Balcony", 2, true]]
+  #   # The fourth Window from the left in the first segment is being replaced
+  #   # by a Balcony. The leftmost (start) slot of the balcony is the third slot
+  #   # in the same section, meaning the balcony must span at least 2 slots.
+  #
+  #   my_building.slot_use("Window", 1, 2)
+  #   # -> [["Balcony Wide", 0, false]]
+  #   # The third Window in the second segment is being replaced by a Balcony
+  #   # Wide. The Balcony Wide is invalid and will not be drawn.
+  #   # Either the Balcony Wide uses slots that doesn't exist because segment is
+  #   # too short or "Balcony Wide" isn't the name of a replacement that is
+  #   # available for thye current template.
+  #
+  # Returns Array listing replacements using giving slots or nil when any of the
+  # slots doesn't exist.
+  # Each Array element is another Array containg String name of replacement using
+  # slot, it's leftmost (start) slot index and a boolean telling if its valid.
+  # A replacement isn't valid when there isn't any available replacement by that
+  # name or when it uses slots that doesn't exist.
+  def inspect_slots(original_name, segment, index, slots = 1)# TODO: Under construction. Complete mess method. Remove completely?
+    
+    # Check if given segment even exists.
+    # TODO: return nil when segment doesn't exist (compare to path)...
   
-    @template.has_corners?
+    last_slot = index + slots - 1
+  
+    part_replacements      = (@part_replacements[@template.id] ||= {})
+    available_replacements = list_available_replacements
+    #available_replacable = list_available_replacable...
+    
+    # Check if all given slots exists within segment.
+    # TODO: return nul if last_slot doesn't exist...
+        
+    uses_slot = []
+    
+    segment_array = part_replacements[original_name][segment]
+    return [] unless segment_array
+    segment_array.each_with_index do |v, other_i|
+    
+      next unless v
+      valid = true
+      using_slot = available_replacements.find { |r| r[:name] == v }
+      unless using_slot
+        valid = false
+        using_slot = {}
+      end
+      other_slots = using_slot[:slots] || 1
+      other_last_slot = other_i + other_slots - 1
+      
+      # TODO: valid = false if other_last_slot is greater than the index of the last available slot.
+
+      next if other_i > last_slot || other_last_slot < index
+      
+      uses_slot << [v, other_i, valid]
+      
+    end
+    
+    uses_slot
     
   end
   
-  # Public: Tells if pre-modeled gable can be added to building
-  # (based on template).
-  #
-  # Called when opening properties dialog to enable or disable the setting for
-  # drawing gables.
-  #
-  # Returns true or false.
-  def has_gables?
-
-    @template.has_gables?
-
-  end
-
-  # Public: Tells if any solid operations can be performed on Building
-  # (based on template).
-  #
-  # Called when opening properties dialog to enable or disable the setting for
-  # performing solid operations.
-  #
-  # Returns true or false.
-  def has_solids?
-
-    @template.has_solids?
-
-  end
-
   # Public: List replaceable materials (based o template).
   # Materials directly in segment groups are listed. Materials in nested groups
   # are also listed if the group has an attribute specifically saying so.
@@ -377,7 +442,7 @@ class Building
     
     # Only allow one properties dialog for each building at a time.
     # References to opened properties dialogs are saved as a hash indexed by the
-    # guid of the group.
+    # GUID of the group.
     @@opened_dialogs ||= {}
     dlg = @@opened_dialogs[@group.guid]
     if dlg
@@ -425,15 +490,13 @@ class Building
       js << "update_template_section();";
 
       # Gables.
-      js << "var has_gables = #{has_gables?};"
-      if has_gables?
+      js << "var has_gables = #{@template.has_gables?};"
+      if @template.has_gables?
         gable_list = list_available_gables.map do |g|
-          #gable_is_used = @gables[@template.id][g[:name]]
           gable_is_used = @gables.fetch(@template.id, {}).fetch(g[:name], [false, false])
           {
-            :name       => g[:name],
-            :used_left  => gable_is_used[0],
-            :used_right => gable_is_used[1]
+            :name => g[:name],
+            :use  => gable_is_used
           }
         end
         js << "var gable_settings = #{JSON.generate gable_list};"
@@ -441,14 +504,13 @@ class Building
       js << "update_gable_section();";
       
       # Corners.
-      js << "var has_corners = #{has_corners?};"
+      js << "var has_corners = #{@template.has_corners?};"
       js << "var corner_number = #{@path.size};"
-      if has_corners?
+      if @template.has_corners?
         corner_list = list_available_corners.map do |g|
-          #corner_use = @corners[@template.id][g[:name]]
           corner_use = @corners.fetch(@template.id, {}).fetch(g[:name], [])
           {
-            :name       => g[:name],
+            :name => g[:name],
             :use  => corner_use
           }
         end
@@ -456,7 +518,42 @@ class Building
       end
       js << "update_corner_section();";
 
-      # Part replacements...
+      # Margins.
+      margins = (0..(@path.size*2-3)).map { |i| (@facade_margins[@template.id] || [])[i].to_s }
+      js << "var margins=#{JSON.generate(margins)};"
+      js << "var suggest_margins=#{@suggest_margins};"
+
+      # Part replacements.
+      available_replacable   = list_available_replacable
+      available_replacements = list_available_replacements
+      replacement_info = available_replacable.map do |r_able|
+        r_ments = available_replacements.select { |r| r[:replaces] == r_able[:name] }
+        next if r_ments.empty?
+        original_name = r_able[:name]
+        available_slots = r_able[:transformations].map { |a| a.size }
+      
+        replacements = r_ments.map do |r_ment|
+          slots = r_ment[:slots]
+          next if slots > available_slots.max
+          replacement_name = r_ment[:name]
+          use = @part_replacements.fetch(@template.id, {}).fetch(original_name, {}).map { |s| (s||[]).map { |v| v  == replacement_name } }
+          {
+            :replacement_name => replacement_name,
+            :slots => slots,
+            :use => use
+          }
+        end
+        replacements.compact!
+      
+        {
+          :original_name => original_name,
+          :available_slots => available_slots,
+          :replacements => replacements
+        }
+      end
+      replacement_info.compact!
+      js << "var replacement_info=#{JSON.generate(replacement_info)};"
+      js << "update_facade_section();"
 
       # Material replacement options (based on template component) and current
       # preferences (saved to building).
@@ -483,7 +580,7 @@ class Building
       js << "update_material_section();";
 
       # Solids.
-      js << "var has_solids = #{has_solids?};"
+      js << "var has_solids = #{@template.has_solids?};"
       js << "var perform_solids = #{@perform_solid_operations};"
       js << "update_solids_section();";
 
@@ -560,6 +657,7 @@ class Building
           @template = t
 
           # Update form.
+          suggest_margins if @suggest_margins
           add_data.call
           dlg.bring_to_front
         end
@@ -568,25 +666,53 @@ class Building
     
     # Toggling a gable.
     dlg.add_action_callback("toggle_gable") do |_, params|
-      name, side, status = JSON.parse(params)
-      @gables[@template.id] ||= {}
-      @gables[@template.id][name] ||= []
-      @gables[@template.id][name][side] = status
-      
-      @gables[@template.id].delete(name) unless @gables[@template.id][name].any?
+      set_gable *JSON.parse(params)
+      if @suggest_margins
+        suggest_margins
+        add_data.call
+      end
     end
     
     # Toggling a corner.
     dlg.add_action_callback("toggle_corner") do |_, params|
-      name, index, status = JSON.parse(params)
-      @corners[@template.id] ||= {}
-      @corners[@template.id][name] ||= []
-      @corners[@template.id][name][index] = status
-      
-      @corners[@template.id].delete(name) unless @corners[@template.id][name].any?
+      set_corner *JSON.parse(params)
+      if @suggest_margins
+        suggest_margins
+        add_data.call
+      end
     end
     
-    # Part replacement...
+    # Setting margin
+    dlg.add_action_callback("set_margin") do |_, params|
+      index, length = *JSON.parse(params)
+      begin
+        length = length.to_l
+      rescue ArgumentError
+        # Do nothing.
+      else
+        length = nil if length == 0
+        set_margin index, length
+        @suggest_margins = false
+        add_data.call
+      end
+    end
+    
+    # Toggle margin suggestions.
+    dlg.add_action_callback("toggle_suggest_margins") do |_, params|
+      status = params == "true"
+      @suggest_margins = status
+      if @suggest_margins
+        suggest_margins
+        add_data.call
+      end
+    end
+    
+    # Setting part replacement
+    dlg.add_action_callback("toggle_replacement") do |_, params|
+      original, replacement, segment, index, status = *JSON.parse(params)
+      replacement = status ? replacement : nil
+      set_replacement original, segment, index, replacement
+    end
 
     # Clicking material replacement button.
     dlg.add_action_callback("replace_material") do |_, original_string|
@@ -643,7 +769,6 @@ class Building
 
     # Open information website.
     dlg.add_action_callback("openUrl") do
-    p @template.source_url
       UI.openURL @template.source_url
     end
 
@@ -704,6 +829,12 @@ class Building
     # Override gable Hash with JSON String.
     @group.set_attribute ATTR_DICT, "gables", JSON.generate(@gables)
     
+    # Override facade_margins Hash with Array.
+    @group.set_attribute ATTR_DICT, "facade_margins", @facade_margins.to_a
+    
+    # Override part_replacements Hash with JSON String.
+    @group.set_attribute ATTR_DICT, "part_replacements", JSON.generate(@part_replacements)
+    
     # Override material replacements wit string identifiers.
     array = @material_replacement.map { |e| e.map{ |m| m.name } }
     @group.set_attribute ATTR_DICT, "material_replacement", array
@@ -712,6 +843,164 @@ class Building
 
   end
 
+  # Public: Sets facade margins to whatever is the biggest suggested margin for
+  # an adjacent gable or corner part.
+  #
+  # returns nothing.
+  def suggest_margins
+  
+    corners = list_used_corners
+    gables  = list_used_gables
+  
+    @facade_margins[@template.id] = (0..(@path.size*2-3)).map do |i|
+      segment = i/2 # Integer division.
+      side    = i%2 # 0 = left, 1 = right.
+      corner  = segment + side
+      first   = i == 0
+      last    = i == @path.size*2-3
+    
+      margins = corners.select{ |c| c[:use][corner] }.map { |c| c[:margin] }
+      
+      if first || last
+        margins +=  gables.select{ |g| g[:use][side] }.map { |g| g[:margin] }
+      end
+    
+      margins.compact.max
+    end
+    
+    nil
+    
+  end
+  
+  # Public: Sets whether a specific corner part should be drawn to a specific
+  # corner of building.
+  #
+  # name   - String name of the corner part.
+  # index  - Int index of the corner (counting from left, starting at 0).
+  #          If index is too high to represent a currently existing corner,
+  #          setting will be kept but not affect how buidling is drawn until the
+  #          corner exists.
+  # status - Boolean whether part should be used.
+  #
+  # Returns nothing.
+  def set_corner(name, index, status)
+  
+    @corners[@template.id] ||= {}
+    @corners[@template.id][name] ||= []
+    @corners[@template.id][name][index] = status
+    
+    @corners[@template.id].delete(name) unless @corners[@template.id][name].any?
+    
+    nil
+    
+  end
+  
+  # Public: Sets whether a specific gable part should be drawn to a specific
+  # side of building.
+  #
+  # name   - String name of the gable part.
+  # side   - Int, 0 being left and 1 right.
+  # status - Boolean whether part should be used.
+  #
+  # Returns nothing.
+  def set_gable(name, side, status)
+  
+    @gables[@template.id] ||= {}
+    @gables[@template.id][name] ||= []
+    @gables[@template.id][name][side] = status
+    
+    @gables[@template.id].delete(name) unless @gables[@template.id][name].any?
+    
+    nil
+    
+  end
+  
+  # Public: Sets the margin used when aligning or spreading parts in segment.
+  #
+  # index  - Index of margin counting from left. Odd values represents the left
+  #          side of a segment and even the right side.
+  # length - A Length or nil when there shouldn't be any margin.
+  def set_margin(index, length)
+  
+    @facade_margins[@template.id] ||= []
+    @facade_margins[@template.id][index] = length
+    
+    @facade_margins[@template.id] = @facade_margins[@template.id].reverse.drop_while {|i| i.nil? }.reverse
+    
+    nil
+  
+  end
+  
+  # Public: Sets replacement for a replaceable part on a given slot by a
+  # with a given replacing part.
+  #
+  # original_name   - String name of the original part to replace.
+  # segment         - Int segment index (counting from left, starting at 0).
+  #                   If segment index is to high to represent a currently
+  #                   existing segment, setting will be kept but not affect how
+  #                   buidling is drawn until the segment exists.
+  # index           - Int slot index (counting from left, starting at 0).
+  #                   If replacment uses several slots, index is of the leftmost
+  #                   one. If slot index is to high to represent a currently
+  #                   existing slot, setting will be kept but not affect how
+  #                   buidling is drawn until the slot exists.
+  # replacement     - String name of replacing part or nil when resetting to no
+  #                   replacement.
+  # purge_colliding - Wether potential colliding replacements (those taking up
+  #                   the same slot(s)) should be purged to make space for this
+  #                   replacment. A collding replacement that currently wouldn't
+  #                   be drawn anyway because it requires slots that doesnn't_array
+  #                   currently exist is always purged. (default: false)
+  #
+  # Returns nothing.
+  # Raises RuntimeError if replcement is invalid.
+  # Raises RuntimeError if there is a slot collision and purge_colliding is
+  # false.
+  def set_replacement(original, segment, index, replacement, purge_colliding = false)
+  
+    if replacement
+      available_replacements = list_available_replacements
+      replacement_info = available_replacements.find { |r| r[:name] == replacement }
+      unless replacement_info
+        raise ArgumentError "Unknown replacement '#{replacement}'."
+      end
+      slots = replacement_info[:slots]
+    else
+      slots = 1
+    end
+        
+    part_replacements = (@part_replacements[@template.id] ||= {})
+    part_replacements[original] ||= []
+    part_replacements[original][segment] ||= []
+    part_replacements[original][segment][index] = replacement
+    
+    # HACK: Empty extra slots used if multi slot replacement.
+    # When called from the properties panel the javascript prevents collisions
+    # with replacements to the left. Those to the right however could use slots
+    # that doesn't exist with the current segment length and therefore aren't
+    # sent to the javascript side. For now collisions are prevented here only if
+    # they couldn't be prevented in javascript which gives this method an odd,
+    # asymmetric behavior that doesn't make much sense when called from the
+    # planned public API.
+    # TODO: API: Improve this behavior (or document better).
+    if slots > 1
+      (index+1..index+slots-1).each do |i|
+        part_replacements[original][segment][i] = nil
+      end
+    end
+    
+    part_replacements[original][segment] = nil unless part_replacements[original][segment].any?
+    part_replacements.delete(original) unless part_replacements[original].any?
+    
+    nil
+    
+  end
+
+  # Internal: List corner parts available for building.
+  # Based on Template.
+  #
+  # Returns Array of Hash objects corresponding to each corner.
+  # Hash has reference to definition, name, original_instance and margin.
   def list_available_corners
   
     parts_data = []
@@ -724,10 +1013,12 @@ class Building
         :defintion => e.definition,
         :original_instance => e,
         :name => e.get_attribute(Template::ATTR_DICT_PART, "name"),
-        :width => e.get_attribute(Template::ATTR_DICT_PART, "corner_margin")
+        :margin => e.get_attribute(Template::ATTR_DICT_PART, "corner_margin")
       }
       parts_data << part_data
     end
+    
+    parts_data.sort_by! { |p| p[:name] || "" }
     
     parts_data
     
@@ -737,7 +1028,7 @@ class Building
   # Based on Template.
   #
   # Returns Array of Hash objects corresponding to each gable.
-  # Hash has reference to definition, name, original_instance and width.
+  # Hash has reference to definition, name, original_instance and margin.
   def list_available_gables
   
     parts_data = []
@@ -750,10 +1041,12 @@ class Building
         :defintion => e.definition,
         :original_instance => e,
         :name => e.get_attribute(Template::ATTR_DICT_PART, "name"),
-        :width => e.get_attribute(Template::ATTR_DICT_PART, "gable_margin")
+        :margin => e.get_attribute(Template::ATTR_DICT_PART, "gable_margin")
       }
       parts_data << part_data
     end
+    
+    parts_data.sort_by! { |p| p[:name] || "" }
     
     parts_data
     
@@ -762,7 +1055,7 @@ class Building
   # Internal: List replaceable parts (spread and aligned parts) available for
   # this building.
   # Also list the Transformation objects for each part.
-  # Based on Template and @path. # TODO: Should also be based on used gables or separate margin-array.
+  # Based on Template and @path.
   #
   # Return Array of Hash objects corresponding to each part.
   # Hash has reference to definition, name, original_instance and
@@ -867,6 +1160,17 @@ class Building
         origin_leftmost  = Geom.intersect_line_plane line_origin, plane_left
         origin_rightmost = Geom.intersect_line_plane line_origin, plane_right
         
+        # Take facade margin into account.
+        margin_left  = (@facade_margins[@template.id] || [])[2*segment_index]
+        margin_right = (@facade_margins[@template.id] || [])[2*segment_index+1]
+        origin_leftmost.offset!(X_AXIS, margin_left) if margin_left
+        origin_rightmost.offset!(X_AXIS, -margin_right) if margin_right
+        
+        # Skip segment for this part if leftmost is to the right of rightmost.
+        unless (origin_rightmost-origin_leftmost).samedirection?(X_AXIS)
+          next
+        end
+        
         # Create Transformation objects from current Transformation, path
         # segment and attribute data.
         if ad["align"]
@@ -936,6 +1240,38 @@ class Building
     
     end
     
+    parts_data.sort_by! { |p| p[:name] || "" }
+    
+    parts_data
+    
+  end
+  
+  # Internal: List replacements available for building.
+  # Based on Template.
+  #
+  # Returns Array of Hash objects corresponding to each replacement part.
+  # Hash has reference to definition, name, original_instance and slots it uses.
+  def list_available_replacements
+  
+    parts_data = []
+    
+    @template.component_def.entities.each do |e|
+      next unless e.get_attribute(Template::ATTR_DICT_PART, "replacement")
+      next unless e.get_attribute(Template::ATTR_DICT_PART, "name")
+      next unless e.get_attribute(Template::ATTR_DICT_PART, "replaces")
+      
+      part_data = {
+        :defintion => e.definition,
+        :original_instance => e,
+        :name => e.get_attribute(Template::ATTR_DICT_PART, "name"),
+        :replaces => e.get_attribute(Template::ATTR_DICT_PART, "replaces"),
+        :slots => e.get_attribute(Template::ATTR_DICT_PART, "slots", 1)
+      }
+      parts_data << part_data
+    end
+    
+    parts_data.sort_by! { |p| p[:name] || "" }
+    
     parts_data
     
   end
@@ -998,13 +1334,13 @@ class Building
     parts_data.map! do |part_data|
       part_data = part_data.dup
 
-      next unless a = corner_settings[part_data[:name]]
-      next unless a.any?
+      use = corner_settings[part_data[:name]] || []# REVIEW: Move this to list_available_corners. Make one single list_corner_parts method that optionally calculate transformations too.
+      part_data[:use] = use
+      next unless use.any?
 
       transformation_original = part_data[:original_instance].transformation
       
       # If building is drawn with its back along path, adapt transformation.
-      # REVIEW: Only transform origin Point3d. Transformation isn't used.
       if @back_along_path
         delta_y = -(@template.depth || Template::FALLBACK_DEPTH)
         translation = Geom::Transformation.translation([0, delta_y, 0])
@@ -1046,7 +1382,7 @@ class Building
         
         # All corner parts expect for that of the last corner is drawn at the
         # left side of the segment group by the same index.
-        if a[segment_index]
+        if use[segment_index]
           transformations << Geom::Transformation.axes(
             origin_leftmost,
             tangent_left,
@@ -1058,7 +1394,7 @@ class Building
         # The rightmost corner part is drawn at the right side of the last
         # segment group. This group is the only one that may contain two
         # corner parts.
-        if segment_index == (@path.size - 2) && a[segment_index + 1]
+        if segment_index == (@path.size - 2) && use[segment_index + 1]
           transformations << Geom::Transformation.axes(
             origin_rightmost,
             tangent_right,
@@ -1075,6 +1411,69 @@ class Building
     
     parts_data
     
+  end
+  
+  # Internal: List facade elements (replaceable and replacements parts) currently
+  # used for this building.
+  # Based on list_available_replacable and @part_replacements.
+  #
+  # Return Array of Hash objects corresponding to each part.
+  # Hash has reference to definition, name, original_instance and
+  # transformations Array.
+  # Transformations Array has one element for each segment in building.
+  # Each element is an Array of Transformation objects.
+  # Transformation is in the local coordinate system of the relevant segment
+  # group.
+  def list_used_facade_elements
+  
+    replaceables  = list_available_replacable
+    replacements = list_available_replacements
+
+    if @part_replacements[@template.id]
+      replaceables.each do |replaceable|
+        next unless @part_replacements[@template.id][replaceable[:name]]
+        
+        replaceable[:transformations].each_with_index do |transformations, segment|
+          next unless transformations
+          next unless @part_replacements[@template.id][replaceable[:name]][segment]
+
+          to_delete = []
+          transformations.each_with_index do |tr_start, slot|
+            replacement_name = @part_replacements[@template.id][replaceable[:name]][segment][slot]
+            next unless replacement_name
+
+            replacement_data = replacements.find { |r| r[:name] == replacement_name }
+            unless replacement_data
+              warn "Unknown replacement '#{replacement_name}'."
+              next
+            end
+            
+            if replacement_data[:slots] == 1
+              tr = tr_start
+            else
+              tr_end = transformations[slot + replacement_data[:slots] -1]
+              next unless tr_end
+              tr = Geom::Transformation.interpolate tr_start, tr_end, 0.5
+            end
+            
+            replacement_data[:transformations] ||= []
+            replacement_data[:transformations][segment] ||= []
+            replacement_data[:transformations][segment] << tr
+
+            to_delete += (slot..(slot + replacement_data[:slots] -1)).to_a
+          end
+          to_delete.reverse_each { |i| transformations.delete_at i }
+          
+        end
+        
+      end
+    end
+    
+    # Purge replacements that aren't used.
+    replacements.keep_if { |r| r[:transformations] }
+    
+    replaceables + replacements
+  
   end
   
   # Internal: List gables currently used in building.
@@ -1140,13 +1539,15 @@ class Building
     parts_data.map! do |part_data|
       part_data = part_data.dup
       
-      next unless a = gable_settings[part_data[:name]]
-      next unless a.any?
+      use = gable_settings[part_data[:name]] || []# REVIEW: Move this to list_available_gables. Make one single list_gable_parts method that optionally calculate transformations too.
+      part_data[:use] = use
+      next unless use.any?
+      
       part_data[:transformations] = (0..@path.length-2).map { [] }
-      if a[0]
+      if use[0]
         part_data[:transformations][0] << transformation_left
       end
-      if a[1]
+      if use[1]
         part_data[:transformations][-1] << transformation_right
       end
 
@@ -1184,6 +1585,18 @@ class Building
     # Override gable JSON String with actual Hash object.
     # Backward compatibility: Set gables to empty Hash if not already set.
     h[:gables] = h[:gables] ? JSON.parse(h[:gables]) : {}
+    
+    # Override facade_margins Array with actual Array object.
+    # Backward compatibility: Set facade_margins to empty Hash if not already set.
+    h[:facade_margins] = h[:facade_margins] ? Hash[h[:facade_margins]] : {}
+    
+    # Backward compatibility: Default suggest margins to true.
+    h[:suggest_margins] = true if h[:suggest_margins].nil?
+    
+    # Override part replacements JSON String with actual Hash object.
+    # Backward compatibility: Set part replacements to empty Hash if not already
+    # set.
+    h[:part_replacements] = h[:part_replacements] ? JSON.parse(h[:part_replacements]) : {}
 
     # Override material replacement string identifiers with actual material
     # references.
@@ -1367,9 +1780,7 @@ class Building
   # Return nothing.
   def draw_parts
     
-    # TODO: Use largest width of currently used gables as margin when listing parts in between
-    
-    part_data = list_available_replacable
+    part_data = list_used_facade_elements
     part_data += list_used_gables
     part_data += list_used_corners
    
@@ -1390,7 +1801,7 @@ class Building
       # Place instances of all spread or aligned parts that has transformations
       # for this segment.
       part_data.each do |part|
-        part[:transformations][segment_index].each do |trans|
+        (part[:transformations][segment_index] || []).each do |trans|
           original = part[:original_instance]
           EneBuildings.copy_instance original, segment_ents, trans
         end
@@ -1452,6 +1863,8 @@ class Building
         hidden << e if e.hidden?
         next unless [Sketchup::Group, Sketchup::ComponentInstance].include? e.class
         next unless ad = e.attribute_dictionary(Template::ATTR_DICT_PART)
+        # SU ISSUE: ad is sometimes an edge :S . seems to happen when invalid
+        # geometry has been produced earlier.
         next unless operation = ad["solid"]
         ops << [e, operation, segment_group]
       end
@@ -1506,6 +1919,15 @@ class Building
     
     Sketchup.status_text = STATUS_CUTTING if write_status
     
+    # Disabled own fast cut code in favor of old intersect_with code.
+    # New code caused invalid geometry which seems to have messed up object
+    # references (tested in SU2015).
+    #
+    # E.g. attribute_dictionary could return an edge.
+    #
+    # Test geometry valditity with:
+    #    Sketchup.send_action 21124
+=begin
     segment_groups.each do |segment_group|
 
       # Copy naked edges of cutting parts into a temporary group and explode it
@@ -1607,6 +2029,138 @@ class Building
       
       cut_away_faces.each { |f| f.hidden = true }
       cut_away_edges.each { |f| f.hidden = true }
+      
+      segment_group.entities.erase_entities cut_away_faces.map { |f| f.get_glued_instances }.flatten
+      
+    end
+=end
+
+
+    segment_groups.each do |segment_group|
+    
+      # Copy naked edges on cutting parts into parent drawing context and keep
+      # reference to new edges.
+      # Also keep references to the end points of each edge, in normalized
+      # order, to later determine which faces are inside the cutting edges.
+      cutting_edges = []
+      cutting_edge_points = []
+      ops.each do |s|
+        part, operation, part_segment_group = s
+        next unless part_segment_group == segment_group
+        next unless operation == "cut_multiple_faces"
+        
+        Sketchup.status_text = STATUS_CUTTING if write_status
+        
+        naked_edges = EneBuildings.naked_edges part.definition.entities
+        original_mirrored = MyGeom.transformation_mirrored? part.transformation
+        
+        naked_edges.each do |edge|
+          points = edge.vertices.map { |v| v.position }
+          points.each { |p| p.transform! part.transformation }
+          points.reverse! if edge.reversed_in?(edge.faces.first)
+          points.reverse! if original_mirrored
+          cutting_edge_points << points
+          
+          new_edge = segment_group.entities.add_line points
+          new_edge.hidden = edge.hidden?
+          cutting_edges << new_edge
+        end
+        
+      end
+      
+      # HACK: Run intersect to split edges where they cross and punch holes in
+      # faces. Would be much much very much faster if the geometry merger
+      # that runs after each tool operation in SU could be called directly.
+      #
+      # Use attributes for referencing cutting edges since attributes
+      # are kept on both sides when an edge is split.
+      # Life would be easier if the internal geometry merger thing could be
+      # called as somehow return the relationship between new entities
+      # and the entities they are split off from.
+      cutting_edges.each { |e| e.set_attribute ID, "cutting_edges", true }
+      cutting_edges += segment_group.entities.intersect_with(
+        false,
+        Geom::Transformation.new,
+        segment_group.entities,
+        Geom::Transformation.new,
+        true,
+        cutting_edges
+      )
+      cutting_edges.keep_if { |e| e.valid? }
+      cutting_edges += segment_group.entities.select { |e| e.get_attribute ID, "cutting_edges" }
+      cutting_edges.uniq!
+
+      # MUCH HACK: Do the freaking thing again if some of the cutting edges are
+      # still free standing. When some cutting objects touches the outer loops
+      # of a face somehow the the intersect method fucks up with finding inside
+      # loops for that face.
+      free_cutting_edges = cutting_edges.select { |e| e.faces.empty? }
+      unless free_cutting_edges.empty?
+        cutting_edges += segment_group.entities.intersect_with(
+          false,
+          Geom::Transformation.new,
+          segment_group.entities,
+          Geom::Transformation.new,
+          true,
+          free_cutting_edges
+        )
+        cutting_edges.keep_if { |e| e.valid? }
+        cutting_edges += segment_group.entities.select { |e| e.get_attribute ID, "cutting_edges" }
+        cutting_edges.uniq!
+      end
+
+      # Loop cutting edges an look for bounded faces that are "inside" the
+      # cutting edge.
+      cut_away_faces = []
+      faces_to_keep  = []
+      cutting_edges.each do |e|
+        # Edge can be marked as deleted if merged with another edge.
+        next unless e.valid?
+        
+        edge_points = e.vertices.map { |v| v.position }
+        matches_as_non_reversed = cutting_edge_points.include?(edge_points)
+        matches_as_reversed = cutting_edge_points.include?(edge_points.reverse)
+        
+        # If edge has been split it doesn't match any pair of points and no
+        # face can be found from it. If any of the edges of a loop is intact
+        # all faces inside will be found later on.
+        next unless matches_as_non_reversed || matches_as_reversed
+        next if matches_as_non_reversed && matches_as_reversed
+        
+        reversed = matches_as_reversed
+        e.faces.each do |face|
+          if e.reversed_in?(face) == reversed
+            cut_away_faces << face
+          else
+            faces_to_keep << face
+          end
+        end
+      end
+      
+      # Traverse faces sharing a binding edge to list faces to cut away and to
+      # keep.
+      #
+      # If the loop of cutting edges doesn't lie tight onto the original
+      # mesh the cut away faces will leak out to the rest of the mesh but the
+      # faces to keep will also leak in. That is why faces to keep are also
+      # listed.
+      #
+      # If a face is listed both as a face to keep and a face to remove it is
+      # because cutting loops overlap. Delete those faces.
+      faces_to_keep -= cut_away_faces
+      cut_away_faces = EneBuildings.connected_faces cut_away_faces, cutting_edges
+      faces_to_keep = EneBuildings.connected_faces faces_to_keep, cutting_edges
+      cut_away_faces -= faces_to_keep
+
+      cut_away_edges = cut_away_faces.map { |f| f.edges }.flatten.uniq
+      cut_away_edges.keep_if { |e| (e.faces - cut_away_faces).empty? }
+      
+      cut_away_faces.each { |f| f.hidden = true }
+      cut_away_edges.each { |f| f.hidden = true }
+      
+      # Also delete parts glued to faces cut away, except for parts with solid
+      # operations. That would risk deleting the part that cut the hole itself.
+      segment_group.entities.erase_entities cut_away_faces.map { |f| f.get_glued_instances }.flatten.select { |p| !p.get_attribute(Template::ATTR_DICT_PART, "solid") }
       
     end
 
