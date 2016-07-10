@@ -601,18 +601,14 @@ class Building
     op_name = "Building Properties"
     model.start_operation op_name, true
     
-    # HACK: Make a temporary group to apply materials to to load them into
-    # model.
-    temp_material_group = model.entities.add_group
-    temp_material_group.visible = false
-    temp_material_group.entities.add_cpoint ORIGIN
+    temp_material_group = nil
 
     # Closing dialog.
     # Cancels (Abort operation) unless called from "apply" callback.
     set_on_close_called_from_apply = false
     dlg.set_on_close do
       unless set_on_close_called_from_apply
-        temp_material_group.erase! if temp_material_group.valid?
+        temp_material_group.erase! if temp_material_group && temp_material_group.valid?
         model.abort_operation
       end
 
@@ -629,7 +625,7 @@ class Building
       # Call all draw methods.
       draw
 
-      temp_material_group.erase! if temp_material_group.valid?
+      temp_material_group.erase! if temp_material_group && temp_material_group.valid?
       model.commit_operation
 
       if close
@@ -720,7 +716,14 @@ class Building
       next unless original
       active_m = model.materials.current
 
-      # Make sure active_m is added to model.
+      # Make sure active_m exists model.
+      # HACK: Make a temporary group to apply materials to to load them into
+      # model.
+      unless temp_material_group && temp_material_group.valid?
+        temp_material_group = model.entities.add_group
+        temp_material_group.visible = false
+        temp_material_group.entities.add_cpoint ORIGIN
+      end
       temp_face = temp_material_group.entities.add_face(# FIXME: In SU2015 when applying a material not already defined in the model temp_face refers to the material :S ??? :O
         Geom::Point3d.new(rand, rand, rand),
         Geom::Point3d.new(rand, rand, rand),
