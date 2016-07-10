@@ -246,6 +246,7 @@
             <td colspan="3">
               <select name="position_method" id="position_method" onchange="toggle_positioning(this.value); toggle_solid();">
                 <option value="">Unspecified (Not drawn)</option>
+                <option disabled>──────────</option>
                 <option value="spread">Array</option>
                 <option value="left">Align left</option>
                 <option value="right">Align right</option>
@@ -320,7 +321,7 @@
           </tr>
           <tr data-category="replacement">
             <td><label for="replaces">Replaces</label></td>
-            <td><input name="replaces" id="replaces" type="text" /></td><!--TODO: PART REPLACEMENTS: make dropdown menu-->
+            <td id="replacable_wrapper"><input name="replaces" id="replaces" type="text" /></td><!--Replaces by dropdown on page load-->
             <td><label for="slots">Slots</label></td>
             <td><input name="slots" id="slots" type="text" /></td>
           </tr>

@@ -73,7 +73,7 @@ module TemplateEditor
 
   # Save all template attributes as attributes to component instance,
   # except the component reference.
-  # Called from .open and observer for placing component.
+  # Called from #open and observer for placing component.
   #
   # Returns nothing.
   def self.attach_template_data_to_component(template, instance)
@@ -204,6 +204,24 @@ module TemplateEditor
 
   end
 
+  # List names of all replacable parts in active drawing context.
+  #
+  # Returns String Array.
+  def self.list_replaceable_names
+  
+    ents = Sketchup.active_model.active_entities
+    
+    names = ents.map do |e|
+      ad = e.attribute_dictionary Template::ATTR_DICT_PART
+      next unless ad
+      next unless ad["spread"] || ad["align"]
+      ad["name"]
+    end
+    
+    names.compact
+    
+  end
+  
   # Sets @@component_inst to template component instance currently selected or
   # opened and load attributes to template info dialog.
   #
@@ -341,9 +359,18 @@ module TemplateEditor
       # Make name unique. If part was copied it may be duplicated.
       # Assume user first selects the copy and not the original.
       name = unique_part_name(@@part, name) unless name == ""
+      
+      # Create dropdown menu for replacement.
+      dropdown = "<select name=\"replaces\" id=\"replaces\">"
+      dropdown += "<option value=\"\" style=\"font-style: italic;\">Please select</option>"
+      list_replaceable_names.each do |name|
+        dropdown += "<option value=\"#{name}\">#{name}</option>"
+      end
+      dropdown += "</select>"
 
       # Add data to dialog.
       js = "warn(false);"
+      js << "document.getElementById('replacable_wrapper').innerHTML=#{dropdown.inspect};"
       js << "document.getElementById('name').value=#{name.to_s.inspect};"
       js << "toggle_positioning(#{position_method.inspect});"
       js << "document.getElementById('margin').value=#{margin.to_s.inspect};"
@@ -973,7 +1000,7 @@ module TemplateEditor
       end
     when "replacement"
       data["replacement"] = true
-      data["replaces"] = @@dlg_part.get_element_value("replaces")# TODO: PART REPLACEMENTS: Validate.
+      data["replaces"] = @@dlg_part.get_element_value("replaces")
       slots = @@dlg_part.get_element_value("slots").to_i
       slots = [slots, 1].max
       data["slots"] = slots
