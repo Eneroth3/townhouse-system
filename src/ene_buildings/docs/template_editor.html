@@ -7,12 +7,9 @@
     <link href="style.css" rel="stylesheet" type="text/css">
   </head>
   <body>
-    <!--<div style="position: fixed; top: 45%; left: 0; right: 0; text-align: center; font-size: 4em; color: red; text-transform: uppercase; font-weight: bold; transform: rotate(-30deg); z-index: 100;">
-      Not up to date!
-    </div>-->
     <img src="template_example.png" alt="" />
 
-    <h1>Editing Templates</h1>
+    <h1>Template Editing</h1>
     <p>
       Templates are the base to draw a building from.
       Installed templates are stored as .bldg files in the building template directory of the plugin directory.
@@ -23,7 +20,7 @@
     </p>
     <p>
       While being edited a template is represented by a component.
-      There are 3 ways to get such a component.
+      There are 3 ways to obtain such a component.
     <p>
     <ul>
       <li>An existing template saved to the library can be opened from the template editing menu or toolbar <img src="../toolbar_icons/template_open.png" />.</li>
@@ -35,19 +32,23 @@
     </p>
 
     <h2>1 Main Volume</h2>
-    <img src="template_volume.png" alt="" />
+    <img src="template_volume.png" alt="" /><!--
+    --><img src="template_volume2.png" alt="" />
     <p>
       The main volume of the building must be drawn directly in the component to be recognized by the plugin.
-      The two gable faces must point in <span class="axis-negative x">negative</span> and <span class="axis x">positive X</span>.
+      The two gable faces must have their normals in <span class="axis-negative x">negative</span> and <span class="axis x">positive X</span>.
       All other faces must be perpendicular to these two.
-      The volume can have any length but the length its drawn to will be used when creating the preview image.
+    </p>
+    <p>
+      The easiest way to achieve this is to draw the building profile in the <span class="axis y">Y</span> <span class="axis z">Z</span> plane and push-pull it into a volume.
+      The volume can have any length but the length its drawn to will be used when creating the preview image later.
     </p>
     <p>
       The side of the volume towards <span class="axis-negative y">negative Y</span> is considered the front side.
       The facade plane should intersect default ground level along the <span class="axis x">X axis</span>.
     </p>
     <p>
-      The volume can extend below the origin to make sure the building meets the ground when drawn on an un-even terrain (I typically extend it 3 m downwards).
+      The volume can extend below the origin to make sure the building meets the ground even when drawn on an un-even terrain (I typically extend it 3 m downwards).
       When volume extends down the side edges of the front facade can be split on the <span class="axis x">X axis</span> to get an Endpoint to snap to when drawing neighboring buildings.
     </p>
 
@@ -66,7 +67,6 @@
     <p>
       ID - Starts with a prefix based on your name to avoid name collisions and people accidentally overwriting each other files when sharing them.
       If you for instance use the prefix "ene" (reserved by me, Eneroth3) and then update the plugin the template might be overwritten by one I made that is included in the plugin and happens to have the same name.
-      The preview image shows either a template saved by the currently written ID or a placeholder so if you accidentally chose an ID that already exists for your installed templates the preview for it is shown.
     </p>
     <h3>2.2 Alignment</h3>
     <p>
@@ -79,13 +79,9 @@
     <h2 id="dlg_part_info">3 Part Info<img src="../toolbar_icons/template_part_info.png" /></h2>
     <p>
       The part info dialog is used to set attributes to the currently selected group or component,
-      such as its positioning within the building.
+      e.g. its positioning within the building.
     </p>
     <h3>3.1 Positioning</h3>
-    <p>
-      These settings changes the <span class="axis x">X coordinate</span> where the group/component is placed (where its origin is).
-      <span class="axis y">Y</span> and <span class="axis z">Z</span> coordinates will be kept as they are in model.
-    </p>
     <p>
       This option must be set for the part to be drawn at all.
     </p>
@@ -93,77 +89,119 @@
       Group/component axes can be displayed by going to Windows > Model Info > Components and tick the checkbox "Show component axes" to easier locate the origins.
     </p>
     <h4>3.1.1 Array</h4>
-    <div class="img-and-text"><img src="template_spread.png" alt="" />Margin and interval on resulting building.</div>
-    <!--<div class="img-and-text"><img src="template_spread_alternate.png" alt="" />Alternating components.</div>-->
     <p>
       Array is used to evenly spread a number of groups/components along the width of the building volume,
       either by a fixed number or by an approximate distance between.
     </p>
+    <img src="template_array.png" alt="" /><!--
+    --><img src="template_array2.png" alt="" />
     <p>
-      Margins can be used to add a fixed distance at each side before spreading evenly over the remaining space.
+      The <span class="axis y">Y</span> and <span class="axis z">Z coordinates</span> of each instance is kept as it is in the original
+      while new <span class="axis x">X coordinates</span> are cauclated for each instance.
+      Typically the group/component should be horizontally centered on its origin.
     </p>
     <p>
-      The number of groups/components can be forced to either an even or odd value by setting rounding.
+      Margins can be used to add a fixed distance at each side of the facade and spread the instances evenly only in the remaining space.
     </p>
-    <div class="img-and-text"><img src="template_spread_override_cut_planes.png" alt="" />Dormer window not drawn when outside building.</div><!--
-    --><div class="img-and-text"><img src="template_spread_override_cut_planes2.png" alt="" />Dormer window drawn anyway.</div>
+    <h4>3.1.2 Align, centering and relative position</h4>
     <p>
-      By default groups/components are not drawn if they are positioned partly besides the main building volume. This behavior can be overridden if undesired.
+      These are used to place only one instance of the group or component on each facade.
     </p>
-    <h4>3.1.2 Align and centering</h4>
+    <img src="aligned.png" alt="" />
     <p>
-      Places origin at the edge or in the middle of the volume.
-      Left is towards <span class="axis-negative x">negative X</span> and right towards <span class="axis x">positive X</span>.
+      The <span class="axis y">Y</span> and <span class="axis z">Z coordinates</span> of the grouo/component is kept as it is
+      while the <span class="axis x">X coordinate</span> is set according to the positioning setting.
     </p>
-    <h4>3.1.3 Relative</h4>
     <p>
-      Relation between distance from <span class="axis-negative x">negative X</span> (left) side and building width.
-      E.g 0,25 is a quarter of the building width, starting from the left side.
+      To create a quoins, have one group or component aligned to the left and one to the right.
+      Make sure these groups/componnets have their origins on the side resembling the buidling corner.
+    </p>
+    <h4>3.1.3 Replacement</h4>
+    <p>
+      Replacement is used to allow the user to replace one or more instances of an arrayed, aligned, centered or relatively positioned group or component with another group or component.
+      This can be used to replace a window by a door or a balcony.
+    </p>
+    <img src="template_replacement.png" alt="" /><!--
+    --><img src="template_replacement2.png" alt="" />
+    <p>
+      First of all the part to replace must have been given a name.
+      Then it cam be selected from a dropdown menu for the replacement.
+      The replacement part must also have a name so users can distinguish it in the UI.
+    </p>
+    <p>
+      For complex replacements, such as a bay window crossing the cornish and continuing onto the roof,
+      the <a href="#cut_multiple_faces">Cut Multiple Faces</a> feature can be used.
+    </p>
+    <p>
+      For this to work it's imprtant that the origin and axes of the replacement correspond to those of the replacement.
+      If a window for instance has its origin at its bottom a replacing door must have its origin at the same height, and not at the bottom of the door.
+    </p>
+    <h4>3.1.4 Gable</h4>
+    <p>
+      Gable is used to place the group or component on the buidling ends.
+    </p>
+    <p>
+      The origin is placed either on the start or end of the path the building is drawn to
+      with the <span class="axis x">X axis</span> pointing inwards to the midle of the building
+      and the <span class="axis y">Y axis</span> following the gable face.
+      This means the component/group is skewed if the user sets end angles different from 90 degrees.
+    </p>
+    <img src="gable.png" alt="" /><!--
+    --><img src="gable2.png" alt="" />
+    <p>
+      The gable setting can be used for replacing the firewall at the buidling short side with a facade.
+      This feature can also be used to add side risalits to the front or add a portik<!--TODO: TRANSLATE: portik--> that is skewed to be paralell with the gable wall.
+      A margin can be suggested for the adjacent facade to prevent arrayed or aligned groups/components from colliding with this one.
+    </p>
+    <p>
+      Typically the <a href="#cut_multiple_faces">Cut Multiple Faces</a> is used for gables, espcially the advanced ones.
+    </p>
+    <h4>3.1.5 Corner</h4>
+    <p>
+      Corner is used to place a group/component by a corner of the buidling.
+    </p>
+    <p>
+      The <span class="axis y">Y</span> and <span class="axis z">Z coordinates</span> of the grouo/component is kept as it is
+      while the <span class="axis x">X coordinate</span> is set to be on the bisector of the corner.
+      The <span class="axis y">Y axis</span> of the group/component follows the bisextris while the <span class="axis x">X axis</span> is perpendicular to it.
+    </p>
+    <p>
+      Typically this setting is used for corner turrets.
+      A margin can be suggested for the adjacent facades to prevent arrayed or aligned groups/components from colliding with this one.
     </p>
     <h3>3.2 Material Replacement</h3>
     <p>
       By default all materials on the main volume can be replaced from the building Properties dialog.
       By ticking "Replace materials within this part" the plugin will also check for and replace materials within this group.
-      This is useful when a group has multiple materials to replace so painting the group/component itself doesn't work.
+      This is useful when a group has multiple materials to replace meaning painting the group/component itself doesn't work.
     </p>
     <p>
       This option is only available for groups.
       Automatically modifying individual components would clutter the component browser with multiple versions of it.
       However the plugin allows you to easily convert a component to a group.
     </p>
-    <!--
-    Component replacements:
-      It's generally good practice to position the replacement outside the main volume to clearly show it's not an arrayed/spread component/group"
-      Cannot be combined with solid operations.
-     Gables
-      Cannot be combined with solid operations.
-     Internal Corner (Formerly "hörntorn")
-      Cannot be combined with solid operations.
-      
-      
-      
-      
-      TODO: BEFORE PUBLISHING: Document Corner, gable and part replacement!
-    -->
     <h3>3.3 Solid Operations</h3>
     <p>
       Solid union and subtract can be performed with a group/component onto the main volume of the building.
     </p>
     <p>
-      Solid operations are slow to perform. If possible use cut-opening components instead.
+      Solid operations are slow to perform. If possible use native cut-opening components instead.
     </p>
     <p>
       Solid index is used to determine what order to perform the operations in starting at the lowest number. Default is 0.
     </p>
-    <h4>3.3.1 Cut Multiple Faces</h4>
+    <h4 id="cut_multiple_faces">3.3.1 Cut Multiple Faces</h4>
     <p>
-      There's also an option to use the part's naked edges to cut openings, similar to the native cut opening feauture but on multiple faces at once.
+      There's also an option to use the group or component's naked edges to cut openings, similar to the native cut opening feauture but on multiple faces at once.
       This is strictly isn't a solid operation and is always performed after the the real solid operations (union and subtract).
       This feature is useful when the part spans multiple faces, e.g. a bay window the roof eaves and continuing on the roof.
     </p>
-    <!--<p>
-      This feaure can be used both cut into the facade and add materialo onto it at once.
-    </p>-->
+    <img src="cut_opening.png" alt="" />
+    <p>
+      For this to work the naked edges of the group/component must lay tight onto the main volume.
+      If there is any gap the plugin can't find what to cut away.
+      It is also important that all faces are correctly oriented for the plugin to distinguish the inside of the cutting loop from the outside.
+    </p>
     <div id="footer">
       Copyright Julia Christina Eneroth 2016
     </div>

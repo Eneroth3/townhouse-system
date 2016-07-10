@@ -76,11 +76,11 @@ thead td{
   display: block;
 }
 .axis{
-  border-bottom: 1.5px solid;/*TODO: make this a text-decoration underline when more supported*/
+  border-bottom: 1px solid;
 }
 .axis-negative{
-  border-bottom: 1.5px dotted;
+  border-bottom: 2px dotted;
 }
-.x { border-color: red;}
-.y { border-color: lime;}
-.z { border-color: blue;}
+.x { border-color: rgb(179, 0, 0);}
+.y { border-color: rgb(0, 179, 0);}
+.z { border-color: rgb(0, 0, 179);}
