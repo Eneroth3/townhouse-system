@@ -329,7 +329,7 @@ class Template
     faces_l = ents.select { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?([-1,0,0]) }
     faces_r = ents.select { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?([1,0,0]) }
     
-    # TODO: check if all other loose faces are perpendicular to these /has normal x == 0)
+    # TODO: TEMPLATE VALIDIATION: check if all other loose faces are perpendicular to these /has normal x == 0)
     # Check if main volume is solid when using solid operations.
     # Part names must be unique!
     

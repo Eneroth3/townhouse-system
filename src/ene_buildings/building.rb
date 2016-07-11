@@ -1922,13 +1922,15 @@ class Building
     
     Sketchup.status_text = STATUS_CUTTING if write_status
     
+    # TODO: Find fast and stable way to cut openings.
+    
     # Disabled own fast cut code in favor of old intersect_with code.
     # New code caused invalid geometry which seems to have messed up object
     # references (tested in SU2015).
     #
     # E.g. attribute_dictionary could return an edge.
     #
-    # Test geometry valditity with:
+    # Test geometry validity with:
     #    Sketchup.send_action 21124
 =begin
     segment_groups.each do |segment_group|

@@ -54,7 +54,7 @@ module PathHandling
   #                    this can be toggled from the context menu.
   #                    When irrelevant, e.g. when path doesn't represent a 
   #                    building,set to nil (default: nil).
-  def initialize(path = [], add_point_mode = false, end_angles = nil, handle_length = HANDLE_LENGTH, force_horizontal = true, back_along_path = nil)# TODO: use hash for all arguments?
+  def initialize(path = [], add_point_mode = false, end_angles = nil, handle_length = HANDLE_LENGTH, force_horizontal = true, back_along_path = nil)# REVIEW: use hash for all arguments?
 
     @path             = path
     @add_point_mode   = add_point_mode

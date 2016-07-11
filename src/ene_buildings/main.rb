@@ -6,7 +6,6 @@ module EneBuildings
 
   require "fileutils"
   require "json"
-  require "rubygems"
   
   unless Sketchup.version.to_i >= REQUIRED_SU_VERSION.to_i
     msg = "#{NAME} requires Sketchup version #{REQUIRED_SU_VERSION} or later to run."

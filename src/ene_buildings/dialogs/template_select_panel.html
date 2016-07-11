@@ -132,6 +132,7 @@
               tooltip += '\n'+label+': '+value;
             }
             if(template['description']) tooltip +='\n\n' + template['description'];
+            tooltip = tooltip.replace(/\"/g, "&quot;");
             src = preview_dir + '/' + template['id'] + '_100.png';
             html += '<img src="' + src + '" data-id="' + template['id'] + '" onclick="select(this);" title="' + tooltip + '" />';
           }

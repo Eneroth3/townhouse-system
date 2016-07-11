@@ -70,11 +70,11 @@ module EneBuildings
   CONTACT     = "#{AUTHOR} at eneroth3@gmail.com"
   COPYRIGHT   = "#{AUTHOR} #{Time.now.year}"
   DESCRIPTION =
-    "Draw townbuildings precisely after their plots no matter its shape. "\
+    "Draw townhouses precisely after their plots no matter its shape. "\
     "Can be used from anything to city planning to game making."
   ID          =  File.basename __FILE__, ".rb"
   NAME        = "Eneroth Townhouse System"
-  VERSION     = "0.1.1"
+  VERSION     = "1.0.0"
   
   # Public: Minimum Sketchup version required to run plugin.
   REQUIRED_SU_VERSION = "15"
