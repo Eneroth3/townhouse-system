@@ -90,13 +90,13 @@ module Zip
   end
 end
 
-require_relative 'extra_field/generic'
-require_relative 'extra_field/universal_time'
-require_relative 'extra_field/old_unix'
-require_relative 'extra_field/unix'
-require_relative 'extra_field/zip64'
-require_relative 'extra_field/zip64_placeholder'
-require_relative 'extra_field/ntfs'
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/extra_field/generic"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/extra_field/universal_time"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/extra_field/old_unix"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/extra_field/unix"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/extra_field/zip64"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/extra_field/zip64_placeholder"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/extra_field/ntfs"
 
 # Copyright (C) 2002, 2003 Thomas Sondergaard
 # rubyzip is free software; you can redistribute it and/or

@@ -3,47 +3,47 @@
 # Modifications are:
 # - This comment.
 # - Wrapping all files in own module.
-# - Changing require calls within rubyzip to have defined paths.
-#     This should allow the files to be required even in another file with the
-#     same basenme is already required.
-# - Chaning ::Zip to Zip.
+# - Changing require calls within rubyzip to have full paths.
+#     This should allow the files to be loaded even in another file with the
+#     same basenme is already loaded.
+# - Channing ::Zip to Zip.
 
 module EneBuildings
 
 
-require 'delegate'
-require 'singleton'
-require 'tempfile'
-require 'tmpdir'
-require 'fileutils'
-require 'stringio'
-require 'zlib'
-require_relative 'zip/dos_time'
-require_relative 'zip/ioextras'
-require 'rbconfig'
-require_relative 'zip/entry'
-require_relative 'zip/extra_field'
-require_relative 'zip/entry_set'
-require_relative 'zip/central_directory'
-require_relative 'zip/file'
-require_relative 'zip/input_stream'
-require_relative 'zip/output_stream'
-require_relative 'zip/decompressor'
-require_relative 'zip/compressor'
-require_relative 'zip/null_decompressor'
-require_relative 'zip/null_compressor'
-require_relative 'zip/null_input_stream'
-require_relative 'zip/pass_thru_compressor'
-require_relative 'zip/pass_thru_decompressor'
-require_relative 'zip/crypto/encryption'
-require_relative 'zip/crypto/null_encryption'
-require_relative 'zip/crypto/traditional_encryption'
-require_relative 'zip/inflater'
-require_relative 'zip/deflater'
-require_relative 'zip/streamable_stream'
-require_relative 'zip/streamable_directory'
-require_relative 'zip/constants'
-require_relative 'zip/errors'
+require "delegate"
+require "singleton"
+require "tempfile"
+require "tmpdir"
+require "fileutils"
+require "stringio"
+require "zlib"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/dos_time"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/ioextras"
+require "rbconfig"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/entry"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/extra_field"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/entry_set"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/central_directory"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/file"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/input_stream"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/output_stream"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/decompressor"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/compressor"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/null_decompressor"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/null_compressor"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/null_input_stream"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/pass_thru_compressor"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/pass_thru_decompressor"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/crypto/encryption"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/crypto/null_encryption"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/crypto/traditional_encryption"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/inflater"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/deflater"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/streamable_stream"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/streamable_directory"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/constants"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/errors"
 
 module Zip
   extend self

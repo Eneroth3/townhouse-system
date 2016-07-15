@@ -30,8 +30,8 @@ module Zip
   end # IOExtras namespace module
 end
 
-require_relative 'ioextras/abstract_input_stream'
-require_relative 'ioextras/abstract_output_stream'
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/ioextras/abstract_input_stream"
+Sketchup.require "#{PLUGIN_DIR}/lib/zip/ioextras/abstract_output_stream"
 
 # Copyright (C) 2002-2004 Thomas Sondergaard
 # rubyzip is free software; you can redistribute it and/or

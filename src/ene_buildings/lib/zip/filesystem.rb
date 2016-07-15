@@ -1,6 +1,6 @@
 module EneBuildings
 
-require_relative '../zip'
+Sketchup.require "#{PLUGIN_DIR}/lib/zip"
 
 module Zip
   # The ZipFileSystem API provides an API for accessing entries in
