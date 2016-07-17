@@ -577,7 +577,7 @@ class Template
 
   # Public: [Re-]Loads data for template JSON and save as attributes to self.
   #
-  # Returns true on success and false if JSON could not be loaded.
+  # Returns true on success and false on load error.
   def load_data
 
     read_archive do
@@ -589,6 +589,7 @@ class Template
         msg =
           "Template '#{@id}' could not be loaded due to invalid json.\n\n"\
           "Error message:\n#{e.message}"
+          puts
         UI.messagebox msg
         return false
       end
@@ -603,8 +604,22 @@ class Template
       
       # Make depth Length.
       # Depth is saved as float in json.
+      
+      # Extension failed Extension Warehouse review for publishing because of an
+      # error parsing depth as length that I cannot reproduce. Also the review
+      # feedback is sent from a f*****g no-reply account so I cannot get more
+      # information from the reviewer. Trying again with extra error handling.
       if @depth
-        @depth = @depth.to_l
+        begin
+          @depth = @depth.to_l
+        rescue ArgumentError
+            msg =
+            "Template '#{@id}' could not be loaded due to invalid building depth.\n\n"\
+            "Error message:\n#{e.message}"
+            puts
+          UI.messagebox msg
+          return false
+        end
       end
 
     end
