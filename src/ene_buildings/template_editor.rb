@@ -739,6 +739,10 @@ module TemplateEditor
     # ID should not be saved in the json file since it's defined in the name of
     # the whole template file.
     id = info.delete "id"
+    
+    # Convert depth length to float.
+    # JSON.generate will otherwise convert it to a string.
+    info["depth"] = info["depth"].to_f if info["depth"]
 
     # Empty temp directory.
     FileUtils.rm_rf Dir.glob(File.join(Template::EXTRACT_DIR, "*"))
