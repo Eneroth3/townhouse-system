@@ -743,6 +743,8 @@ module TemplateEditor
     # Convert depth length to float.
     # JSON.generate will otherwise convert it to a string.
     info["depth"] = info["depth"].to_f if info["depth"]
+    
+    info["su_file_version"] = Sketchup.version# TODO: FUTURE SU VERSION: Make this the oldest version supporting the plugin.
 
     # Empty temp directory.
     FileUtils.rm_rf Dir.glob(File.join(Template::EXTRACT_DIR, "*"))

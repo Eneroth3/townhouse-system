@@ -411,7 +411,7 @@ class Template
 
   # Public: Length between front and back side or nil if not set.
   attr_reader :depth
-  
+
   # Public: Returns the description of the template or nil if not set.
   attr_reader :description
 
@@ -434,6 +434,9 @@ class Template
 
   # Public: Returns the number of stories or nil if not set.
   attr_reader :stories
+  
+  # Public: What SU version is used for the template Sketchup file.
+  attr_reader :su_file_version
 
   # Public: Returns the year template was built or nil if not set.
   attr_reader :year
@@ -493,6 +496,7 @@ class Template
       path = File.join(EXTRACT_DIR, "model.skp")
       temp_path = File.join(EXTRACT_DIR, "#{@id}_#{Time.now.to_i}.skp")
       File.rename path, temp_path
+      # SU ISSUE: SU crashes when trying to load a file or a newer version.
       component_def = definitions.load temp_path
       component_def.name = name
       
