@@ -361,7 +361,7 @@ module TemplateEditor
       name = unique_part_name(@@part, name) unless name == ""
       
       # Create dropdown menu for replacement.
-      dropdown = "<select name=\"replaces\" id=\"replaces\">"
+      dropdown = "<select name=\"replaces\" id=\"replaces\" style=\"width: 100%\">"
       dropdown += "<option value=\"\" style=\"font-style: italic;\">Please select</option>"
       list_replaceable_names.each do |name|
         dropdown += "<option value=\"#{name}\">#{name}</option>"
