@@ -93,11 +93,6 @@ class Building
   # front.
   attr_accessor :back_along_path
   
-  # Public: Gets/sets component replacements.
-  # Array where each element is array of original (string identifier) and
-  # replacement (array of replacement of each slot, also string identifier).
-  attr_accessor :componet_replacement
-  
   # Public: Gets/sets rotation of gables.
   # Array containing 2 angels in radians cc seen from above.
   attr_accessor :end_angles

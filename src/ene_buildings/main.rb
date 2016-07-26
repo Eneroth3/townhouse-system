@@ -281,7 +281,7 @@ module EneBuildings
 
   # Internal: Find edges that's only binding one face.
   #
-  # entities - An Enteties object or an Array of Entity objects.
+  # entities - An Entities object or an Array of Entity objects.
   #
   # Returns an Array of Edges.
   def self.naked_edges(entities)
