@@ -106,7 +106,7 @@ class Building
   attr_reader :group
 
   # Public: Gets/set material replacements.
-  # Array where each element is an array of original and replacement Material.
+  # Hash of replacement Materials indexed by original Material to replace.
   attr_accessor :material_replacement
 
   # Public: Gets/sets path Building is drawn to in local coordinates of the
@@ -189,10 +189,8 @@ class Building
       # replacing part.
       @part_replacements = {}
 
-      # Array of Materials to replace and replacement.
-      # Each element is an array containing the original and the replacement
-      # Material object.
-      @material_replacement = []
+      # Hash of replacement Materials indexed by original Material to replace.
+      @material_replacement = {}
 
       # Boolean telling whether solid operations should be performed during
       # building drawing.
@@ -733,17 +731,10 @@ class Building
       active_m = temp_face.material
 
       # Save setting.
-      pair = @material_replacement.find { |e| e[0] == original}
-      if pair
-        # override replacement or remove if active material is nil.
-          if active_m
-            pair[1] = active_m
-          else
-            @material_replacement.delete pair
-          end
-      elsif active_m
-        # Create replacement unless active material is nil.
-        @material_replacement << [original, active_m]
+      if active_m
+        @material_replacement[original] = active_m
+      else
+        @material_replacement.delete original
       end
 
       # Update preview.
@@ -839,7 +830,7 @@ class Building
     @group.set_attribute ATTR_DICT, "part_replacements", JSON.generate(@part_replacements)
     
     # Override material replacements wit string identifiers.
-    array = @material_replacement.map { |e| e.map{ |m| m.name } }
+    array = @material_replacement.to_a.map { |e| e.map{ |m| m.name } }
     @group.set_attribute ATTR_DICT, "material_replacement", array
 
     nil
@@ -1610,6 +1601,7 @@ class Building
     # Delete replacement pair if replacement Material is nil. Replacer
     # Material becomes nil if it has been deleted from model.
     h[:material_replacement].delete_if { |p| !p[1] }
+    h[:material_replacement] = Hash[h[:material_replacement]]
     
     h
   
@@ -2183,15 +2175,11 @@ class Building
   # Returns nothing.
   def draw_material_replacement
 
-    # Hash of replacements. Original as key and replacement as value.
-    # Used for faster indexing.
-    replacements  = Hash[*@material_replacement.flatten]
-
     # Recursive material replacer.
     # Replace materials in group and in all nested groups with an attribute
     # specifically telling it to do so.
     recursive = lambda do |group|
-      group.name += ""# Make group unique.
+      group.name += ""# Make group unique. # OPTIMIZE: Keep hash of new definitions indexed by old definitions. Re-use repainted definition.
       group.entities.each do |e|
         next unless e.respond_to? :material
         original_name = e.get_attribute(Template::ATTR_DICT_PART, "original_material")
@@ -2200,7 +2188,7 @@ class Building
         else
           e.material
         end
-        replacment = replacements[original]
+        replacment = @material_replacement[original]
         if replacment
           e.material = replacment
           e.set_attribute(Template::ATTR_DICT_PART, "original_material", original.name)
