@@ -485,11 +485,10 @@ class Building
       # Gables.
       js << "var has_gables = #{@template.has_gables?};"
       if @template.has_gables?
-        gable_list = list_available_gables.map do |g|
-          gable_is_used = @gables.fetch(@template.id, {}).fetch(g[:name], [false, false])
+        gable_list = list_gable_parts.map do |g|
           {
             :name => g[:name],
-            :use  => gable_is_used
+            :use  => g[:use]
           }
         end
         js << "var gable_settings = #{JSON.generate gable_list};"
@@ -838,7 +837,7 @@ class Building
   def suggest_margins
   
     corners = list_corner_parts
-    gables  = list_used_gables
+    gables  = list_gable_parts
   
     @facade_margins[@template.id] = (0..(@path.size*2-3)).map do |i|
       segment = i/2 # Integer division.
@@ -1033,26 +1032,40 @@ class Building
   # Internal: List gables available for building.
   # Based on Template.
   #
+  # calculate_transformations - Whether transformations should be calculated
+  #                             for part placement (default: false).
+  #
   # Returns Array of Hash objects corresponding to each gable.
   # Hash has reference to definition, name, original_instance and margin.
-  def list_available_gables
+  # If calculate_transformations is set to true each hash contains an Array
+  # where each element corresponds to a building segment and contains another
+  # Array with transformations defining instances in that segment.
+  def list_gable_parts(calculate_transformations = false)
+     
+    gable_settings = @gables[@template.id] || {}
   
     parts_data = []
     
     @template.component_def.entities.each do |e|
       next unless e.get_attribute(Template::ATTR_DICT_PART, "gable")
-      next unless e.get_attribute(Template::ATTR_DICT_PART, "name")
+      next unless name = e.get_attribute(Template::ATTR_DICT_PART, "name")
+      use = gable_settings[name] || []
       
       part_data = {
         :defintion => e.definition,
         :original_instance => e,
-        :name => e.get_attribute(Template::ATTR_DICT_PART, "name"),
+        :name => name,
+        :use => use,
         :margin => e.get_attribute(Template::ATTR_DICT_PART, "gable_margin")
       }
       parts_data << part_data
     end
     
     parts_data.sort_by! { |p| p[:name] || "" }
+    
+    if calculate_transformations
+      calculate_gable_transformations parts_data
+    end
     
     parts_data
     
@@ -1282,6 +1295,10 @@ class Building
     
   end
   
+  
+  
+  
+  
   # Internal: List corner parts currently used in building.
   # Based on Template and @corners.
   #
@@ -1334,7 +1351,7 @@ class Building
     
     # Calculate transformations.
     
-    parts_data.map do |part_data|
+    parts_data.each do |part_data|
 
       next unless part_data[:use].any?
 
@@ -1484,7 +1501,7 @@ class Building
   # Each element is an Array of Transformation objects.
   # Transformation is in the local coordinate system of the relevant segment
   # group.
-  def list_used_gables
+  def calculate_gable_transformations(parts_data)
   
     if @back_along_path
       delta_y = -(@template.depth || Template::FALLBACK_DEPTH)
@@ -1531,29 +1548,21 @@ class Building
       )
     end
     
-    parts_data = list_available_gables
-    
-    gable_settings = @gables[@template.id] || {}
-    parts_data.map! do |part_data|
-      part_data = part_data.dup
+    parts_data.each do |part_data|
       
-      use = gable_settings[part_data[:name]] || []# REVIEW: Move this to list_available_gables. Make one single list_gable_parts method that optionally calculate transformations too.
-      part_data[:use] = use
-      next unless use.any?
+      next unless part_data[:use].any?
       
       part_data[:transformations] = (0..@path.length-2).map { [] }
-      if use[0]
+      if part_data[:use][0]
         part_data[:transformations][0] << transformation_left
       end
-      if use[1]
+      if part_data[:use][1]
         part_data[:transformations][-1] << transformation_right
       end
 
-      part_data
     end
-    parts_data.compact!
     
-    parts_data
+    nil
     
   end
   
@@ -1780,8 +1789,8 @@ class Building
   def draw_parts
     
     part_data = list_used_facade_elements
-    part_data += list_used_gables
-    part_data += list_corner_parts(true)
+    part_data += list_gable_parts true
+    part_data += list_corner_parts true
    
     segment_groups = @group.entities.to_a
 
