@@ -1287,7 +1287,7 @@ class Building
       part_data = {
         :defintion => e.definition,
         :original_instance => e,
-        :name => name
+        :name => name,
         :replaces => replaces,
         :slots => e.get_attribute(Template::ATTR_DICT_PART, "slots", 1)
       }
