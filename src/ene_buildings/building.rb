@@ -460,49 +460,7 @@ class Building
   #                        in local coordinates grouped by building segment.
   def list_replaceable_parts(calculate_transformations = false)# TODO: CLEANUP PART LISTING: See if slots can be added as output.
 
-
-    # TODO: CLEANUP PART LISTING: separate transformation calculation to its own method!
-
-
-
-
-    # Prepare path.
-
-    # RVIWEW: Make Path class and move some of this stuff there instead of
-    # just having same code copied here from draw_basic. Or at least use separate internal method.
-
-    # Transform path to local building coordinates.
-    trans_inverse = @group.transformation.inverse
-    path = @path.map { |p| p.transform trans_inverse }
-
-    # Get tangent for each point in path.
-    # Tangents point in the positive direction of path.
-    tangents = []
-    tangents << path[1] - path[0]
-    if path.size > 2
-      (1..path.size - 2).each do |corner|
-        p_prev = path[corner - 1]
-        p_here = path[corner]
-        p_next = path[corner + 1]
-        v_prev = p_here - p_prev
-        v_next = p_next - p_here
-        tangents << Geom.linear_combination(0.5, v_prev, 0.5, v_next)
-      end
-    end
-    tangents << path[-1] - path[-2]
-
-    # Rotate first and last tangent according to @end_angles.
-    tangents.first.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.first
-    tangents.last.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.last
-
-    # If building should be drawn with it back along the path instead of its
-    # front, reverse the path and tangents.
-    # The terms left and right relates to the building front side.
-    if @back_along_path
-      path.reverse!
-      tangents.reverse!
-      tangents.each { |t| t.reverse! }
-    end
+    path, tangents = calculate_local_path
 
     parts_data = []
 
@@ -923,13 +881,13 @@ class Building
       js << "var suggest_margins=#{@suggest_margins};"
 
       # Part replacements.
-      available_replacable   = list_replaceable_parts(true)# TODO: CLEANUP PART LISTING: Don't calculate transformations.
+      available_replacable   = list_replaceable_parts true
       available_replacements = list_replacement_parts
       replacement_info = available_replacable.map do |r_able|
         r_ments = available_replacements.select { |r| r[:replaces] == r_able[:name] }
         next if r_ments.empty?
         original_name = r_able[:name]
-        available_slots = r_able[:transformations].map { |a| a.size }# TODO: CLEANUP PART LISTING: Let listing method list slots.
+        available_slots = r_able[:transformations].map { |a| a.size }
 
         replacements = r_ments.map do |r_ment|
           slots = r_ment[:slots]
@@ -1398,49 +1356,11 @@ class Building
   # Returns nil.
   def calculate_corner_transformations(parts_data)
 
-    # Prepare path.
-
-    # RVIWEW: Make Path class and move some of this stuff there instead of
-    # just having same code copied here from draw_basic. Or at least use separate internal method.
-
-    # Transform path to local building coordinates.
-    trans_inverse = @group.transformation.inverse
-    path = @path.map { |p| p.transform trans_inverse }
-
-    # Get tangent for each point in path.
-    # Tangents point in the positive direction of path.
-    tangents = []
-    tangents << path[1] - path[0]
-    if path.size > 2
-      (1..path.size - 2).each do |corner|
-        p_prev = path[corner - 1]
-        p_here = path[corner]
-        p_next = path[corner + 1]
-        v_prev = p_here - p_prev
-        v_next = p_next - p_here
-        tangents << Geom.linear_combination(0.5, v_prev, 0.5, v_next)
-      end
-    end
-    tangents << path[-1] - path[-2]
-
-    # Rotate first and last tangent according to @end_angles.
-    tangents.first.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.first
-    tangents.last.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.last
-
-    # If building should be drawn with it back along the path instead of its
-    # front, reverse the path and tangents.
-    # The terms left and right relates to the building front side.
-    if @back_along_path
-      path.reverse!
-      tangents.reverse!
-      tangents.each { |t| t.reverse! }
-    end
-
-    # Calculate transformations.
+    path, tangents = calculate_local_path
 
     parts_data.each do |part_data|
 
-      next unless part_data[:use].any?
+      next unless part_data[:use].any?# TODO: CLEANUP PART LISTING: Even when not used transformations should be defined as an Array.
 
       transformation_original = part_data[:original_instance].transformation
 
@@ -1585,6 +1505,49 @@ class Building
 
   end
 
+  # Internal: Convert path to local coordinates for building Group, calculate
+  # tangents and adapt direction according to @back_along_path.
+  #
+  # Returns Array of path (Point3d Array) and tangents (Vector3d Array).
+  def calculate_local_path
+
+    # Transform path to local building coordinates.
+    trans_inverse = @group.transformation.inverse
+    path = @path.map { |p| p.transform trans_inverse }
+
+    # Get tangent for each point in path.
+    # Tangents point in the positive direction of path.
+    tangents = []
+    tangents << path[1] - path[0]
+    if path.size > 2
+      (1..path.size - 2).each do |corner|
+        p_prev = path[corner - 1]
+        p_this = path[corner]
+        p_next = path[corner + 1]
+        v_prev = p_this - p_prev
+        v_next = p_next - p_this
+        tangents << Geom.linear_combination(0.5, v_prev, 0.5, v_next)
+      end
+    end
+    tangents << path[-1] - path[-2]
+
+    # Rotate first and last tangent according to @end_angles.
+    tangents.first.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.first
+    tangents.last.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.last
+
+    # If building should be drawn with it back along the path instead of its
+    # front, reverse the path and tangents.
+    # The terms left and right relates to the building front side.
+    if @back_along_path
+      path.reverse!
+      tangents.reverse!
+      tangents.each { |t| t.reverse! }
+    end
+
+    [path, tangents]
+
+  end
+
   # Internal: Load building group's attributes as Hash.
   # Replaces string references used in attributes with actual objects such as
   # Template and Material.
@@ -1667,38 +1630,7 @@ class Building
     ents = @group.entities
     ents.clear!
 
-    # Transform path to local building coordinates.
-    trans_inverse = @group.transformation.inverse
-    path = @path.map { |p| p.transform trans_inverse }
-
-    # Get tangent for each point in path.
-    # Tangents point in the positive direction of path.
-    tangents = []
-    tangents << path[1] - path[0]
-    if path.size > 2
-      (1..path.size - 2).each do |corner|
-        p_prev = path[corner - 1]
-        p_here = path[corner]
-        p_next = path[corner + 1]
-        v_prev = p_here - p_prev
-        v_next = p_next - p_here
-        tangents << Geom.linear_combination(0.5, v_prev, 0.5, v_next)
-      end
-    end
-    tangents << path[-1] - path[-2]
-
-    # Rotate first and last tangent according to @end_angles.
-    tangents.first.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.first
-    tangents.last.transform! Geom::Transformation.rotation ORIGIN, Z_AXIS, @end_angles.last
-
-    # If building should be drawn with it back along the path instead of its
-    # front, reverse the path and tangents.
-    # The terms left and right relates to the building front side.
-    if @back_along_path
-      path.reverse!
-      tangents.reverse!
-      tangents.each { |t| t.reverse! }
-    end
+    path, tangents = calculate_local_path
 
     # Loop path segments.
     (0..path.size - 2).each do |segment_index|
