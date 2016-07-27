@@ -2169,12 +2169,23 @@ class Building
   #
   # Returns nothing.
   def draw_material_replacement
+  
+    #repainted_defs = {}
 
     # Recursive material replacer.
     # Replace materials in group and in all nested groups with an attribute
     # specifically telling it to do so.
     recursive = lambda do |group|
-      group.name += ""# Make group unique. # OPTIMIZE: Keep hash of new definitions indexed by old definitions. Re-use repainted definition.
+    
+       Reuse definition if group has already been repainted.
+      d_old = group.definition
+      if d_new = repainted_defs[d_old]
+        group.definition = d_new# BUG: SU ISSUE: No definiton= method on group -_- .
+        next
+      end
+      
+      group.name += ""# Make group unique.
+      
       group.entities.each do |e|
         next unless e.respond_to? :material
         original_name = e.get_attribute(Template::ATTR_DICT_PART, "original_material")
@@ -2191,15 +2202,19 @@ class Building
           e.material = original
         end
 
-        if e.is_a?(Sketchup::Group) && e.get_attribute(Template::ATTR_DICT_PART, "replace_nested_mateials")# OPTIMIZE: edit groups using same definition once. Create one new definition for all instances in this building (this entities collection)
+        if e.is_a?(Sketchup::Group) && e.get_attribute(Template::ATTR_DICT_PART, "replace_nested_mateials")
+          old_def = e.definition
           recursive.call(e)
+          new_def = e.definition
+          repainted_defs[old_def] = new_def unless old_def == new_def
+          p old_def == new_def
         end
       end
     end
 
     # Replace materials in all groups in building root (segments, corner etc).
     recursive.call @group
-
+    
     nil
 
   end
