@@ -308,7 +308,7 @@ class Building
     last_slot = index + slots - 1
   
     part_replacements      = (@part_replacements[@template.id] ||= {})
-    available_replacements = list_available_replacements
+    available_replacements = list_replacement_parts
     #available_replacable = list_available_replacable...
     
     # Check if all given slots exists within segment.
@@ -516,7 +516,7 @@ class Building
 
       # Part replacements.
       available_replacable   = list_replacable_parts(true)# TODO: CLEANUP PART LISTING: Don't calculate transformations.
-      available_replacements = list_available_replacements
+      available_replacements = list_replacement_parts
       replacement_info = available_replacable.map do |r_able|
         r_ments = available_replacements.select { |r| r[:replaces] == r_able[:name] }
         next if r_ments.empty?
@@ -946,7 +946,7 @@ class Building
   def set_replacement(original, segment, index, replacement, purge_colliding = false)
   
     if replacement
-      available_replacements = list_available_replacements
+      available_replacements = list_replacement_parts
       replacement_info = available_replacements.find { |r| r[:name] == replacement }
       unless replacement_info
         raise ArgumentError "Unknown replacement '#{replacement}'."
@@ -985,7 +985,7 @@ class Building
 
   
   
-  # TODO:Clean up documentation for all these. Have short sensical description. Have consistent return value.
+  # TODO: CLEANUP PART LISTING: Clean up documentation for all these. Have short sensical description. Have consistent return value.
   
   # Public: List corner parts available for building.
   # Based on Template.
@@ -1087,7 +1087,7 @@ class Building
   def list_replacable_parts(calculate_transformations = false)
 
   
-    # TODO: separate transformation calculation to its own method!
+    # TODO: CLEANUP PART LISTING: separate transformation calculation to its own method!
     
     
     
@@ -1275,20 +1275,20 @@ class Building
   #
   # Returns Array of Hash objects corresponding to each replacement part.
   # Hash has reference to definition, name, original_instance and slots it uses.
-  def list_available_replacements
+  def list_replacement_parts
   
     parts_data = []
     
     @template.component_def.entities.each do |e|
       next unless e.get_attribute(Template::ATTR_DICT_PART, "replacement")
-      next unless e.get_attribute(Template::ATTR_DICT_PART, "name")
-      next unless e.get_attribute(Template::ATTR_DICT_PART, "replaces")
+      next unless replaces = e.get_attribute(Template::ATTR_DICT_PART, "replaces")
+      next unless name = e.get_attribute(Template::ATTR_DICT_PART, "name")
       
       part_data = {
         :defintion => e.definition,
         :original_instance => e,
-        :name => e.get_attribute(Template::ATTR_DICT_PART, "name"),
-        :replaces => e.get_attribute(Template::ATTR_DICT_PART, "replaces"),
+        :name => name
+        :replaces => replaces,
         :slots => e.get_attribute(Template::ATTR_DICT_PART, "slots", 1)
       }
       parts_data << part_data
@@ -1301,10 +1301,73 @@ class Building
   end
   
   
+  # Internal: List facade elements (replaceable and replacements parts) currently
+  # used for this building.
+  # Based on list_available_replacable and @part_replacements.
+  #
+  # Return Array of Hash objects corresponding to each part.
+  # Hash has reference to definition, name, original_instance and
+  # transformations Array.
+  # Transformations Array has one element for each segment in building.
+  # Each element is an Array of Transformation objects.
+  # Transformation is in the local coordinate system of the relevant segment
+  # group.
+  def list_used_facade_elements
+  
+    replaceables = list_replacable_parts true
+    replacements = list_replacement_parts
+
+    if @part_replacements[@template.id]
+      replaceables.each do |replaceable|
+        next unless @part_replacements[@template.id][replaceable[:name]]
+        
+        replaceable[:transformations].each_with_index do |transformations, segment|
+          next unless transformations
+          next unless @part_replacements[@template.id][replaceable[:name]][segment]
+
+          to_delete = []
+          transformations.each_with_index do |tr_start, slot|
+            replacement_name = @part_replacements[@template.id][replaceable[:name]][segment][slot]
+            next unless replacement_name
+
+            replacement_data = replacements.find { |r| r[:name] == replacement_name }
+            unless replacement_data
+              warn "Unknown replacement '#{replacement_name}'."
+              next
+            end
+            
+            if replacement_data[:slots] == 1
+              tr = tr_start
+            else
+              tr_end = transformations[slot + replacement_data[:slots] -1]
+              next unless tr_end
+              tr = Geom::Transformation.interpolate tr_start, tr_end, 0.5
+            end
+            
+            replacement_data[:transformations] ||= []
+            replacement_data[:transformations][segment] ||= []
+            replacement_data[:transformations][segment] << tr
+
+            to_delete += (slot..(slot + replacement_data[:slots] -1)).to_a
+          end
+          to_delete.reverse_each { |i| transformations.delete_at i }
+          
+        end
+        
+      end
+    end
+    
+    # Purge replacements that aren't used.
+    replacements.keep_if { |r| r[:transformations] }
+    
+    replaceables + replacements
+  
+  end
   
   
   
-  # TODO: Clean up description of these.
+  
+  # TODO: CLEANUP PART LISTING: Clean up description of these.
   
   # Internal: List corner parts currently used in building.
   # Based on Template and @corners.
@@ -1434,70 +1497,7 @@ class Building
     nil
     
   end
-  
-  # Internal: List facade elements (replaceable and replacements parts) currently
-  # used for this building.
-  # Based on list_available_replacable and @part_replacements.
-  #
-  # Return Array of Hash objects corresponding to each part.
-  # Hash has reference to definition, name, original_instance and
-  # transformations Array.
-  # Transformations Array has one element for each segment in building.
-  # Each element is an Array of Transformation objects.
-  # Transformation is in the local coordinate system of the relevant segment
-  # group.
-  def list_used_facade_elements
-  
-    replaceables  = list_replacable_parts true
-    replacements = list_available_replacements
 
-    if @part_replacements[@template.id]
-      replaceables.each do |replaceable|
-        next unless @part_replacements[@template.id][replaceable[:name]]
-        
-        replaceable[:transformations].each_with_index do |transformations, segment|
-          next unless transformations
-          next unless @part_replacements[@template.id][replaceable[:name]][segment]
-
-          to_delete = []
-          transformations.each_with_index do |tr_start, slot|
-            replacement_name = @part_replacements[@template.id][replaceable[:name]][segment][slot]
-            next unless replacement_name
-
-            replacement_data = replacements.find { |r| r[:name] == replacement_name }
-            unless replacement_data
-              warn "Unknown replacement '#{replacement_name}'."
-              next
-            end
-            
-            if replacement_data[:slots] == 1
-              tr = tr_start
-            else
-              tr_end = transformations[slot + replacement_data[:slots] -1]
-              next unless tr_end
-              tr = Geom::Transformation.interpolate tr_start, tr_end, 0.5
-            end
-            
-            replacement_data[:transformations] ||= []
-            replacement_data[:transformations][segment] ||= []
-            replacement_data[:transformations][segment] << tr
-
-            to_delete += (slot..(slot + replacement_data[:slots] -1)).to_a
-          end
-          to_delete.reverse_each { |i| transformations.delete_at i }
-          
-        end
-        
-      end
-    end
-    
-    # Purge replacements that aren't used.
-    replacements.keep_if { |r| r[:transformations] }
-    
-    replaceables + replacements
-  
-  end
-  
   # Internal: List gables currently used in building.
   # Based on Template and @gables.
   #
