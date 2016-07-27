@@ -341,20 +341,6 @@ class Building
     uses_slot
     
   end
-  
-  # Public: List replaceable materials (based o template).
-  # Materials directly in segment groups are listed. Materials in nested groups
-  # are also listed if the group has an attribute specifically saying so.
-  #
-  # Called when opening properties dialog to allow user to set what materials
-  # to replace with what other materials.
-  #
-  # Returns array of Material objects.
-  def list_replaceable_materials
-
-    @template.list_replaceable_materials
-
-  end
 
   # Public: [Re-]Load class instance variables from group attributes.
   # Unknown (not installed) template will be nil.
@@ -550,7 +536,7 @@ class Building
 
       # Material replacement options (based on template component) and current
       # preferences (saved to building).
-      material_pairs = list_replaceable_materials.map do |original|
+      material_pairs = @template.list_replaceable_materials.map do |original|
         pair = @material_replacement.find { |e| e[0] == original}
         replacement = pair[1] if pair
         a = [
