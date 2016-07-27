@@ -500,11 +500,10 @@ class Building
       js << "var has_corners = #{@template.has_corners?};"
       js << "var corner_number = #{@path.size};"
       if @template.has_corners?
-        corner_list = list_available_corners.map do |g|
-          corner_use = @corners.fetch(@template.id, {}).fetch(g[:name], [])
+        corner_list = list_corner_parts.map do |c|
           {
-            :name => g[:name],
-            :use  => corner_use
+            :name => c[:name],
+            :use  => c[:use]
           }
         end
         js << "var corner_settings = #{JSON.generate corner_list};"
@@ -838,7 +837,7 @@ class Building
   # returns nothing.
   def suggest_margins
   
-    corners = list_used_corners
+    corners = list_corner_parts
     gables  = list_used_gables
   
     @facade_margins[@template.id] = (0..(@path.size*2-3)).map do |i|
@@ -985,29 +984,47 @@ class Building
     
   end
 
-  # Internal: List corner parts available for building.
+  
+  
+  
+  # Public: List corner parts available for building.
   # Based on Template.
+  #
+  # calculate_transformations - Whether transformations should be calculated
+  #                             for part placement (default: false).
   #
   # Returns Array of Hash objects corresponding to each corner.
   # Hash has reference to definition, name, original_instance and margin.
-  def list_available_corners
+  # If calculate_transformations is set to true each hash contains an Array
+  # where each element corresponds to a building segment and contains another
+  # Array with transformations defining instances in that segment.
+  def list_corner_parts(calculate_transformations = false)
+    
+    corner_settings = @corners[@template.id] || {}
   
     parts_data = []
     
     @template.component_def.entities.each do |e|
       next unless e.get_attribute(Template::ATTR_DICT_PART, "corner")
-      next unless e.get_attribute(Template::ATTR_DICT_PART, "name")
+      next unless name = e.get_attribute(Template::ATTR_DICT_PART, "name")
+      use = corner_settings[name] || []
       
       part_data = {
         :defintion => e.definition,
         :original_instance => e,
-        :name => e.get_attribute(Template::ATTR_DICT_PART, "name"),
+        :name => name,
+        :use => use,
         :margin => e.get_attribute(Template::ATTR_DICT_PART, "corner_margin")
       }
+      
       parts_data << part_data
     end
     
     parts_data.sort_by! { |p| p[:name] || "" }
+    
+    if calculate_transformations
+      calculate_corner_transformations parts_data
+    end
     
     parts_data
     
@@ -1275,7 +1292,7 @@ class Building
   # Each element is an Array of Transformation objects.
   # Transformation is in the local coordinate system of the relevant segment
   # group.
-  def list_used_corners
+  def calculate_corner_transformations(parts_data)
 
     # Prepare path.
   
@@ -1315,17 +1332,11 @@ class Building
       tangents.each { |t| t.reverse! }
     end
     
-    # Collect parts data.
+    # Calculate transformations.
     
-    parts_data = list_available_corners
-    
-    corner_settings = @corners[@template.id] || {}
-    parts_data.map! do |part_data|
-      part_data = part_data.dup
+    parts_data.map do |part_data|
 
-      use = corner_settings[part_data[:name]] || []# REVIEW: Move this to list_available_corners. Make one single list_corner_parts method that optionally calculate transformations too.
-      part_data[:use] = use
-      next unless use.any?
+      next unless part_data[:use].any?
 
       transformation_original = part_data[:original_instance].transformation
       
@@ -1371,7 +1382,7 @@ class Building
         
         # All corner parts expect for that of the last corner is drawn at the
         # left side of the segment group by the same index.
-        if use[segment_index]
+        if part_data[:use][segment_index]
           transformations << Geom::Transformation.axes(
             origin_leftmost,
             tangent_left,
@@ -1383,7 +1394,7 @@ class Building
         # The rightmost corner part is drawn at the right side of the last
         # segment group. This group is the only one that may contain two
         # corner parts.
-        if segment_index == (@path.size - 2) && use[segment_index + 1]
+        if segment_index == (@path.size - 2) && part_data[:use][segment_index + 1]
           transformations << Geom::Transformation.axes(
             origin_rightmost,
             tangent_right,
@@ -1394,11 +1405,9 @@ class Building
         
       end
 
-      part_data
     end
-    parts_data.compact!
-    
-    parts_data
+   
+    nil
     
   end
   
@@ -1772,7 +1781,7 @@ class Building
     
     part_data = list_used_facade_elements
     part_data += list_used_gables
-    part_data += list_used_corners
+    part_data += list_corner_parts(true)
    
     segment_groups = @group.entities.to_a
 
@@ -1791,7 +1800,8 @@ class Building
       # Place instances of all spread or aligned parts that has transformations
       # for this segment.
       part_data.each do |part|
-        (part[:transformations][segment_index] || []).each do |trans|
+        transformations = (part[:transformations] || [])[segment_index] || []
+        (transformations).each do |trans|
           original = part[:original_instance]
           EneBuildings.copy_instance original, segment_ents, trans
         end
