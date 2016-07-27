@@ -1312,7 +1312,7 @@ class Building
   # Each element is an Array of Transformation objects.
   # Transformation is in the local coordinate system of the relevant segment
   # group.
-  def list_used_facade_elements
+  def list_replaced_parts
   
     replaceables = list_replacable_parts true
     replacements = list_replacement_parts
@@ -1799,7 +1799,7 @@ class Building
   # Return nothing.
   def draw_parts
     
-    part_data = list_used_facade_elements
+    part_data = list_replaced_parts
     part_data += list_gable_parts true
     part_data += list_corner_parts true
    
