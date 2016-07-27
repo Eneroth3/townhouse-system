@@ -515,13 +515,13 @@ class Building
       js << "var suggest_margins=#{@suggest_margins};"
 
       # Part replacements.
-      available_replacable   = list_available_replacable
+      available_replacable   = list_replacable_parts(true)# TODO: CLEANUP PART LISTING: Don't calculate transformations.
       available_replacements = list_available_replacements
       replacement_info = available_replacable.map do |r_able|
         r_ments = available_replacements.select { |r| r[:replaces] == r_able[:name] }
         next if r_ments.empty?
         original_name = r_able[:name]
-        available_slots = r_able[:transformations].map { |a| a.size }
+        available_slots = r_able[:transformations].map { |a| a.size }# TODO: CLEANUP PART LISTING: Let listing method list slots.
       
         replacements = r_ments.map do |r_ment|
           slots = r_ment[:slots]
@@ -985,6 +985,7 @@ class Building
 
   
   
+  # TODO:Clean up documentation for all these. Have short sensical description. Have consistent return value.
   
   # Public: List corner parts available for building.
   # Based on Template.
@@ -1083,12 +1084,18 @@ class Building
   # Each element is an Array of Transformation objects.
   # Transformation is in the local coordinate system of the relevant segment
   # group.
-  def list_available_replacable
+  def list_replacable_parts(calculate_transformations = false)
 
+  
+    # TODO: separate transformation calculation to its own method!
+    
+    
+    
+    
     # Prepare path.
   
     # RVIWEW: Make Path class and move some of this stuff there instead of
-    # just having same code copied here from draw_basic.
+    # just having same code copied here from draw_basic. Or at least use separate internal method.
     
     # Transform path to local building coordinates.
     trans_inverse = @group.transformation.inverse
@@ -1122,8 +1129,6 @@ class Building
       tangents.reverse!
       tangents.each { |t| t.reverse! }
     end
-    
-    # Collect parts data.
     
     parts_data = []
     
@@ -1299,6 +1304,8 @@ class Building
   
   
   
+  # TODO: Clean up description of these.
+  
   # Internal: List corner parts currently used in building.
   # Based on Template and @corners.
   #
@@ -1314,7 +1321,7 @@ class Building
     # Prepare path.
   
     # RVIWEW: Make Path class and move some of this stuff there instead of
-    # just having same code copied here from list_available_replacable.
+    # just having same code copied here from draw_basic. Or at least use separate internal method.
     
     # Transform path to local building coordinates.
     trans_inverse = @group.transformation.inverse
@@ -1441,7 +1448,7 @@ class Building
   # group.
   def list_used_facade_elements
   
-    replaceables  = list_available_replacable
+    replaceables  = list_replacable_parts true
     replacements = list_available_replacements
 
     if @part_replacements[@template.id]
@@ -1565,6 +1572,10 @@ class Building
     nil
     
   end
+  
+  
+  
+  
   
   # Internal: Load building group's attributes as Hash.
   # Replaces string references used in attributes with actual objects such as
