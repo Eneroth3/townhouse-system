@@ -6,7 +6,7 @@
     <title>TITLE</title>
     <script type="text/javascript">
       "use strict";
-      
+
       //Initialize each section.
       //Runs when showing dialog and when template has changed.
 
@@ -44,7 +44,7 @@
         if(description) html += description.replace(/\n/g, '<br />');
         document.getElementById('template_info').innerHTML = html;
       }
-      
+
       //Gables.
       //var has_gables = <boolean>.
       //var gable_settings = <array>, each element is object with keys:
@@ -53,7 +53,7 @@
         document.getElementById('gables').style.display = has_gables ? '' : 'none';
         if(!has_gables) return(false);
         var html = '<table class="leftmost-is-label">';
-        
+
         for(var i=0; i<gable_settings.length; i++) {
           var gable_data = gable_settings[i];
           html += '<tr>';
@@ -64,11 +64,11 @@
           html += '</td>';
           html += '</tr>';
         }
-        
+
         html += '</table>';
         document.getElementById('gable-settings').innerHTML = html;
       }
-      
+
       //Corners.
       //var has_corners = <boolean>.
       //var corner_number = <int>
@@ -78,7 +78,7 @@
         document.getElementById('corners').style.display = has_corners ? '' : 'none';
         if(!has_corners) return(false);
         var html = '<table class="leftmost-is-label">';
-        
+
         for(var i=0; i<corner_settings.length; i++) {
           var corner_data = corner_settings[i];
           html += '<tr>';
@@ -91,11 +91,11 @@
           html += '</td>';
           html += '</tr>';
         }
-        
+
         html += '</table>';
         document.getElementById('corner-settings').innerHTML = html;
       }
-      
+
       //Part replacements and margins.
       //var margins = <array> of Strings representing formatted lengths.
       //var suggest_margins = <boolean>.
@@ -150,10 +150,10 @@
         }
       ];*/
       function update_facade_section(){
-      
+
         // The width of one checkbox. Make sure it matches css.
         var module = 20;
-        
+
         var html = '<table class="leftmost-is-label">';
         html += '<tr>';
         html += '<td>Margins:</td>';
@@ -173,7 +173,7 @@
           html += '</tr>';
         }
         html += '</table>';
-        
+
         for(var i=0; i<replacement_info.length; i++) {
           var original_name   = replacement_info[i]['original_name'];
           var available_slots = replacement_info[i]['available_slots'];
@@ -292,12 +292,12 @@
 
       //Handle user input.
       //Most input is handled by inline code in click attribute of input.
-      
+
       function toggle_gable(name, side, status){
         var params = JSON.stringify([name, side, status]);
         window.location='skp:toggle_gable@' + encodeURIComponent(params);
       }
-      
+
       function toggle_corner(name, index, status){
         var params = JSON.stringify([name, index, status]);
         window.location='skp:toggle_corner@' + encodeURIComponent(params);
@@ -309,13 +309,13 @@
         var params = JSON.stringify([index, length]);
         window.location='skp:set_margin@' + encodeURIComponent(params);
       }
-      
+
       function toggle_suggest_margins(checkbox) {
         var status = checkbox.checked;
         var params = JSON.stringify(status);
         window.location='skp:toggle_suggest_margins@' + params;
       }
-      
+
       function toggle_replacement(checkbox){
         var original_name    = checkbox.getAttribute('data-original-name');
         var replacement_name = checkbox.getAttribute('data-replacement-name');
@@ -330,7 +330,7 @@
         // already using slot.
         toggle_part_replacement_enability();
       }
-      
+
       //Misc/UI stuff.
 
       //Every time mouse enters document the style rule for hovered material
@@ -343,7 +343,7 @@
       // available or used by another replacement.
       // Runs on initialization and when checkboxes changes state.
       function toggle_part_replacement_enability(){
-      
+
         var section_div = document.getElementById('facade_elemnets');
         var inputs = section_div.getElementsByTagName('input');
         var checkboxes = [];
@@ -351,55 +351,55 @@
           var input = inputs[i];
           if (input.type == 'checkbox') checkboxes.push(input);
         }
-        
+
         for (var i=0; i<checkboxes.length; i++) {
-        
+
           var box0 = checkboxes[i];
-        
+
           // A ticked checkbox is always enabled.
           if (box0.checked) continue;
-          
+
           var replaces0 = box0.getAttribute('data-original-name');
           var segment0  = parseInt(box0.getAttribute('data-segment'));
-          
+
           var start0 = parseInt(box0.getAttribute('data-index'));
           var slots0 = parseInt(box0.getAttribute('data-slots'));
           var end0   = start0 + slots0 - 1;
 
           var occupied = false;
           for (var j=0; j<checkboxes.length; j++) {
-          
+
             var box1 = checkboxes[j];
-          
+
             if (!box1.checked) continue;
-            
+
             // Can't collide with self.
             if (i == j) continue;
-            
+
             // Only compare to those that replaces the same part in the same segment.
             var replaces1 = box1.getAttribute('data-original-name');
             var segment1  = parseInt(box1.getAttribute('data-segment'));
             if(replaces1 != replaces0 || segment1 != segment0) continue;
-          
+
             var start1 = parseInt(box1.getAttribute('data-index'));
             var slots1 = parseInt(box1.getAttribute('data-slots'));
             var end1   = start1 + slots1 - 1;
-            
+
             var occupied_name = box1.getAttribute('data-replacement-name');
-            
+
             if (!(start1 > end0 || end1 < start0)) {
               occupied = true;
               break;
             }
-            
+
           }
           box0.disabled = occupied;
           box0.title = occupied ? 'Slot occupied by '+occupied_name : '';
-          
+
         }
-        
+
       }
-      
+
       //When a new dialog is created while other are opened it needs to
       //be offset to not lie on top of the previous one.
       function offset_window(offset){
@@ -410,7 +410,7 @@
     </script>
     <link href="style.css" rel="stylesheet" type="text/css">
     <style type="text/css">
-      
+
       table.leftmost-is-label tr td:nth-child(1){
         width: 100px;
         text-align: right;
@@ -419,7 +419,7 @@
         text-align: left;
         color: gray;
       }
-      
+
       fieldset{
         margin: 0.75em 0;
         padding: 0.5em 0;
@@ -431,8 +431,8 @@
       fieldset table {
         margin-left: -1px;
       }
-      
-      
+
+
       #template img{
         width: 200px;
         height: 124px;/*golden rectangle*/
@@ -478,7 +478,7 @@
         width: 200px;
         margin-top: 10px;
       }
-      
+
       /*
         Based on module 20px. Half module as margin between sections.
         Make sure this matches module var in javascript.
@@ -504,7 +504,7 @@
       #facade_elemnets table.leftmost-is-label tr td:nth-child(n+2) {
         white-space: nowrap;
       }
-      
+
     </style>
    </head>
    <body>
@@ -575,7 +575,7 @@
           <p style="clear: both;"></p>
           <button id="material_browser_opener" onclick="window.location='skp:browse_materials';">Material browser...</button>
         </div>
-        
+
         <div id="corners" class="section">
           <!--Visibility is toggled depending on relevance of these settings.-->
           <b>Corners</b>

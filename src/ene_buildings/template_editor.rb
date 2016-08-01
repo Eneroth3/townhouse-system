@@ -16,7 +16,7 @@ module EneBuildings
 # The component can be modified as usual in Sketchup and the attributes from
 # a dialog window.
 #
-# The component definition along with the attributes can be saved back to a 
+# The component definition along with the attributes can be saved back to a
 # template file when done editing.
 module TemplateEditor
 
@@ -36,18 +36,18 @@ module TemplateEditor
 
   # Group/component which attributes are being edited in part info dialog.
   @@part ||= nil
-  
+
   @@update_previes = true unless defined? @@update_previes
 
   # Module variable accessors
-  
+
   # Internal: Whether preview images should be automatically updates or not on
   # template save
   def self.update_previes; @@update_previes; end
   def self.update_previes=(v); @@update_previes = v; end
-  
+
   # Module methods
-  
+
   # Returns component instance representing template currently being edited.
   # Either this is selected or user is editing within it.
   # nil when no template is currently being edited.
@@ -100,7 +100,7 @@ module TemplateEditor
     if @@dlg
       @@dlg.bring_to_front
     else
-    
+
       # Make sure installed templates are loaded so preview image for a taking
       # ID can be shown.
       Template.require_all
@@ -206,20 +206,20 @@ module TemplateEditor
   #
   # Returns String Array.
   def self.list_replaceable_names
-  
+
     ents = Sketchup.active_model.active_entities
-    
+
     names = ents.map do |e|
       ad = e.attribute_dictionary Template::ATTR_DICT_PART
       next unless ad
       next unless ad["spread"] || ad["align"]
       ad["name"]
     end
-    
+
     names.compact
-    
+
   end
-  
+
   # Sets @@component_inst to template component instance currently selected or
   # opened and load attributes to template info dialog.
   #
@@ -353,11 +353,11 @@ module TemplateEditor
       slots                   = data["slots"]                   || 1
       solid                   = data["solid"]                   || ""
       solid_index             = data["solid_index"]             || 0
-      
+
       # Make name unique. If part was copied it may be duplicated.
       # Assume user first selects the copy and not the original.
       name = unique_part_name(@@part, name) unless name == ""
-      
+
       # Create dropdown menu for replacement.
       dropdown = "<select name=\"replaces\" id=\"replaces\" style=\"width: 100%\">"
       dropdown += "<option value=\"\" style=\"font-style: italic;\">Please select</option>"
@@ -505,17 +505,17 @@ module TemplateEditor
     dlg.add_action_callback("close") do
       dlg.close
     end
-    
+
     # Do not show me this again.
     dlg.add_action_callback("prevent") do |_, cb|
       Sketchup.write_default ID, "template_entering_no_warning", cb == "true"
     end
-    
+
     # Help link.
     dlg.add_action_callback("help") do
       show_docs
     end
-    
+
     nil
 
   end
@@ -682,7 +682,7 @@ module TemplateEditor
   #
   # Returns nothing.
   def self.save
-  
+
     unless active_template_component
       msg =
         "No active Template.\n"\
@@ -702,7 +702,7 @@ module TemplateEditor
       info_dialog
       return
     end
-    
+
     unless Template.valdiate_component? active_template_component.definition
       msg =
         "Template does not have valid gables.\n\n"\
@@ -723,11 +723,11 @@ module TemplateEditor
     else
       t = Template.new info["id"]
     end
-    
+
     Sketchup.status_text = "Saving template..."
 
     save_part_data if part_info_opened?
-    
+
     t.save_info info
     t.save_component active_template_component.definition
 
@@ -735,7 +735,7 @@ module TemplateEditor
       Sketchup.status_text = "Creating Preview..."
       t.update_preview
     end
-    
+
     Sketchup.status_text = "Done saving."
 
     nil
@@ -753,7 +753,7 @@ module TemplateEditor
 
     return unless @@component_inst
     return if @@component_inst.deleted?
-    
+
     # Get data already saved.
     old_data = EneBuildings.attr_dict_to_hash(@@component_inst, ATTR_DICT_EDITING)
 
@@ -978,9 +978,9 @@ module TemplateEditor
     return if data == old_data
 
     model = @@part.model
-    
+
     Observers.disable
-    
+
     model.start_operation "Saving Part Data", true
 
     # Remove old dictionary in case a value was changed to default and therefore
@@ -994,7 +994,7 @@ module TemplateEditor
     end
 
     model.commit_operation
-    
+
     Observers.enable
     onSelectionChange
 
@@ -1022,7 +1022,7 @@ module TemplateEditor
   #
   # Returns String name.
   def self.unique_part_name(part, basename)
-  
+
     entities = part.parent.entities
     taken_names = entities.map do |e|
       next if e == part
@@ -1030,20 +1030,20 @@ module TemplateEditor
       e.get_attribute Template::ATTR_DICT_PART, "name"
     end
     taken_names.compact!
-    
+
    basename = basename.sub(/ #\d+$/, "")
-    
+
     name = basename
     i = 1
     while taken_names.include? name
       name = "#{basename} ##{i}"
       i += 1
     end
-    
+
     name
-    
+
   end
-  
+
 end
 
 end

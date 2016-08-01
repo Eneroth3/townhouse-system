@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
     <title>TITLE</title>
     <script type="text/javascript">
-    
+
       //Display either warning message or actual form.
       function warn(bool, title, msg){
 
@@ -19,21 +19,21 @@
         if(title) warning.innerHTML = "<div>"+title+"</div>"+msg;
 
       }
-      
+
       //Set preview image.
       function set_image_path(path){
-      
+
         e = document.getElementById("general").getElementsByTagName("img")[0];
         e.src = "file://" + path + '?' + (new Date()).getTime();
-        
+
       }
-      
+
       //Update preview image based on value in ID field.
       //Called when value changes.
       function load_preview(){
         window.location='skp:load_preview';
       }
-      
+
       //Should ID be suggested?
       //Called when selection/drawing context changes or checkbox changes.
       function suggest_id(bool){
@@ -47,20 +47,20 @@
 
         //Update checkbox
         checkbox.checked = bool;
-        
+
       }
-      
+
       //Suggest an ID based on name and author.
-      //Called when changing name and author. 
+      //Called when changing name and author.
       function make_id_suggestion(){
-      
+
         checkbox = document.getElementById('suggest_id_checkbox');
         if(!checkbox.checked) return;
-        
+
         window.location='skp:make_id_suggestion';
-      
-      }    
-      
+
+      }
+
     </script>
     <link href="style.css" rel="stylesheet" type="text/css">
     <style type="text/css">
@@ -78,7 +78,7 @@
       textarea{
         font: caption;
       }
-      
+
       #general img{
         width: 100px;
         height: 100px;

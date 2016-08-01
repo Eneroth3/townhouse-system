@@ -57,7 +57,7 @@ require "sketchup.rb"
 #   Sketchup.active_model.start_operation "Draw Building"
 #   building.draw
 #   Sketchup.active_model.commit_operation
-#  
+#
 module EneBuildings
 
   # Public: General extension information.
@@ -70,7 +70,7 @@ module EneBuildings
   ID          =  File.basename __FILE__, ".rb"
   NAME        = "Eneroth Townhouse System"
   VERSION     = "1.0.1"
-  
+
   # Public: Minimum Sketchup version required to run plugin.
   REQUIRED_SU_VERSION = "15"
 

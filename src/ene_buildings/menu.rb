@@ -49,12 +49,12 @@ unless file_loaded? file
   item = t_menu.add_item("Part Info") { TemplateEditor.part_info_toggle }
   t_menu.set_validation_proc(item) { TemplateEditor.part_info_opened? ? MF_CHECKED : MF_UNCHECKED }
   t_menu.add_separator
-  
+
   item = t_menu.add_item("Manually Downsample Previews") { Template.manually_resize_previews = !Template.manually_resize_previews }
   t_menu.set_validation_proc(item) { Template.manually_resize_previews ? MF_CHECKED : MF_UNCHECKED }
   item = t_menu.add_item("Update Previewss on Save") { TemplateEditor.update_previes = !TemplateEditor.update_previes }
   t_menu.set_validation_proc(item) { TemplateEditor.update_previes ? MF_CHECKED : MF_UNCHECKED }
-  
+
   t_menu.add_separator
   t_menu.add_item("Open Template Directory") { Template.open_dir }
   t_menu.add_item("Documentation") { TemplateEditor.show_docs }
@@ -85,12 +85,12 @@ unless file_loaded? file
   cmd.status_bar_text = "Open properties window for selected building."
   cmd.set_validation_proc { Building.selection_is_building? ? MF_ENABLED : MF_GRAYED }
   tb.add_item cmd
-  
+
   tb.show
 
   # Template Toolbar (separate so non-advanced users can hide it).
   tb = UI::Toolbar.new "#{NAME} Template Editing"
-  
+
   cmd = UI::Command.new("New Template") { TemplateEditor.new }
   cmd.large_icon = "toolbar_icons/template_new.png"
   cmd.small_icon = "toolbar_icons/template_new_small.png"
@@ -98,7 +98,7 @@ unless file_loaded? file
   cmd.status_bar_text = "Create a new template component from the selected entities."
   cmd.set_validation_proc { TemplateEditor.new_available? ? MF_ENABLED : MF_GRAYED }
   tb.add_item cmd
-    
+
   cmd = UI::Command.new("Open Template...") { TemplateEditor.open }
   cmd.large_icon = "toolbar_icons/template_open.png"
   cmd.small_icon = "toolbar_icons/template_open_small.png"
@@ -106,16 +106,16 @@ unless file_loaded? file
   cmd.status_bar_text = "Load template component from library for editing."
   cmd.set_validation_proc { TemplateEditor.inside_template_component ? MF_GRAYED : MF_ENABLED }
   tb.add_item cmd
-  
+
   cmd = UI::Command.new("Save Template") { TemplateEditor.save }
   cmd.large_icon = "toolbar_icons/template_save.png"
   cmd.small_icon = "toolbar_icons/template_save_small.png"
   cmd.tooltip = "Save Template"
   cmd.status_bar_text = "Save template component to library."
   tb.add_item cmd
-  
+
   tb.add_separator
-  
+
   cmd = UI::Command.new("Template Info") { TemplateEditor.info_toggle }
   cmd.large_icon = "toolbar_icons/template_info.png"
   cmd.small_icon = "toolbar_icons/template_info_small.png"
@@ -123,7 +123,7 @@ unless file_loaded? file
   cmd.status_bar_text = "Set template information such as name, ID and built year."
   cmd.set_validation_proc { TemplateEditor.info_opened? ? MF_CHECKED : MF_UNCHECKED }
   tb.add_item cmd
-  
+
   cmd = UI::Command.new("Part Info") { TemplateEditor.part_info_toggle }
   cmd.large_icon = "toolbar_icons/template_part_info.png"
   cmd.small_icon = "toolbar_icons/template_part_info_small.png"
@@ -131,9 +131,9 @@ unless file_loaded? file
   cmd.status_bar_text = "Set part information such as positioning within building."
   cmd.set_validation_proc { TemplateEditor.part_info_opened? ? MF_CHECKED : MF_UNCHECKED }
   tb.add_item cmd
-  
+
   tb.show
-  
+
 end
 
 end

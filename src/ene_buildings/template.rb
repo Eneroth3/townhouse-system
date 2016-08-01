@@ -35,11 +35,11 @@ class Template
 
   # Public: Prefix before template id in component names.
   COMPONENT_NAME_PREFIX = "#{NAME}: "
-  
+
   # Public: Building depth to use in certain cases for template without a defined
   # depth, e.g. setting end rotation handle lengths in tools.
   FALLBACK_DEPTH = 10.m
-  
+
   # Public: The file extension used by this template.
   FILE_EXTENSION = "bldg"
 
@@ -51,10 +51,10 @@ class Template
   # should be written to this directory from outside this plugin itself.
   PREVIEW_DIR = File.join PLUGIN_TEMP_DIR, "previews"
   Dir.mkdir PREVIEW_DIR unless File.exists? PREVIEW_DIR
-  
+
   # Public: Path to 100 px wide template preview placeholder image.
   PREVIEW_PLACEHOLDER_100 = File.join PLUGIN_DIR, "dialogs", "template_placeholder_100.png"
-  
+
   # Public: Path to 200 px wide template preview placeholder image.
   PREVIEW_PLACEHOLDER_200 = File.join PLUGIN_DIR, "dialogs", "template_placeholder_200.png"
 
@@ -67,10 +67,10 @@ class Template
   # Internal: Temporary directory used when reading archives.
   EXTRACT_DIR = File.join PLUGIN_TEMP_DIR, "extract"
   Dir.mkdir EXTRACT_DIR unless File.exists? EXTRACT_DIR
-  
+
   # Internal: Vector to point camera in when making template previews.
   PREVIEW_CAM_VECTOR = Geom::Vector3d.new -1, 1, 0
-  
+
   # Internal: Field of view (in degrees) for preview camera.
   PREVIEW_FOV = 35
 
@@ -85,11 +85,11 @@ class Template
   @@loaded ||= false
 
   @@instances ||= []
-  
+
   # HACK: Automatically seize previews with library instead.
   # Remember to remove hack entry from menu.
   @@manually_resize_previews = false unless defined? @@manually_resize_previews
-  
+
   # Class variable accessors
 
   # Public: Tells if templates has been loaded for this SU session.
@@ -98,7 +98,7 @@ class Template
 
   # Public: Returns instances array.
   def self.instances; @@instances; end
-  
+
   # Internal: Whether user should manually downsample preview images.
   def self.manually_resize_previews; @@manually_resize_previews; end
   def self.manually_resize_previews=(v); @@manually_resize_previews = v; end
@@ -111,50 +111,50 @@ class Template
   #
   # Returns true if ComponentInstance represents a template, otherwise false.
   def self.component_is_template?(entity)
-  
+
     return false unless entity.is_a?(Sketchup::ComponentInstance)
     return false unless entity.definition.name.start_with? COMPONENT_NAME_PREFIX
-    
+
     true
-    
+
   end
-  
+
   # Public: Get filename of template file for specific template ID.
   #
   # id - The ID of the template.
   #
   # Returns String filename.
   def self.filename(id)
-  
+
     id + "." + FILE_EXTENSION
-    
+
   end
-  
+
   # Public: Get full path of template file for specific template ID.
   #
   # id - The ID of the template.
   #
   # Returns String path.
   def self.full_path(id)
-  
+
     File.join TEMPLATE_DIR, filename(id)
-    
+
   end
-  
+
   # Public: Get Template object that uses a given component definition.
   #
   # component_def - a ComponentDefinition object.
   #
   # Returns Template object or nil if not found.
   def self.get_from_component_definition(component_def)
-  
+
     name = component_def.name
     return unless name.start_with? COMPONENT_NAME_PREFIX
-   
+
     @@instances.find { |h| h.component_name == name }
-    
+
   end
-  
+
   # Public Get Template object from given template id.
   #
   # id - Id String.
@@ -198,7 +198,7 @@ class Template
       t = new id
     end
     t.load_data
-    
+
     t
 
   end
@@ -320,15 +320,15 @@ class Template
     ents = component_definition.entities
     faces_l = ents.select { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?([-1,0,0]) }
     faces_r = ents.select { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?([1,0,0]) }
-    
+
     # TODO: TEMPLATE VALIDIATION: check if all other loose faces are perpendicular to these /has normal x == 0)
     # Check if main volume is solid when using solid operations.
     # Part names must be unique!
-    
+
     faces_l.size == 1 && faces_r.size == 1
-    
+
   end
-  
+
   # Internal: Resets previous camera after preview camera has been used.
   # Must run after set_preview_camera.
   #
@@ -386,7 +386,7 @@ class Template
   end
 
   # Instance attribute accessors
-  
+
   # Public: Returns 2 element array of what front and back side is aligned to.
   #   nil - Unspecified
   #   0   - Street
@@ -426,7 +426,7 @@ class Template
 
   # Public: Returns the number of stories or nil if not set.
   attr_reader :stories
-  
+
   # Public: What SU version is used for the template Sketchup file.
   attr_reader :su_file_version
 
@@ -442,7 +442,7 @@ class Template
   def initialize(id)
 
     @id = id
-    
+
     @@instances << self
 
   end
@@ -466,18 +466,18 @@ class Template
   #
   # Returns ComponentDefinition.
   def component_def
-        
+
     name = component_name
-    
+
     # If component definition is already loaded, return it.
     definitions = Sketchup.active_model.definitions
     component_def = definitions.find { |cd| cd.name == name }
     return component_def if component_def
-    
+
     # Otherwise load and return it.
     Sketchup.status_text = STATUS_LOADING
     read_archive do
-    
+
       # Definitions.load cannot load multiple definitions from the same file
       # path. The latter will replace the previous definition in model.
       # Therefore use a temporary name while loading the external model.
@@ -487,7 +487,7 @@ class Template
       # SU ISSUE: SU crashes when trying to load a file or a newer version.
       component_def = definitions.load temp_path
       component_def.name = name
-      
+
       # Make sure loaded component has the correct name.
       # If an older version of it was already loaded and had the name associated
       # with this template they should switch name-
@@ -501,42 +501,42 @@ class Template
         end
         component_def.name = name
       end
-    
+
     end
     Sketchup.status_text = STATUS_DONE_LOADING
-    
+
     component_def
-      
+
   end
-  
+
   # Public: Returns the name that the component definition used to draw
   # buildings with this template should.
   #
   # Returns name String.
   def component_name
-  
+
     COMPONENT_NAME_PREFIX + @id
-    
+
   end
-  
+
   # Public: Get filename of template file.
   #
   # Returns String filename.
   def filename
-  
+
     @id + "." + FILE_EXTENSION
-    
+
   end
-  
+
   # Public: Get full path of template file.
   #
   # Returns String path.
   def full_path
-  
+
     File.join TEMPLATE_DIR, filename
-    
+
   end
-  
+
   # Public: Checks if there are any groups/components that can be used as
   # corners in building.
   def has_corners?
@@ -593,10 +593,10 @@ class Template
 
       # If no name is supplied in JSON file, inherit id.
       @name ||= @id
-      
+
       # Make depth Length.
       # Depth is saved as float in json.
-      
+
       # Extension failed Extension Warehouse review for publishing because of an
       # error parsing depth as length that I cannot reproduce. Also the review
       # feedback is sent from a f*****g no-reply account so I cannot get more
@@ -649,18 +649,18 @@ class Template
   end
 
   def save_component(definition)
-  
+
     # The plugin is supported by SU 2015 and later. Save template as version
     # 2015 so it can be used in 2015 even if it's created in a newer version.
     version = Sketchup::Model::VERSION_2015
     path = File.join Template::EXTRACT_DIR, "model.skp"#, version#TODO: FUTURE SU VERSION: add version parameter when supported
     definition.save_as path
     write_to_archive path
-    
+
     nil
-    
+
   end
-  
+
   # Public: Update Template properties to Hash and save to library.
   # Corresponding hash can be obtain from with the to_hash method.
   #
@@ -668,31 +668,31 @@ class Template
   #
   # Returns nothing.
   def save_info(info)
-  
+
     # ID should not be saved to JSON file since it's defined as the basename
     # of the whole archive containing the JSON.
     info = info.dup
     info.delete "id"
-    
+
     info["su_file_version"] = Sketchup.version# TODO: FUTURE SU VERSION: Make this the oldest version supporting the plugin.
     info["date_modified"] = Time.now.to_i
     info["date_created"] ||= Time.now.to_i
-    
+
     info.each_pair do |k, v|
       instance_variable_set("@" + k.to_s, v)
     end
-    
+
     # Convert depth length to float.
     # JSON.generate will otherwise convert it to a string.
     info["depth"] = info["depth"].to_f if info["depth"]
-  
+
     path = File.join EXTRACT_DIR, "info.json"
     json_string = JSON.generate info
     File.write path, json_string
     write_to_archive path
-    
+
     nil
-    
+
   end
 
   # Public: List all object attributes as Hash.
@@ -708,7 +708,7 @@ class Template
       k = k.to_sym
       h[k] = v
     end
-    
+
     h
 
   end
@@ -722,13 +722,13 @@ class Template
   #
   # Returns nothing.
   def update_preview
-    
+
     model = Sketchup.active_model
     view = model.active_view
     entities = model.entities
     selection = model.selection
     ro = model.rendering_options
-    
+
     # Remember selection so currently selected entities can be re-selected.
     # If drawing context is inside the template component entities objects are
     # safely kept when creating previews. If in model root entities object gets
@@ -740,32 +740,32 @@ class Template
       old_selection_guids = selection.map { |e| e.respond_to?(:guid) && e.guid}
       old_selection_guids.compact!
     end
-    
+
     Observers.disable
-    
+
     # Start operator that can then be aborted so model isn't affected.
     model.start_operation "PREVIEW"
-    
+
     # Go to top drawing context.
     model.close_active while model.active_path
-    
+
     # Clear model.
     entities.clear!
-    
+
     # Get building length from main volume of template component.
     face_left   = component_def.entities.find { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?(X_AXIS.reverse) }
     face_right  = component_def.entities.find { |e| e.is_a?(Sketchup::Face) && e.normal.samedirection?(X_AXIS) }
     point_left  = face_left.vertices.first.position
     point_right = point_left.project_to_plane face_right.plane
     length = point_left.distance point_right
-    
+
     # Draw building with given template.
     p = [ORIGIN, Geom::Point3d.new(length, 0, 0)]
     b = Building.new
     b.template = self
     b.path = p
     b.draw false
-    
+
     # Hide parts under ground level and set background color.
     # Change rendering options and backup existing options.
     new_ro = {}
@@ -781,32 +781,32 @@ class Template
       old_ro[k] = ro[k]
       ro[k] = v
     end
-    
+
     # Set camera vector.
     self.class.set_preview_camera
-        
+
     # Images.
     images = [
       ["preview_100.png", 100, 100],
       ["preview_200.png", 200, 124]
     ]
-    
+
     paths = []
     images.each do |i|
       name, width, height = i
-      
+
       view.camera.aspect_ratio = width/height.to_f
       zoom_to_pts = EneBuildings.points_in_entities b.group
       zoom_to_pts = zoom_to_pts.each do |p|
         p.z = [p.z, 0].max
       end
       MyView.zoom_content view, zoom_to_pts, 0.04
-      
+
       if @@manually_resize_previews
         width  *= PREVIEW_RESIZE_FACTOR
         height *= PREVIEW_RESIZE_FACTOR
       end
-      
+
       # Export image.
       path = File.join EXTRACT_DIR, name
       paths << path
@@ -819,12 +819,12 @@ class Template
       }
       view.write_image options
     end
-    
+
     # Abort operation and reset camera.
     model.abort_operation
     self.class.reset_camera
     old_ro.each_pair { |k, v| ro[k] = v }
-    
+
     # Tell user to scale down images manually if not at correct size.
     if @@manually_resize_previews
       msg =
@@ -834,10 +834,10 @@ class Template
       EneBuildings.open_dir EXTRACT_DIR
       UI.messagebox "Press OK when images are resized and saved."
     end
-    
+
     # Save images to the template's archive file.
     write_to_archive paths
-    
+
     # Move images to preview temp folder used by web dialogs.
     paths.each do |old_path|
       basename = File.basename old_path
@@ -845,7 +845,7 @@ class Template
       new_path = File.join PREVIEW_DIR, "#{@id}_#{width}.png"
       File.rename old_path, new_path
     end
-        
+
     # Re-select previous selection.
     selection.clear
     if model.active_path
@@ -864,14 +864,14 @@ class Template
       end
       selection.add to_reselect
     end
-    
+
     # Update template editor's dialogs if opened.
     # This is called manually since Observers are disabled during the operation.
     TemplateEditor.load_info if TemplateEditor.info_opened?
     TemplateEditor.load_part_data if TemplateEditor.part_info_opened?
-    
+
     Observers.enable
-    
+
     nil
 
   end
@@ -884,7 +884,7 @@ class Template
   #
   # Returns nothing.
   def read_archive
-  
+
     # REVIEW: some of this stuff only applies to building templates and not templates generally.
 
     # Empty temp directory.
@@ -918,11 +918,11 @@ class Template
   #
   # Returns nothing.
   def write_to_archive(files)
-  
+
     EneBuildings.compress files, full_path
-    
+
     nil
-    
+
   end
 
 end

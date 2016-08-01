@@ -70,7 +70,7 @@ module EneBuildings
       vector = Geom::Vector3d.new 234, 1343, 345
       line = [point, vector]
       intersections = []
-      
+
       ents = entities_from_group_or_componet group_or_component
       ents.each do |f|
         next unless f.is_a?(Sketchup::Face)
@@ -135,7 +135,7 @@ module EneBuildings
       #Make groups unique so no other instances of are altered.
       #Group.make_unique is for some reason deprecated, change name instead.
       original.name += "" if original.is_a? Sketchup::Group
-      
+
       #Create new group for to_add so components sharing same definition
       #aren't affected.
       temp_group = original.parent.entities.add_group
@@ -144,7 +144,7 @@ module EneBuildings
 
       original_ents = entities_from_group_or_componet original
       to_add_ents = entities_from_group_or_componet to_add
-      
+
       old_coplanar = find_coplanar_edges original_ents
       old_coplanar += find_coplanar_edges to_add_ents
 
@@ -162,15 +162,15 @@ module EneBuildings
 
       #Move to_add into original_ents and explode it.
       move_into original, to_add
-      
+
       #Purge edges no longer not binding 2 edges.
       purge_edges original_ents
 
       #Remove co-planar edges that occurred from the intersection (not those that already existed)
-      all_coplanar = find_coplanar_edges original_ents  
+      all_coplanar = find_coplanar_edges original_ents
       new_coplanar = all_coplanar - old_coplanar
       original_ents.erase_entities new_coplanar
-      
+
       weld_hack original.entities
 
       original.model.commit_operation if wrap_in_operator
@@ -216,7 +216,7 @@ module EneBuildings
 
       original_ents = entities_from_group_or_componet original
       to_subtract_ents = entities_from_group_or_componet to_subtract
-      
+
       old_coplanar = find_coplanar_edges original_ents
       old_coplanar += find_coplanar_edges to_subtract_ents
 
@@ -231,7 +231,7 @@ module EneBuildings
       corresponding.each_with_index { |v, i| i%2==0 ? to_remove << v : to_remove1 << v }#even?
       original_ents.erase_entities to_remove
       to_subtract_ents.erase_entities to_remove1
-      
+
       #Reverse all faces in to_subtract
       to_subtract_ents.each { |f| f.reverse! if f.is_a? Sketchup::Face }
 
@@ -243,13 +243,13 @@ module EneBuildings
       all_coplanar = find_coplanar_edges original_ents
       new_coplanar = all_coplanar - old_coplanar
       original_ents.erase_entities new_coplanar
-      
+
       #Purge edges no longer binding 2 faces.
       #Faces that where in the same plane in the different solids may have been
       #kept even if they are outside the expected resulting solid.
       #Remove all edges not binding 2 faces to get rid of them.
       purge_edges original_ents
-      
+
       weld_hack original.entities
 
       original.model.commit_operation if wrap_in_operator
@@ -276,12 +276,12 @@ module EneBuildings
 
       #Call subtract method with keep_to_subtract set to true.
       subtract(original, to_trim, wrap_in_operator, true)
-      
+
     end
-    
+
     #Following methods are used internally and may be subject to change between
     #releases. Typically names may change.
-    
+
     # Internal: Get the Entities object for either a Group or CompnentInstance.
     #
     # group_or_component - The group or ComponentInstance object.
@@ -312,19 +312,19 @@ module EneBuildings
       #Both solids must be in the same drawing context which they are moved to
       #in union and subtract method.
       temp_group = ent0.parent.entities.add_group
-      
+
       #ents0.intersect_with false, ent0.transformation, temp_group.entities, temp_group.transformation, true, ent1
       #ents1.intersect_with false, ent1.transformation, temp_group.entities, temp_group.transformation, true, ent0
-      
+
       #Only intersect raw geometry, save time and avoid unwanted edges.
       ents0.intersect_with false, ent0.transformation, temp_group.entities, temp_group.transformation, true, ents1.to_a.select { |e| [Sketchup::Face, Sketchup::Edge].include?(e.class) }
       ents1.intersect_with false, ent0.transformation, temp_group.entities, temp_group.transformation, true, ents0.to_a.select { |e| [Sketchup::Face, Sketchup::Edge].include?(e.class) }
 
       move_into ent0, temp_group, true
       move_into ent1, temp_group
-      
+
       nil
-      
+
     end
 
     # Internal: Fin d arbitrary point inside face, not on its edge or corner.
@@ -333,7 +333,7 @@ module EneBuildings
     #
     # Returns a Point3d object.
     def self.point_in_face(face)
-    
+
       # Sometimes invalid faces gets created when intersecting.
       # These are removed when validity check run.
       return false if face.area == 0
@@ -348,11 +348,11 @@ module EneBuildings
       centroid.x /= face.vertices.size
       centroid.y /= face.vertices.size
       centroid.z /= face.vertices.size
-      
+
       return centroid if face.classify_point(centroid) == Sketchup::Face::PointInside
-      
+
       #puts "could not use centroid because it wasn't inside face. Get point close to convex corner instead,"
-      
+
       # Find points by combining 3 adjacent corners.
       # If middle corner is convex point should be inside face (or in a hole).
       face.vertices.each_with_index do |v, i|
@@ -361,26 +361,26 @@ module EneBuildings
         c2 = face.vertices[i-2].position
         p  = Geom.linear_combination 0.95, c0, 0.05, c2
         p  = Geom.linear_combination 0.95, p,  0.05, c1
-        
+
         cp = face.classify_point(p)
         #face.parent.entities.add_cpoint p
         return p if cp == Sketchup::Face::PointInside
       end
 
-      #puts "Could not find any point within face :( ."      
-      
+      #puts "Could not find any point within face :( ."
+
       # This line should never be reached.
       # If it does code isn't functioning as intended :( .
       false
-    
+
     end
-    
+
     # Internal: Find faces to remove based on their position relative to the
     # other solid.
     def self.find_faces(to_search_in, reference, inside, on_surface)
 
       to_remove_in_ents = entities_from_group_or_componet to_search_in
-      
+
       to_remove_in_ents.select do |f|
         next unless f.is_a? Sketchup::Face
         point = point_in_face f
@@ -397,7 +397,7 @@ module EneBuildings
       end
 
     end
-    
+
     # Internal: Find faces that exists with same location in both contexts.
     #
     # same_orientation - true to only return those oriented the same direction,
@@ -443,7 +443,7 @@ module EneBuildings
         next unless e.faces.size < 2
         true
       }
-      
+
     end
 
     # Internal: Merges groups/components.
@@ -454,21 +454,21 @@ module EneBuildings
       #Properties like material and attributes will be lost but should not be used
       #anyway because group/component is exploded.
       #References to entities will be kept. Hooray!
-      
+
       destination_ents = entities_from_group_or_componet destination
-      
+
       to_move_def = to_move.is_a?(Sketchup::Group) ? to_move.entities.parent : to_move.definition
-      
+
       trans_target = destination.transformation
       trans_old = to_move.transformation
-      
+
       trans = trans_old*(trans_target.inverse)
       trans = trans_target.inverse*trans*trans_target#Transform transformation so it's relative to local and not global axes.
-      
+
       temp = destination_ents.add_instance to_move_def, trans
       to_move.erase! unless keep
       temp.explode
-      
+
     end
 
     # Internal: Find all co-planar edges in entities with both faces having same
@@ -480,16 +480,16 @@ module EneBuildings
         next unless e.faces.length == 2
         f0 = e.faces[0]
         f1 = e.faces[1]
-        
+
         #next unless f0.material == f1.material#Prevented subtract from functioning as intended.
         #next unless f0.layer == f1.layer
-        
+
         verts = f0.vertices
         !verts.any? { |v| f1.classify_point(v.position) == Sketchup::Face::PointNotOnPlane}
       end
-      
+
     end
-    
+
     # Internal: Sometimes naked overlapping un-welded edges are formed in SU.
     # This method tried to weld them.
     #
@@ -497,34 +497,34 @@ module EneBuildings
     #
     # returns nothing
     def self.weld_hack(entities)
-    
+
       unless is_solid? entities.parent
         naked_edges = naked_edges entities
-                
+
         temp_group = entities.add_group
         naked_edges.each do |e|
           temp_group.entities.add_line e.start, e.end
         end
         temp_group.explode
       end
-      
+
       nil
-    
+
     end
-    
+
     # Internal: Find edges that's only binding one face.
     #
     # entities - An Entities object or an Array of Entity objects.
     #
     # Returns an Array of Edges.
     def self.naked_edges(entities)
-    
+
       entities = entities.to_a
-      
+
       entities.select { |e| e.is_a?(Sketchup::Edge) && e.faces.size == 1 }
-      
+
     end
-    
+
   end
-  
+
 end

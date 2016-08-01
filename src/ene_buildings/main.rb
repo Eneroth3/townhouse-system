@@ -6,7 +6,7 @@ module EneBuildings
 
   require "fileutils"
   require "json"
-  
+
   unless Sketchup.version.to_i >= REQUIRED_SU_VERSION.to_i
     msg = "#{NAME} requires Sketchup version #{REQUIRED_SU_VERSION} or later to run."
     UI.messagebox msg
@@ -17,15 +17,15 @@ module EneBuildings
   CURSOR_ARROW       = UI.create_cursor File.join(PLUGIN_DIR, "cursors", "arrow.png"), 9, 9# TODO: prevent from covering tooltip but keep consistent to native cursors based on the select cursor.
   CURSOR_PEN         = UI.create_cursor File.join(PLUGIN_DIR, "cursors", "pen.png"), 1, 31
   CURSOR_PEN_INVALID = UI.create_cursor File.join(PLUGIN_DIR, "cursors", "pen_invalid.png"), 1, 31
-  
+
   # Internal: Path to plugin's temp directory.
   PLUGIN_TEMP_DIR = File.join Sketchup.temp_dir, ID
   Dir.mkdir PLUGIN_TEMP_DIR unless File.exists? PLUGIN_TEMP_DIR
-  
+
   # Internal: Path to material thumbnail directory.
   THUMBS_DIR = File.join PLUGIN_TEMP_DIR, "material_thumbnails"
   Dir.mkdir THUMBS_DIR unless File.exists? THUMBS_DIR
-  
+
   # Internal: Resolution of material thumbnails.
   THUMB_RES = 18
 
@@ -46,7 +46,7 @@ module EneBuildings
   # Some general methods that don't really fit into any class or module.
   # REVIEW: Typically these would fit better as refinements to classes outside
   # this extension.
-       
+
   # Internal: Get hash from attribute dictionary.
   #
   # entity    - The entity the dictionary is attached to.
@@ -98,10 +98,10 @@ module EneBuildings
   #
   # Returns newly placed Group or ComponentInstance.
   def self.copy_instance(old_instance, new_entities = nil, new_transformation = nil)
-    
+
     new_entities       ||= old_instance.entities
     new_transformation ||= old_instance.transformation
-    
+
     instance          = new_entities.add_instance(
       old_instance.definition,
       new_transformation
@@ -110,11 +110,11 @@ module EneBuildings
     instance.layer    = old_instance.layer
     instance.name     = old_instance.name
     copy_attributes old_instance, instance
-      
+
     instance
-    
+
   end
-  
+
   # Internal: Replaces component instance with similar group.
   #
   # component      - The ComponentInstance.
@@ -134,9 +134,9 @@ module EneBuildings
     group.material = component.material
     group.name     = component.name
     component.erase! unless keep_component
-    
+
     group
-    
+
   end
 
   # Internal: compress directory to zip archive.
@@ -147,18 +147,18 @@ module EneBuildings
   #
   # Returns nothing.
   def self.compress(files, target)
-  
+
     files = [*files]
-    
+
     Zip::File.open(target, Zip::File::CREATE) do |zipfile|
       files.each do |file_path|
         file_name = File.basename file_path
         zipfile.add(file_name, file_path) { true }
       end
     end
-    
+
     nil
-    
+
   end
 
   # Internal: Find all faces connected by sharing bounding edges with faces.
@@ -170,23 +170,23 @@ module EneBuildings
   def self.connected_faces(faces, disconnecting_edges = [])
 
     faces = faces.dup
-    
+
     while true
-    
+
       binding_edges = faces.map { |f| f.edges }.flatten.uniq
       binding_edges -= disconnecting_edges
-      
+
       break if binding_edges.empty?
-      
+
       adjacent_faces = binding_edges.map { |e| e.faces }.flatten.uniq
       adjacent_faces -= faces
-      
+
       break if adjacent_faces.empty?
-      
+
       faces += adjacent_faces
-      
+
     end
-    
+
     faces
 
   end
@@ -214,17 +214,17 @@ module EneBuildings
   #
   # Returns ID string.
   def self.make_id_suggestion(name, author)
-    
+
     return if name.empty?
     return if author.empty?
-    
+
     name = normalize_string name.downcase
     author = normalize_string author, true
-    
+
     author_prefixes = Sketchup.read_default ID, "author_prefixes", []
     author_prefixes = Hash[*author_prefixes.zip().flatten]
-    
-    prefix = 
+
+    prefix =
       if author_prefixes[author]
         # If there's a saved prefix that's been used before by tis user, use it.
         author_prefixes[author]
@@ -243,7 +243,7 @@ module EneBuildings
       else
         author
       end
-         
+
     "#{prefix}_#{name}"
 
   end
@@ -261,7 +261,7 @@ module EneBuildings
       color = material.color
       "rgb(#{color.red},#{color.green},#{color.blue})"
     else
-    
+
       # Bake colors and other information into thumbnail file name to avoid
       # collision of edited materials between Sketchup models.
       basename = File.basename material.texture.filename
@@ -269,14 +269,14 @@ module EneBuildings
       hash = (material.name + basename + color.to_a.join(" ")).hash
       name = "#{hash}_#{THUMB_RES}.png"
       filename = File.join THUMBS_DIR, name
-      
+
       unless File.exist? filename
         # FIXME: Colorize thumbnail when supported by SU or use third party library.
         material.write_thumbnail filename, THUMB_RES
       end
-      
+
       "url('file:///#{filename}')"
-      
+
     end
 
   end
@@ -287,11 +287,11 @@ module EneBuildings
   #
   # Returns an Array of Edges.
   def self.naked_edges(entities)
-  
+
     entities = entities.to_a
-    
+
     entities.select { |e| e.is_a?(Sketchup::Edge) && e.faces.size == 1 }
-    
+
   end
 
   # Internal: Remove special characters from string.
@@ -310,7 +310,7 @@ module EneBuildings
     )
     string.tr!(" ", "_") unless allow_space
     string.gsub!(/\W/, "")
-    
+
     string
 
   end
@@ -339,18 +339,18 @@ module EneBuildings
   def self.open_temp_dir
 
     EneBuildings.open_dir PLUGIN_TEMP_DIR
-    
+
     nil
 
   end
-  
+
   # Internal: List all points in entities.
   #
   # entities - An Entities object, and Entity or an array of these.
   #
   # Returns Array of Points3d objects.
   def self.points_in_entities(entities)
-  
+
   # Make entities an array of drawing elements.
   entities = entities.to_a if entities.is_a?(Sketchup::Entities)
   entities = [entities] if entities.is_a?(Sketchup::Drawingelement)
@@ -367,14 +367,14 @@ module EneBuildings
     end
     pts
   end
-  
+
   pts = recursive.call entities
   pts.uniq! { |a| a.to_a }
-  
+
   pts
-  
+
   end
-  
+
   # Internal: Reload whole extension (except loader) without littering
   # console. Inspired by ThomTohm's method.
   #
@@ -402,14 +402,14 @@ module EneBuildings
 
     return if author.empty?
     return if prefix.empty?
-    
+
     author_prefixes = Sketchup.read_default ID, "author_prefixes", []
     author_prefixes = Hash[*author_prefixes.zip().flatten]
     author_prefixes[author] = prefix
     Sketchup.write_default ID, "author_prefixes", author_prefixes.to_a
-      
+
     nil
-    
+
   end
 
 end

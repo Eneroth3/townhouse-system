@@ -11,22 +11,22 @@ module MyView
   # Draw arrow tip.
   # REVIEW: Currently can't point straight upwards or downwards.
   def self.draw_arrow_head(view, point, vector, width, depth, centered = false)
-    
+
     path = [
       Geom::Point3d.new(-depth, -width/2, 0),
       Geom::Point3d.new(0, 0, 0),
       Geom::Point3d.new(-depth, width/2, 0),
     ]
-    
+
     path.each { |p| p.x += depth/2 } if centered
-    
+
     trans = Geom::Transformation.axes point, vector, vector*Z_AXIS, vector*Z_AXIS*vector
     path.each { |p| p.transform! trans }
-    
+
     view.draw GL_LINE_STRIP, path
-    
+
   end
-  
+
   # Draw 3d box to viewport.
   # Side as a Length.
   # Omit colors to skip edge or fill drawing.
@@ -238,14 +238,14 @@ module MyView
   #
   # When angles are not set they are taken from the current camera.
   def self.zoom_content(view, content = nil, margin = 0.025, h_angle = nil, v_angle = nil)
-  
+
     model = view.model
     cam = view.camera
-    
+
     unless cam.perspective?
       raise "Method only supported for perspective projection."
     end
-    
+
     # Points to fit in view.
     content ||= model.active_entities
     unless [Array, Sketchup::Entities].include? content.class
@@ -258,7 +258,7 @@ module MyView
     else
       pts     = EneBuildings.points_in_entities content
     end
-    
+
     # Get frustum angles from current camera if arguments are not given.
     ratio   = cam.aspect_ratio
     ratio   = view.vpwidth.to_f/view.vpheight if ratio == 0
@@ -294,7 +294,7 @@ module MyView
       outermost_point = pts.sort_by { |p| MyGeom.distance_to_plane(p, plane) }.last
       plane[0] = outermost_point
     end
-    
+
     # Get camera eye point.
     # Intersect opposite frustum planes and find point on the furthest back
     # intersection line where it's closest to other intersection line.
@@ -305,11 +305,11 @@ module MyView
     closest_points = Geom.closest_points(intersection_lines[0], intersection_lines[1])
     eye = closest_points.sort_by { |p| MyGeom.distance_to_plane(p, [cam.eye, sight_vector]) }.first
     cam.set(eye, eye + sight_vector, cam.up)
-    
+
     nil
-  
+
   end
-  
+
 end
 
 end

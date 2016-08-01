@@ -28,7 +28,7 @@ module PathHandling
 
   GRAPHICAL_ANGLES = [-90.degrees, 90.degrees]
   HANDLE_LENGTH = 10.m
-  
+
 
   TOOLTIPS = {
     :add_interior  => "Add Corner on Segment",
@@ -52,7 +52,7 @@ module PathHandling
   # back_along_path  - Whether the path represents the back side of a building
   #                    instead of the frotn side. When set to a boolean values
   #                    this can be toggled from the context menu.
-  #                    When irrelevant, e.g. when path doesn't represent a 
+  #                    When irrelevant, e.g. when path doesn't represent a
   #                    building,set to nil (default: nil).
   def initialize(path = [], add_point_mode = false, end_angles = nil, handle_length = HANDLE_LENGTH, force_horizontal = true, back_along_path = nil)# REVIEW: use hash for all arguments?
 
@@ -161,7 +161,7 @@ module PathHandling
 
       end
     end
-    
+
     # Front side arrows
     unless @back_along_path.nil?
       (0..@path.size - 2).each do |i|
@@ -170,9 +170,9 @@ module PathHandling
         segment_v = p1 - p0
         normal_v  = segment_v*Z_AXIS
         p         = p0.offset(segment_v, segment_v.length/2).offset(normal_v, -@handle_length/2)
-        
+
         normal_v.reverse! if @back_along_path
-        
+
         view.line_width    = ARROW_WIDTH
         view.drawing_color = COLOR_ARROW
         MyView.draw_arrow_head view, p, normal_v , @handle_length*0.6, @handle_length*0.25, true
@@ -197,12 +197,12 @@ module PathHandling
 
     bb = Geom::BoundingBox.new
     bb.add @path unless @path.empty?
-    
+
     @path.each do |p|
       bb.add p.offset([-1, -1, -1], @handle_length*2)
       bb.add p.offset([ 1,  1, -1], @handle_length*2)
     end
-    
+
     bb
 
  end
@@ -504,17 +504,17 @@ module PathHandling
 
     eye = view.camera.eye
     line_to_cam = [eye, eye - @ip.position]
-    
+
     @corrected_input =
       if !@active_controller && @hovered_controller.is_a?(Symbol)
         # A end vector handle is hovered.
-        
+
         nil
-        
+
       elsif !@active_controller && @hovered_controller && @hovered_controller < 0
         # A path segment is hovered.
         # Correct point so it's on the path.
-        
+
         c0 = @path[-@hovered_controller - 1]
         c1 = @path[-@hovered_controller]
         segment_line = [c0, c1 - c0]

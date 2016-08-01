@@ -51,19 +51,19 @@ module MyGeom
   #
   # Returns Length.
   def self.distance_to_plane(point, plane, use_negative = true)
-  
+
     point_on_plane = point.project_to_plane plane
     vector         = point - point_on_plane
     distance       = vector.length
-    
+
     if distance != 0 && use_negative && !vector.samedirection?(plane[1])
-      distance *= -1 
+      distance *= -1
     end
 
     distance
-    
+
   end
-  
+
   # Flatten vector to plane.
   #
   # v      - Vector.
@@ -107,7 +107,7 @@ module MyGeom
     if xaxis.parallel?(yaxis) || yaxis.parallel?(zaxis) || zaxis.parallel?(xaxis)
       raise ArgumentError, "Axes must not be parallel."
     end
-    
+
     # Create new Vectors instead of manipulating existing.
     xaxis = xaxis.clone
     yaxis = yaxis.clone
@@ -132,7 +132,7 @@ module MyGeom
       yaxis.normalize!
       zaxis.normalize!
     end
-    
+
     Geom::Transformation.new([
       xaxis.x,  xaxis.y,  xaxis.z,  0,
       yaxis.x,  yaxis.y,  yaxis.z,  0,
@@ -144,11 +144,11 @@ module MyGeom
 
   # Check if a Transformation is mirrored.
   def self.transformation_mirrored?(transformation)
-  
+
     (transformation.xaxis*transformation.yaxis) % transformation.zaxis < 0
-    
+
   end
-  
+
 end
 
 end

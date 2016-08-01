@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
     <title>TITLE</title>
     <script type="text/javascript">
-    
+
       //Get label with specific for attribute.
       function label_for(id){
         labels = document.getElementsByTagName('label');
@@ -33,21 +33,21 @@
       //Toggle between each individual section and a message telling why it
       //cannot be shown.
       function toggle_sections(){
-      
+
         not_in_root_message = "Not available in nested groups or components.";
-        
+
         sections = document.getElementsByClassName('section');//Requires IE9+
-        
+
         for(var i=0;i<sections.length;i++){
           section = sections[i];
           id = section.id;
-          
+
           //Material replacement is available in nested drawing contexts.
           if(id == "material_replacement") continue;
-          
+
           content = section.getElementsByTagName('table')[0];
           warning = section.getElementsByTagName('p')[0];
-          
+
           if(in_template_root){
             content.style.display = '';
             warning.style.display = 'none';
@@ -57,9 +57,9 @@
             warning.innerHTML = not_in_root_message;
           }
         }
-      
+
       }
-      
+
       //Toggle what table rows are shown depending on positioning method.
       //Called when selection changes or drop down changes.
       function toggle_positioning(positioning){
@@ -156,36 +156,36 @@
         for(var i=1;i<rows.length;i++) rows[i].style.display = bool ? 'none' : '';//First row is always available.
 
       }
-      
+
       //Toggle solid and solid_index enability depending on other inputs' states.
       //Called when selection changes, positioning changes or solid drop down changes.
       function toggle_solid(){
-      
+
         var positioning = document.getElementById('position_method').value;
         var solid = document.getElementById('solid').value;
-        
+
         var solid_input = document.getElementById('solid');
         var solid_label = label_for(solid_input.id)
-        
+
         var index_input = document.getElementById('solid_index');
         var index_label = label_for(index_input.id)
-        
+
         if (positioning == "corner") {
-        
+
           solid_input.disabled = "disabled";
           solid_label.className = "disabled";
           index_input.disabled = "disabled";
           index_label.className = "disabled";
-          
+
         } else {
-        
+
           solid_input.disabled = "";
           solid_label.className = "";
 
           var disabled = solid == "" || solid == "cut_multiple_faces";
           index_input.disabled = disabled;
           index_label.className = disabled ? "disabled" : "";
-        
+
         }
 
       }
@@ -235,7 +235,7 @@
           </tr>
         </table>
       </div>
-      
+
       <div class="section" id="positioning">
         <b>Positioning</b>
         <hr />
@@ -307,7 +307,7 @@
             <td>&nbsp;</td>
             <td><input type="text" style="visibility: hidden;" /></td><!--Hidden dummy input to fill out table so relation field has same width as other fields.-->
           </tr>
-          
+
           <tr data-category="gable">
             <td></td>
             <td colspan="3" style="text-align: center;"><img src="template_editor_part_position_gable.png" alt="" /></td>
@@ -318,7 +318,7 @@
             <td>&nbsp;</td>
             <td><input type="text" style="visibility: hidden;" /></td><!--Hidden dummy input to fill out table so gable margin field has same width as other fields.-->
           </tr>
-          
+
           <tr data-category="corner">
             <td></td>
             <td colspan="3" style="text-align: center;"><img src="template_editor_part_position_corner.png" alt="" /></td>
@@ -329,7 +329,7 @@
             <td>&nbsp;</td>
             <td><input type="text" style="visibility: hidden;" /></td><!--Hidden dummy input to fill out table so corner margin field has same width as other fields.-->
           </tr>
-          
+
           <tr data-category="replacement">
             <td></td>
             <td colspan="3" style="text-align: center;"><img src="template_editor_part_position_replacement.png" alt="" /></td>
@@ -366,7 +366,7 @@
         </table>
         <input type="hidden" name="replace_nested_mateials" id="replace_nested_mateials" />
       </div>
-      
+
       <div class="section" id="solids">
         <b>Solid Operations</b>
         <hr />

@@ -184,7 +184,7 @@ class BuildingInsertTool
   b.back_along_path = @back_along_path
   b.end_angles      = @end_angles
   b.draw
-  
+
   @path = []
   @end_angles = [0, 0]
   @reset

@@ -377,7 +377,7 @@ class Building
     # are considered replaceable. Other parts like gables and corners are only
     # drawn when actively enabled in building properties.
     replaceable_attributes = ["align", "spread"]
-    
+
     parts_data = []
 
     @template.component_def.entities.each do |e|
@@ -507,7 +507,7 @@ class Building
     # Purge references to available slots and other irrelevant values.
     allowed_keys = %i(definition name original_instance transformations)
     parts.map! { |p| p.select { |k, v| allowed_keys.include? k } }
-    
+
     parts
 
   end
@@ -1151,7 +1151,7 @@ class Building
     parts_data.each do |part_data|
 
       part_data[:transformations] ||= []
-      
+
       next unless part_data[:use].any?
 
       tr_original = part_data[:original_instance].transformation
@@ -1280,7 +1280,7 @@ class Building
     parts_data.each do |part_data|
 
       part_data[:transformations] = []
-      
+
       next unless part_data[:use].any?
 
       part_data[:transformations] = (0..@path.length-2).map { [] }
@@ -1304,13 +1304,13 @@ class Building
   #
   # Returns nil.
   def calculate_replaceable_transformations(parts_data)
-  
+
     path, tangents = calculate_local_path
 
     parts_data.each do |part_data|
 
       part_data[:transformations] ||= []
-     
+
       original    = part_data[:original_instance]
       tr_original = original.transformation
 
@@ -1323,7 +1323,7 @@ class Building
 
       tr_original_ary = tr_original.to_a
       ad = original.attribute_dictionary(Template::ATTR_DICT_PART)
-      
+
       origin      = tr_original.origin
       line_origin = [origin, X_AXIS]
 
@@ -1354,7 +1354,7 @@ class Building
         plane_right      = [[segment_length, 0, 0], tangent_right]
         origin_leftmost  = Geom.intersect_line_plane line_origin, plane_left
         origin_rightmost = Geom.intersect_line_plane line_origin, plane_right
-        
+
         # Take facade margin into account.
         margin_left  = (@facade_margins[@template.id] || [])[2*segment_index]
         margin_right = (@facade_margins[@template.id] || [])[2*segment_index+1]
@@ -1365,7 +1365,7 @@ class Building
         unless (origin_rightmost-origin_leftmost).samedirection?(X_AXIS)
           next
         end
-        
+
         # Create Transformations.
         if ad["align"]
           # Align one instance.
@@ -1436,9 +1436,9 @@ class Building
     end
 
     nil
-    
+
   end
-  
+
   # Internal: Convert path to local coordinates for building Group, calculate
   # tangents and adapt direction according to @back_along_path.
   #
