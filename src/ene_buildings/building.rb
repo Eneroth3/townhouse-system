@@ -458,145 +458,32 @@ class Building
   #   :transformations   - (Only when calculate_transformations is true)
   #                        Transformations object defining instance placement
   #                        in local coordinates grouped by building segment.
-  def list_replaceable_parts(calculate_transformations = false)# TODO: CLEANUP PART LISTING: See if slots can be added as output.
+  def list_replaceable_parts(calculate_transformations = false)# TODO: CLEANUP PART LISTING: See if slots can be added as output ans use it in properties panel. also document as output from this method and document in what argument does.
 
-    path, tangents = calculate_local_path
-
+    # Aligned (left, right, center and percentage) and "spread" (arrayed) parts
+    # are considered replaceable. Other parts like gables and corners are only
+    # drawn when actively enabled in building properties.
+    replaceable_attributes = ["align", "spread"]
+    
     parts_data = []
 
-    # Loop parts in Template's ComponentDefinition.
     @template.component_def.entities.each do |e|
-      next unless [Sketchup::Group, Sketchup::ComponentInstance].include? e.class
       next unless ad = e.attribute_dictionary(Template::ATTR_DICT_PART)
+      next unless replaceable_attributes.any? { |a| ad[a] }
 
       part_data = {
-        :name => ad["name"],
         :definition => e.definition,
         :original_instance => e,
-        :transformations => []
+        :name => ad["name"]
       }
       parts_data << part_data
-
-      transformation_original = e.transformation
-
-      # If building is drawn with its back along path, adapt transformation.
-      if @back_along_path
-        delta_y = -(@template.depth || Template::FALLBACK_DEPTH)
-        translation = Geom::Transformation.translation([0, delta_y, 0])
-        transformation_original = translation * transformation_original
-      end
-
-      origin      = transformation_original.origin
-      line_origin = [origin, X_AXIS]
-      t_array     = transformation_original.to_a
-
-      # Loop path segments.
-      (0..path.size - 2).each do |segment_index|
-
-        transformations = []
-        part_data[:transformations] << transformations
-
-        # Values in main building @group's coordinates.
-        corner_left    = path[segment_index]
-        corner_right   = path[segment_index + 1]
-        segment_vector = corner_right - corner_left
-        segment_length = segment_vector.length
-        tangent_left   = tangents[segment_index]
-        tangent_right  = tangents[segment_index + 1]
-        segment_trans  = Geom::Transformation.axes(
-          corner_left,
-          segment_vector,
-          Z_AXIS * segment_vector,
-          Z_AXIS
-        )
-
-        # Values in local segment group's coordinates.
-        plane_left       = [ORIGIN, tangent_left.reverse.transform(segment_trans.inverse)]
-        plane_right      = [[segment_length, 0, 0], tangent_right.transform(segment_trans.inverse)]
-        origin_leftmost  = Geom.intersect_line_plane line_origin, plane_left
-        origin_rightmost = Geom.intersect_line_plane line_origin, plane_right
-
-        # Take facade margin into account.
-        margin_left  = (@facade_margins[@template.id] || [])[2*segment_index]
-        margin_right = (@facade_margins[@template.id] || [])[2*segment_index+1]
-        origin_leftmost.offset!(X_AXIS, margin_left) if margin_left
-        origin_rightmost.offset!(X_AXIS, -margin_right) if margin_right
-
-        # Skip segment for this part if leftmost is to the right of rightmost.
-        unless (origin_rightmost-origin_leftmost).samedirection?(X_AXIS)
-          next
-        end
-
-        # Create Transformation objects from current Transformation, path
-        # segment and attribute data.
-        if ad["align"]
-          # Align one instance
-          # Either "left", "right", "center" or percentage (float between 0 and
-          # 1).
-
-          new_origin =
-            if ad["align"] == "left"
-              origin_leftmost
-            elsif ad["align"] == "right"
-             origin_rightmost
-            elsif ad["align"] == "center"
-              Geom.linear_combination 0.5, origin_leftmost, 0.5, origin_rightmost
-            elsif ad["align"].is_a? Float
-              Geom.linear_combination(1-ad["align"], origin_leftmost, ad["align"], origin_rightmost)
-            end
-          t_array[12] = new_origin.x
-          transformations << Geom::Transformation.new(t_array)
-
-        elsif ad["spread"]
-          # Spread multiple groups/components.
-          # Either Fixnum telling number of copies or float/length telling
-          # approximate distance between (in inches). This distance will adapt
-          # to fit available space.
-
-          available_distance = origin_leftmost.distance origin_rightmost
-          margin_l = ad["margin_left"] || ad["margin"] || 0
-          margin_r = ad["margin_right"] || ad["margin"] || 0
-          available_distance -= (margin_l + margin_r)
-          if ad["spread"].is_a?(Fixnum)
-            total_number = ad["spread"]
-            raise "If 'spread' is a Fuxnum it must be zero or more." if total_number < 0
-          else
-            total_number = available_distance/ad["spread"]
-            raise "If 'spread' is a Length it must bigger than zero." unless ad["spread"] > 0
-            # Round total_number to closets Int or force to odd/even.
-            #(If rounding is set to anything else than "force_odd" it's used as "force_even".)
-            total_number =
-              if ad["rounding"]
-                fraction = total_number%2
-                (ad["rounding"] == "force_odd") && fraction > 1 ? total_number.floor : total_number.ceil
-              else
-                total_number.round
-              end
-          end
-          distance_between = available_distance/total_number
-          # Each copy has its origin at x = margin_l + (n + 0.5)*distance_between
-          e_def = e.definition
-          (0..total_number-1).each do |n|
-            x = origin_leftmost.x + margin_l + (n + 0.5) * distance_between
-            t_array[12] = x
-            trans = Geom::Transformation.new t_array
-            # Don't place anything with its bounding box outside the segment if
-            # not specifically told to do so.
-            unless ad["override_cut_planes"]
-              corners = MyGeom.bb_corners(e_def.bounds)
-              corners.each { |c| c.transform! trans }
-              next if corners.any? { |c| MyGeom.front_of_plane?(plane_left, c) || MyGeom.front_of_plane?(plane_right, c) }
-            end
-            transformations << trans
-          end
-
-        end
-
-      end
-
     end
 
     parts_data.sort_by! { |p| p[:name] || "" }
+
+    if calculate_transformations
+      calculate_replaceable_transformations parts_data
+    end
 
     parts_data
 
@@ -699,12 +586,16 @@ class Building
       end
     end
 
-    # TODO: CLEANUP PART LISTING: purge slots and replaces references!
-
     # Purge replacements that aren't used.
     replacements.keep_if { |r| r[:transformations] }
 
-    replaceables + replacements
+    parts = replaceables + replacements
+
+    # Purge references to available slots and other irrelevant values.
+    allowed_keys = %i(definition name original_instance transformations)
+    parts.map! { |p| p.select { |k, v| allowed_keys.include? k } }
+    
+    parts
 
   end
 
@@ -1349,7 +1240,7 @@ class Building
 
   end
 
-  # Internal: Adds corner Transformation information to parts_data array.
+  # Internal: Adds corner Transformation information to parts_data Array.
   #
   # parts_data - The Array to add transformations to.
   #
@@ -1360,21 +1251,21 @@ class Building
 
     parts_data.each do |part_data|
 
-      next unless part_data[:use].any?# TODO: CLEANUP PART LISTING: Even when not used transformations should be defined as an Array.
+      part_data[:transformations] ||= []
+      
+      next unless part_data[:use].any?
 
-      transformation_original = part_data[:original_instance].transformation
+      tr_original = part_data[:original_instance].transformation
 
       # If building is drawn with its back along path, adapt transformation.
       if @back_along_path
         delta_y = -(@template.depth || Template::FALLBACK_DEPTH)
         translation = Geom::Transformation.translation([0, delta_y, 0])
-        transformation_original = translation * transformation_original
+        tr_original = translation * tr_original
       end
 
-      origin      = transformation_original.origin
+      origin      = tr_original.origin
       line_origin = [origin, X_AXIS]
-
-      part_data[:transformations] ||= []
 
       # Loop path segments.
       (0..path.size - 2).each do |segment_index|
@@ -1435,7 +1326,7 @@ class Building
 
   end
 
-  # Internal: Adds gable Transformation information to parts_data array.
+  # Internal: Adds gable Transformation information to parts_data Array.
   #
   # parts_data - The Array to add transformations to.
   #
@@ -1489,6 +1380,8 @@ class Building
 
     parts_data.each do |part_data|
 
+      part_data[:transformations] = []
+      
       next unless part_data[:use].any?
 
       part_data[:transformations] = (0..@path.length-2).map { [] }
@@ -1505,6 +1398,148 @@ class Building
 
   end
 
+  # Internal: Adds arrayed and aligned Transformation information to parts_data
+  # Array.
+  #
+  # parts_data - The Array to add transformations to.
+  #
+  # Returns nil.
+  def calculate_replaceable_transformations(parts_data)
+  
+    path, tangents = calculate_local_path
+
+    parts_data.each do |part_data|
+
+      part_data[:transformations] ||= []
+     
+      original    = part_data[:original_instance]
+      tr_original = original.transformation
+
+      # If building is drawn with its back along path, adapt transformation.
+      if @back_along_path
+        delta_y = -(@template.depth || Template::FALLBACK_DEPTH)
+        translation = Geom::Transformation.translation([0, delta_y, 0])
+        tr_original = translation * tr_original
+      end
+
+      tr_original_ary = tr_original.to_a
+      ad = original.attribute_dictionary(Template::ATTR_DICT_PART)
+      
+      origin      = tr_original.origin
+      line_origin = [origin, X_AXIS]
+
+      # Loop path segments.
+      (0..path.size - 2).each do |segment_index|
+
+        transformations = []
+        part_data[:transformations] << transformations
+
+        # Values in main building @group's coordinates.
+        corner_left    = path[segment_index]
+        corner_right   = path[segment_index + 1]
+        segment_vector = corner_right - corner_left
+        segment_length = segment_vector.length
+        tangent_left   = tangents[segment_index]
+        tangent_right  = tangents[segment_index + 1]
+        segment_trans  = Geom::Transformation.axes(
+          corner_left,
+          segment_vector,
+          Z_AXIS * segment_vector,
+          Z_AXIS
+        )
+
+        # Values in local segment group's coordinates.
+        tangent_left     = tangent_left.transform(segment_trans.inverse)
+        tangent_right    = tangent_right.transform(segment_trans.inverse)
+        plane_left       = [ORIGIN, tangent_left.reverse]
+        plane_right      = [[segment_length, 0, 0], tangent_right]
+        origin_leftmost  = Geom.intersect_line_plane line_origin, plane_left
+        origin_rightmost = Geom.intersect_line_plane line_origin, plane_right
+        
+        # Take facade margin into account.
+        margin_left  = (@facade_margins[@template.id] || [])[2*segment_index]
+        margin_right = (@facade_margins[@template.id] || [])[2*segment_index+1]
+        origin_leftmost.offset!(X_AXIS, margin_left) if margin_left
+        origin_rightmost.offset!(X_AXIS, -margin_right) if margin_right
+
+        # Skip segment for this part if leftmost is to the right of rightmost.
+        unless (origin_rightmost-origin_leftmost).samedirection?(X_AXIS)
+          next
+        end
+        
+        # Create Transformations.
+        if ad["align"]
+          # Align one instance.
+          # Either "left", "right", "center" or percentage (float between 0 and
+          # 1).
+
+          new_origin =
+            if ad["align"] == "left"
+              origin_leftmost
+            elsif ad["align"] == "right"
+             origin_rightmost
+            elsif ad["align"] == "center"
+              Geom.linear_combination 0.5, origin_leftmost, 0.5, origin_rightmost
+            elsif ad["align"].is_a? Float
+              Geom.linear_combination(1-ad["align"], origin_leftmost, ad["align"], origin_rightmost)
+            end
+          tr_ary = tr_original_ary.dup
+          tr_ary[12] = new_origin.x
+          transformations << Geom::Transformation.new(tr_ary)
+
+        elsif ad["spread"]
+          # Array multiple instances.
+          # Either Fixnum telling number of copies or float/length telling
+          # approximate distance between (in inches). This distance will adapt
+          # to fit available space.
+
+          available_distance = origin_leftmost.distance origin_rightmost
+          margin_l = ad["margin_left"] || ad["margin"] || 0
+          margin_r = ad["margin_right"] || ad["margin"] || 0
+          available_distance -= (margin_l + margin_r)
+          if ad["spread"].is_a?(Fixnum)
+            total_number = ad["spread"]
+            raise "If 'spread' is a Fuxnum it must be zero or more." if total_number < 0
+          else
+            total_number = available_distance/ad["spread"]
+            raise "If 'spread' is a Length it must bigger than zero." unless ad["spread"] > 0
+            # Round total_number to closets Int or force to odd/even.
+            #(If rounding is set to anything else than "force_odd" it's used as "force_even".)
+            total_number =
+              if ad["rounding"]
+                fraction = total_number%2
+                (ad["rounding"] == "force_odd") && fraction > 1 ? total_number.floor : total_number.ceil
+              else
+                total_number.round
+              end
+          end
+          distance_between = available_distance/total_number
+          # Each copy has its origin at x = margin_l + (n + 0.5)*distance_between
+          (0..total_number-1).each do |n|
+            x = origin_leftmost.x + margin_l + (n + 0.5) * distance_between
+            tr_ary = tr_original_ary.dup
+            tr_ary[12] = x
+            tr = Geom::Transformation.new tr_ary
+            # Don't place anything with its bounding box outside the segment if
+            # not specifically told to do so.
+            unless ad["override_cut_planes"]
+              corners = MyGeom.bb_corners(part_data[:definition].bounds)
+              corners.each { |c| c.transform! tr }
+              next if corners.any? { |c| MyGeom.front_of_plane?(plane_left, c) || MyGeom.front_of_plane?(plane_right, c) }
+            end
+            transformations << tr
+          end
+
+        end
+
+      end
+
+    end
+
+    nil
+    
+  end
+  
   # Internal: Convert path to local coordinates for building Group, calculate
   # tangents and adapt direction according to @back_along_path.
   #
@@ -1760,7 +1795,7 @@ class Building
       # Place instances of all spread or aligned parts that has transformations
       # for this segment.
       part_data.each do |part|
-        transformations = (part[:transformations] || [])[segment_index] || []
+        transformations = part[:transformations][segment_index] || []
         (transformations).each do |trans|
           original = part[:original_instance]
           EneBuildings.copy_instance original, segment_ents, trans
