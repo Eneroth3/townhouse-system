@@ -167,16 +167,17 @@ class Template
   end
 
   # Public: [Re-]Load all templates from building templates directory.
+  # Loaded templates can be obtain using Template.instances.
   #
   # Returns nothing.
   def self.load_all
+  
+    purge
 
     files = Dir.glob(File.join(TEMPLATE_DIR, "*.#{FILE_EXTENSION}"))
-
     files.each do |file|
       id = File.basename file, ".*"
       load_id id
-      # FEATURE: add reload-button in select panel? requires removed templates to be unloaded (purged).
     end
 
     @@loaded = true
@@ -210,10 +211,25 @@ class Template
 
   end
 
+  # Purges all Template that aren't saved to the template library from the
+  # instances array. IF a template file has been deleted, run this to update the
+  # template list.
+  #
+  # Returns nothing.
+  def self.purge
+  
+    @@instances.keep_if { |t| t.has_archive? }
+    
+    nil
+    
+  end
+  
   # Public: Load all installed templates unless they have already been loaded.
   # Called when building object is created and select_panel is opened.
   # By waiting to load templates until they are needed Sketchup startup is
   # sped up.
+  #
+  # Loaded templates can be obtain using Template.instances.
   #
   # Returns nothing.
   def self.require_all
@@ -254,25 +270,28 @@ class Template
     dlg.set_file(File.join(PLUGIN_DIR, "dialogs", "template_select_panel.html"))
 
     # Add data.
-    js ="var preview_dir = '#{PREVIEW_DIR}';"
-    json = JSON.generate(@@instances.sort.map { |t| t.to_hash })
-    js << "var templates=#{json};"
-    js << "var selected='#{selected ? selected.id : "null"}';"
-    js << "var sorting='#{Sketchup.read_default(ID, "template_sorting", "0")}';"
-    js << "var grouping='#{Sketchup.read_default(ID, "template_grouping", "country")}';"
-    if instant
-      js << "document.getElementById('buttons_not_instant').style.display='none';"
-    else
-      js << "document.getElementById('buttons_instant').style.display='none';"
+    add_data = lambda do
+      js ="var preview_dir = '#{PREVIEW_DIR}';"
+      json = JSON.generate(@@instances.sort.map { |t| t.to_hash })
+      js << "var templates=#{json};"
+      js << "var selected='#{selected ? selected.id : "null"}';"
+      js << "var sorting='#{Sketchup.read_default(ID, "template_sorting", "0")}';"
+      js << "var grouping='#{Sketchup.read_default(ID, "template_grouping", "country")}';"
+      if instant
+        js << "document.getElementById('buttons_not_instant').style.display='none';"
+      else
+        js << "document.getElementById('buttons_instant').style.display='none';"
+      end
+      js << "set_dropdowns();"
+      js << "view_list();"
+      dlg.execute_script js
     end
-    js << "set_dropdowns();"
-    js << "view_list();"
 
     # Show dialog.
     if Sketchup.platform == :platform_win
-      dlg.show { dlg.execute_script js }
+      dlg.show { add_data.call }
     else
-      dlg.show_modal { dlg.execute_script js }
+      dlg.show_modal { add_data.call }
     end
 
     # Clicking OK, cancel or close.
@@ -303,6 +322,12 @@ class Template
     # Open template folder.
     dlg.add_action_callback("open_dir") do
       open_dir
+    end
+    
+    # Reload templates from folder.
+    dlg.add_action_callback("reload") do
+      load_all
+      add_data.call
     end
 
     dlg
@@ -648,8 +673,13 @@ class Template
 
   end
 
+  # Public: Update Template component saved to library.
+  #
+  # definition - The ComponentDefinition to use for the template.
+  #
+  # Returns nothing.
   def save_component(definition)
-
+    
     # The plugin is supported by SU 2015 and later. Save template as version
     # 2015 so it can be used in 2015 even if it's created in a newer version.
     version = Sketchup::Model::VERSION_2015
@@ -661,10 +691,10 @@ class Template
 
   end
 
-  # Public: Update Template properties to Hash and save to library.
-  # Corresponding hash can be obtain from with the to_hash method.
+  # Public: Update Template properties saved to library.
   #
   # info - Hash containing template information to save.
+  #        Corresponding hash can be obtain from with the to_hash method.
   #
   # Returns nothing.
   def save_info(info)
@@ -876,6 +906,15 @@ class Template
 
   end
 
+  # Internal: Check if there is an archive file associated with template.
+  #
+  # Returns boolean.
+  def has_archive?
+  
+    File.exist?(File.join(TEMPLATE_DIR, "#{@id}.#{FILE_EXTENSION}"))
+  
+  end
+  
   # Internal: Temporary decompresses template archive to EXTRACT_DIR so files
   # can be read. Also copies the preview images to the temp folder web dialogs
   # loads them from.
