@@ -226,7 +226,7 @@ class Building
         (
           @gables  != last_drawn_as[:gables] ||
           @corners != last_drawn_as[:corners] ||
-          @facade_margins != last_drawn_as[:facade_margins] ||
+          !@facade_margins.eql?(last_drawn_as[:facade_margins]) || # Using eql? because Length == nil comparision raises error.
           @part_replacements != last_drawn_as[:part_replacements]
         )
       )
@@ -238,7 +238,7 @@ class Building
      elsif(
       @gables  != last_drawn_as[:gables] ||
       @corners != last_drawn_as[:corners] ||
-      @facade_margins != last_drawn_as[:facade_margins] ||
+      !@facade_margins.eql?(last_drawn_as[:facade_margins]) ||
       @part_replacements != last_drawn_as[:part_replacements]
      )
        draw_parts
