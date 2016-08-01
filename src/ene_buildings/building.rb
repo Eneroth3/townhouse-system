@@ -372,7 +372,7 @@ class Building
       use = corner_settings[name] || []
 
       part_data = {
-        :defintion => e.definition,
+        :definition => e.definition,
         :original_instance => e,
         :name => name,
         :use => use,
@@ -422,7 +422,7 @@ class Building
       use = gable_settings[name] || []
 
       part_data = {
-        :defintion => e.definition,
+        :definition => e.definition,
         :original_instance => e,
         :name => name,
         :use => use,
@@ -470,8 +470,8 @@ class Building
       next unless ad = e.attribute_dictionary(Template::ATTR_DICT_PART)
 
       part_data = {
-        :defintion => e.definition,
         :name => ad["name"],
+        :definition => e.definition,
         :original_instance => e,
         :transformations => []
       }
@@ -625,7 +625,7 @@ class Building
       next unless name = e.get_attribute(Template::ATTR_DICT_PART, "name")
 
       part_data = {
-        :defintion => e.definition,
+        :definition => e.definition,
         :original_instance => e,
         :name => name,
         :replaces => replaces,
