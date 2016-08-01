@@ -704,9 +704,9 @@ class Template
     info = info.dup
     info.delete "id"
 
-    info["su_file_version"] = Sketchup.version# TODO: FUTURE SU VERSION: Make this the oldest version supporting the plugin.
-    info["date_modified"] = Time.now.to_i
-    info["date_created"] ||= Time.now.to_i
+    info[:su_file_version] = Sketchup.version# TODO: FUTURE SU VERSION: Make this the oldest version supporting the plugin.
+    info[:date_modified]   = Time.now.to_i
+    info[:date_created]  ||= Time.now.to_i
 
     info.each_pair do |k, v|
       instance_variable_set("@" + k.to_s, v)

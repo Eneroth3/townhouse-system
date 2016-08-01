@@ -822,8 +822,17 @@ module TemplateEditor
     model = Sketchup.active_model
     model.start_operation "Saving Template Data", true
 
-    # Remove old dictionary in case a value was changed to default and therefore
-    # shouldn't be present in new data
+    # REVIEW: The very absence/presence of a key has a meaning as the
+    # code is currently written.
+    # This cannot be changed now due to compatibility with existing templates.
+    #
+    # Completely delete old attribute dictionary before writing new attributes
+    # to get the effect of old attributes being replaced by nothingness.
+    #
+    # List attributes to always carry over (not included in dialog).
+    data[:su_file_version] = old_data[:su_file_version]
+    data[:date_modified]   = old_data[:date_modified]
+    data[:date_created]    = old_data[:date_created]
     ad = @@component_inst.attribute_dictionary ATTR_DICT_EDITING
     @@component_inst.attribute_dictionaries.delete(ad) if ad
 
@@ -982,8 +991,15 @@ module TemplateEditor
 
     model.start_operation "Saving Part Data", true
 
-    # Remove old dictionary in case a value was changed to default and therefore
-    # shouldn't be present in new data.
+    # REVIEW: The very absence/presence of an attribute has a meaning as the
+    # code is currently written.
+    # E.g. presence of (truthy) attribute "gable" means part is a gable instead
+    # of simply having a "positioning" attribute that can represent any
+    # positioning.
+    # This cannot be changed now due to compatibility with existing templates.
+    #
+    # Completely delete old attribute dictionary before writing new attributes
+    # to get the effect of old attributes being replaced by nothingness.
     ad = @@part.attribute_dictionary Template::ATTR_DICT_PART
     @@part.attribute_dictionaries.delete(ad) if ad
 
