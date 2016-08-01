@@ -241,27 +241,27 @@ module TemplateEditor
     else
 
       info = EneBuildings.attr_dict_to_hash(@@component_inst, ATTR_DICT_EDITING)
-      img_path = File.join Template::PREVIEW_DIR, "#{info["id"]}_100.png"
+      img_path = File.join Template::PREVIEW_DIR, "#{info[:id]}_100.png"
       img_path = Template::PREVIEW_PLACEHOLDER_100 unless File.exist?(img_path)
       img_path += "?no_cache=#{Time.now.to_i}"
-      info["alignment"] = [nil, nil] unless info["alignment"]
-      suggest_id = !info["name"] || !info["modeler"]
+      info[:alignment] = [nil, nil] unless info[:alignment]
+      suggest_id = !info[:name] || !info[:modeler]
 
       js = "warn(false);"
-      js << "document.getElementById('name').value=#{info["name"].to_s.inspect};"
-      js << "document.getElementById('modeler').value=#{info["modeler"].to_s.inspect};"
-      js << "document.getElementById('id').value=#{info["id"].to_s.inspect};"
+      js << "document.getElementById('name').value=#{info[:name].to_s.inspect};"
+      js << "document.getElementById('modeler').value=#{info[:modeler].to_s.inspect};"
+      js << "document.getElementById('id').value=#{info[:id].to_s.inspect};"
       js << "suggest_id(#{suggest_id});"
-      js << "document.getElementById('architect').value=#{info["architect"].to_s.inspect};"
-      js << "document.getElementById('country').value=#{info["country"].to_s.inspect};"
-      js << "document.getElementById('year').value=#{info["year"].to_s.inspect};"
-      js << "document.getElementById('stories').value=#{info["stories"].to_s.inspect};"
-      js << "document.getElementById('source').value=#{info["source"].to_s.inspect};"
-      js << "document.getElementById('source_url').value=#{info["source_url"].to_s.inspect};"
-      js << "document.getElementById('description').value=#{info["description"].to_s.inspect};"
-      js << "document.getElementById('alignment_front').value=#{info["alignment"][0].to_s.inspect};"
-      js << "document.getElementById('alignment_back').value=#{info["alignment"][1].to_s.inspect};"
-      js << "document.getElementById('depth').value=#{info["depth"].to_s.inspect};"
+      js << "document.getElementById('architect').value=#{info[:architect].to_s.inspect};"
+      js << "document.getElementById('country').value=#{info[:country].to_s.inspect};"
+      js << "document.getElementById('year').value=#{info[:year].to_s.inspect};"
+      js << "document.getElementById('stories').value=#{info[:stories].to_s.inspect};"
+      js << "document.getElementById('source').value=#{info[:source].to_s.inspect};"
+      js << "document.getElementById('source_url').value=#{info[:source_url].to_s.inspect};"
+      js << "document.getElementById('description').value=#{info[:description].to_s.inspect};"
+      js << "document.getElementById('alignment_front').value=#{info[:alignment][0].to_s.inspect};"
+      js << "document.getElementById('alignment_back').value=#{info[:alignment][1].to_s.inspect};"
+      js << "document.getElementById('depth').value=#{info[:depth].to_s.inspect};"
       js << "set_image_path(#{img_path.inspect});"
       @@dlg.execute_script js
 
@@ -317,42 +317,42 @@ module TemplateEditor
       spread_distance = ""
       spread_int = 1
       position_method =
-        if data["align"]
-          if data["align"].is_a? String
-            data["align"]
+        if data[:align]
+          if data[:align].is_a? String
+            data[:align]
           else
-            percentage = data["align"]
+            percentage = data[:align]
             "percentage"
           end
-        elsif data["spread"]
-          spread_fix_number = data["spread"].is_a? Fixnum
+        elsif data[:spread]
+          spread_fix_number = data[:spread].is_a? Fixnum
           if spread_fix_number
-            spread_int = data["spread"]
+            spread_int = data[:spread]
           else
-            spread_distance = data["spread"]
+            spread_distance = data[:spread]
           end
           "spread"
-        elsif data["gable"]
+        elsif data[:gable]
           "gable"
-        elsif data["corner"]
+        elsif data[:corner]
           "corner"
-        elsif data["replacement"]
+        elsif data[:replacement]
           "replacement"
         else
           ""
         end
-      name                    = data["name"]                    || ""
-      margin                  = data["margin"]                  || 0.to_l
-      margin_right            = data["margin_right"]            || ""
-      rounding                = data["rounding"]                || ""
-      override_cut_planes     = data["override_cut_planes"]     || false
-      replace_nested_mateials = data["replace_nested_mateials"] || false
-      gable_margin            = data["gable_margin"]            || 0.to_l
-      corner_margin           = data["corner_margin"]           || 0.to_l
-      replaces                = data["replaces"]                || ""
-      slots                   = data["slots"]                   || 1
-      solid                   = data["solid"]                   || ""
-      solid_index             = data["solid_index"]             || 0
+      name                    = data[:name]                    || ""
+      margin                  = data[:margin]                  || 0.to_l
+      margin_right            = data[:margin_right]            || ""
+      rounding                = data[:rounding]                || ""
+      override_cut_planes     = data[:override_cut_planes]     || false
+      replace_nested_mateials = data[:replace_nested_mateials] || false
+      gable_margin            = data[:gable_margin]            || 0.to_l
+      corner_margin           = data[:corner_margin]           || 0.to_l
+      replaces                = data[:replaces]                || ""
+      slots                   = data[:slots]                   || 1
+      solid                   = data[:solid]                   || ""
+      solid_index             = data[:solid_index]             || 0
 
       # Make name unique. If part was copied it may be duplicated.
       # Assume user first selects the copy and not the original.
@@ -694,7 +694,7 @@ module TemplateEditor
     save_info if info_opened?
     info = EneBuildings.attr_dict_to_hash(active_template_component, ATTR_DICT_EDITING)
 
-    unless info["id"]
+    unless info[:id]
       msg =
         "ID not set. A template cannot be saved without an ID.\n"\
         "Set an ID in the Template Info dialog and try again."
@@ -715,13 +715,13 @@ module TemplateEditor
     end
 
     Template.require_all
-    if t = Template.get_from_id(info["id"])
+    if t = Template.get_from_id(info[:id])
       msg =
-        "The template '#{Template.filename(info["id"])}' already exists.\nReplace it?\n\n"\
+        "The template '#{Template.filename(info[:id])}' already exists.\nReplace it?\n\n"\
         "To save by another name, change the ID field in template info dialog."
       return if UI.messagebox(msg, MB_YESNO) == IDNO
     else
-      t = Template.new info["id"]
+      t = Template.new info[:id]
     end
 
     Sketchup.status_text = "Saving template..."
@@ -760,10 +760,9 @@ module TemplateEditor
     # Get settings from dialog.
     data = {}#REVIEW:  use loop instead of repeating code.
     name = @@dlg.get_element_value "name"
-    data["name"] = name unless name.empty?
+    data[:name] = name unless name.empty?
     modeler = @@dlg.get_element_value "modeler"
-    data["modeler"] = modeler unless modeler.empty?
-    #@@suggest_id = @@dlg.get_element_value("suggest_id") == "true"
+    data[:modeler] = modeler unless modeler.empty?
     id = @@dlg.get_element_value "id"
     unless id.empty?
       if /\W/.match id
@@ -771,33 +770,33 @@ module TemplateEditor
           "'ID must only contain letters A-Z and underscore (_).\n"\
           "Keeping old value."
         UI.messagebox msg
-        id = old_data["id"]
+        id = old_data[:id]
       end
-      data["id"] = id if id
+      data[:id] = id if id
     end
     architect = @@dlg.get_element_value "architect"
-    data["architect"] = architect unless architect.empty?
+    data[:architect] = architect unless architect.empty?
     country = @@dlg.get_element_value "country"
-    data["country"] = country unless country.empty?
+    data[:country] = country unless country.empty?
     year = @@dlg.get_element_value("year")
-    data["year"] = year.to_i unless year.empty?
+    data[:year] = year.to_i unless year.empty?
     stories = @@dlg.get_element_value "stories"
-    data["stories"] = stories.to_i unless stories.empty?
+    data[:stories] = stories.to_i unless stories.empty?
     source = @@dlg.get_element_value "source"
-    data["source"] = source unless source.empty?
+    data[:source] = source unless source.empty?
     source_url = @@dlg.get_element_value "source_url"
-    data["source_url"] = source_url unless source_url.empty?
+    data[:source_url] = source_url unless source_url.empty?
     description = @@dlg.get_element_value "description"
-    data["description"] = description unless description.empty?
+    data[:description] = description unless description.empty?
     alignment = [nil, nil]
     alignment_front = @@dlg.get_element_value "alignment_front"
     alignment_back = @@dlg.get_element_value "alignment_back"
     alignment[0] = alignment_front.to_i unless alignment_front.empty?
     alignment[1] = alignment_back.to_i unless alignment_back.empty?
-    data["alignment"] = alignment
+    data[:alignment] = alignment
     depth = @@dlg.get_element_value "depth"
     if depth.start_with? "~"# Assume user didn't write value.
-      data["depth"] = old_data["depth"]
+      data[:depth] = old_data[:depth]
     elsif !depth.empty?
       begin
         depth = depth.to_l
@@ -808,16 +807,16 @@ module TemplateEditor
         UI.messagebox msg
         depth = old_data["depth"]
       end
-      data["depth"] = depth if depth && depth != 0
+      data[:depth] = depth if depth && depth != 0
     end
 
     # Stop executing if data didn't change.
     return if data == old_data
 
     # Save prefix for this author so it can be suggested in the future.
-    if data["id"] && data["modeler"]
-      prefix = /^[^_]*/.match(data["id"])[0]
-      EneBuildings.save_author_prefix data["modeler"], prefix
+    if data[:id] && data[:modeler]
+      prefix = /^[^_]*/.match(data[:id])[0]
+      EneBuildings.save_author_prefix data[:modeler], prefix
     end
 
     model = Sketchup.active_model
@@ -830,7 +829,7 @@ module TemplateEditor
 
     # Save attributes.
     data.each_pair do |k, v|
-      @@component_inst.set_attribute ATTR_DICT_EDITING, k, v
+      @@component_inst.set_attribute ATTR_DICT_EDITING, k.to_s, v
     end
 
     # Update ComponentDefinition name to make it correspond to ID.
@@ -869,32 +868,32 @@ module TemplateEditor
     # Notify user when input cannot be parsed as length and keep old value.
     data = {}
     name = @@dlg_part.get_element_value "name"
-    data["name"] = unique_part_name(@@part, name) unless name.empty?
+    data[:name] = unique_part_name(@@part, name) unless name.empty?
     case @@dlg_part.get_element_value "position_method"
     when "spread"
       margin = @@dlg_part.get_element_value("margin")
       begin
-        margin = margin.start_with?("~") ? old_data["margin"] : margin.to_l
+        margin = margin.start_with?("~") ? old_data[:margin] : margin.to_l
       rescue ArgumentError
         msg =
           "'#{margin}' could not be parsed as length.\n"\
           "Keeping old value for margin."
         UI.messagebox msg
-        margin = old_data["margin"] || 0
+        margin = old_data[:margin] || 0
       end
-      data["margin"] = margin unless margin == 0
+      data[:margin] = margin unless margin == 0
       margin_r = @@dlg_part.get_element_value("margin_right")
       unless margin_r.empty?
         begin
-          margin_r = margin_r.start_with?("~") ? old_data["margin_right"] : margin_r.to_l
+          margin_r = margin_r.start_with?("~") ? old_data[:margin_right] : margin_r.to_l
         rescue ArgumentError
           msg =
             "'#{margin_r}' could not be parsed as length.\n"\
             "Keeping old value for right margin."
           UI.messagebox msg
-          margin_r = old_data["margin_right"] || margin
+          margin_r = old_data[:margin_right] || margin
         end
-        data["margin_right"] = margin_r unless margin_r == margin
+        data[:margin_right] = margin_r unless margin_r == margin
       end
       if @@dlg_part.get_element_value("spread_fix_number") == "true"
         sp = @@dlg_part.get_element_value("spread_int").to_i
@@ -902,25 +901,25 @@ module TemplateEditor
       else
         sp = @@dlg_part.get_element_value("spread_distance")
         begin
-          sp = sp.start_with?("~") ? old_data["spread"] : sp.to_l
+          sp = sp.start_with?("~") ? old_data[:spread] : sp.to_l
         rescue ArgumentError
           msg =
             "'#{sp}' could not be parsed as length.\n"\
             "Keeping old value for spread interval."
           UI.messagebox msg
-          sp = old_data["spread"] || 1.m
+          sp = old_data[:spread] || 1.m
         end
-        sp = old_data["spread"] unless sp > 0
+        sp = old_data[:spread] unless sp > 0
       end
-      data["spread"] = sp if sp
+      data[:spread] = sp if sp
       rounding = @@dlg_part.get_element_value("rounding")
-      data["rounding"] = rounding unless rounding.empty?
+      data[:rounding] = rounding unless rounding.empty?
     when "left", "right", "center"
-      data["align"] = @@dlg_part.get_element_value "position_method"
+      data[:align] = @@dlg_part.get_element_value "position_method"
     when "percentage"
-      data["align"] = @@dlg_part.get_element_value("align_percentage").gsub(",",".").to_f
+      data[:align] = @@dlg_part.get_element_value("align_percentage").gsub(",",".").to_f
     when "gable"
-      data["gable"] = true
+      data[:gable] = true
       gable_margin = @@dlg_part.get_element_value("gable_margin")
       begin
         gable_margin = gable_margin.start_with?("~") ? old_data["gable_margin"] : gable_margin.to_l
@@ -931,14 +930,14 @@ module TemplateEditor
         UI.messagebox msg
         gable_margin = old_data["gable_margin"] || 0
       end
-      data["gable_margin"] = gable_margin unless gable_margin == 0
-      unless data["name"]
-         data["name"] = unique_part_name(@@part, "Gable")
-         msg = "Gable must have a name.\nUsing '#{data["name"]}."
+      data[:gable_margin] = gable_margin unless gable_margin == 0
+      unless data[:name]
+         data[:name] = unique_part_name(@@part, "Gable")
+         msg = "Gable must have a name.\nUsing '#{data[:name]}."
          UI.messagebox msg
       end
     when "corner"
-      data["corner"] = true
+      data[:corner] = true
       corner_margin = @@dlg_part.get_element_value("corner_margin")
       begin
         corner_margin = corner_margin.start_with?("~") ? old_data["corner_margin"] : corner_margin.to_l
@@ -949,30 +948,30 @@ module TemplateEditor
         UI.messagebox msg
         corner_margin = old_data["corner_margin"] || 0
       end
-      data["corner_margin"] = corner_margin unless corner_margin == 0
-      unless data["name"]
-         data["name"] = unique_part_name(@@part, "Corner")
-         msg = "Corner must have a name.\nUsing '#{data["name"]}."
+      data[:corner_margin] = corner_margin unless corner_margin == 0
+      unless data[:name]
+         data[:name] = unique_part_name(@@part, "Corner")
+         msg = "Corner must have a name.\nUsing '#{data[:name]}."
          UI.messagebox msg
       end
     when "replacement"
-      data["replacement"] = true
-      data["replaces"] = @@dlg_part.get_element_value("replaces")
+      data[:replacement] = true
+      data[:replaces] = @@dlg_part.get_element_value("replaces")
       slots = @@dlg_part.get_element_value("slots").to_i
       slots = [slots, 1].max
-      data["slots"] = slots
-      unless data["name"]
-         data["name"] = unique_part_name(@@part, "Replacement")
-         msg = "Replacement must have a name.\nUsing '#{data["name"]}."
+      data[:slots] = slots
+      unless data[:name]
+         data[:name] = unique_part_name(@@part, "Replacement")
+         msg = "Replacement must have a name.\nUsing '#{data[:name]}."
          UI.messagebox msg
       end
     end
-    data["override_cut_planes"] = true if @@dlg_part.get_element_value("override_cut_planes") == "true"
-    data["replace_nested_mateials"] = true if @@dlg_part.get_element_value("replace_nested_mateials") == "true"
+    data[:override_cut_planes] = true if @@dlg_part.get_element_value("override_cut_planes") == "true"
+    data[:replace_nested_mateials] = true if @@dlg_part.get_element_value("replace_nested_mateials") == "true"
     solid = @@dlg_part.get_element_value("solid")
-    data["solid"] = solid unless solid.empty?
+    data[:solid] = solid unless solid.empty?
     solid_index = @@dlg_part.get_element_value("solid_index").to_i
-    data["solid_index"] = solid_index unless solid_index.zero?
+    data[:solid_index] = solid_index unless solid_index.zero?
 
     # Stop executing if data didn't change.
     return if data == old_data
@@ -990,7 +989,7 @@ module TemplateEditor
 
     # Save attributes.
     data.each_pair do |k, v|
-      @@part.set_attribute Template::ATTR_DICT_PART, k, v
+      @@part.set_attribute Template::ATTR_DICT_PART, k.to_s, v
     end
 
     model.commit_operation

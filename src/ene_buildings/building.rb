@@ -1489,7 +1489,7 @@ class Building
   # Return Hash.
   def load_attributes_to_hash
 
-    h = EneBuildings.attr_dict_to_hash @group, ATTR_DICT, true
+    h = EneBuildings.attr_dict_to_hash @group, ATTR_DICT
 
     # Backward compatibility: Set back_along_path to false if not already set.
     # The value nil is reserved to let PathHandling handle paths where
