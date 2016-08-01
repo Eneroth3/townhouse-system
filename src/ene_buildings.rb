@@ -31,11 +31,6 @@
 # *Yup, SU on Windows uses IE to render web dialogs no matter what your
 # default browser is.
 
-# TODO
-#   Better preview images with thinner nicer looking edges.
-#   Component replacement. E.g. a certain windows can be replaced by doors.
-#   More buildings!
-
 # Known issues
 #  In SU 2015 template parts cannot be copied while Part Info dialog is opened
 #    due to dark observer magic.

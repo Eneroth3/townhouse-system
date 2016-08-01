@@ -255,93 +255,6 @@ class Building
 
   end
 
-  # Public: Find what part replacement currently uses a specific slot.
-  #
-  # original_name - String name of the original part being replace.
-  # segment       - Int segment index (counting from left, starting at 0).
-  # index         - Int slot index for leftmost slot to be checked
-  #                 (counting from left, starting at 0).
-  # slots         - How many slots to check (default: 1).
-  #
-  # Example:
-  #
-  #   my_building.slot_use("Window", 0, 0)
-  #   # -> []
-  #   # The first Winow from the left in the first segment from the left is
-  #   # not being replaced.
-  #
-  #   my_building.slot_use("Window", 0, 0, 4)
-  #   # -> []
-  #   # The first 4 Winow from the left in the first segment from the left are
-  #   # not being replaced.
-  #
-  #   my_building.slot_use("Window", 0, 1)
-  #   # -> [["Door", 1, true]]
-  #   # The second Window from the left in the first segment is being replaced
-  #   # by a Door.
-  #
-  #   my_building.slot_use("Window", 0, 3)
-  #   # -> [["Balcony", 2, true]]
-  #   # The fourth Window from the left in the first segment is being replaced
-  #   # by a Balcony. The leftmost (start) slot of the balcony is the third slot
-  #   # in the same section, meaning the balcony must span at least 2 slots.
-  #
-  #   my_building.slot_use("Window", 1, 2)
-  #   # -> [["Balcony Wide", 0, false]]
-  #   # The third Window in the second segment is being replaced by a Balcony
-  #   # Wide. The Balcony Wide is invalid and will not be drawn.
-  #   # Either the Balcony Wide uses slots that doesn't exist because segment is
-  #   # too short or "Balcony Wide" isn't the name of a replacement that is
-  #   # available for thye current template.
-  #
-  # Returns Array listing replacements using giving slots or nil when any of the
-  # slots doesn't exist.
-  # Each Array element is another Array containg String name of replacement using
-  # slot, it's leftmost (start) slot index and a boolean telling if its valid.
-  # A replacement isn't valid when there isn't any available replacement by that
-  # name or when it uses slots that doesn't exist.
-  def inspect_slots(original_name, segment, index, slots = 1)# TODO: Under construction. Complete mess method. Remove completely?
-
-    # Check if given segment even exists.
-    # TODO: return nil when segment doesn't exist (compare to path)...
-
-    last_slot = index + slots - 1
-
-    part_replacements      = (@part_replacements[@template.id] ||= {})
-    available_replacements = list_replacement_parts
-    #available_replacable = list_available_replacable...
-
-    # Check if all given slots exists within segment.
-    # TODO: return nul if last_slot doesn't exist...
-
-    uses_slot = []
-
-    segment_array = part_replacements[original_name][segment]
-    return [] unless segment_array
-    segment_array.each_with_index do |v, other_i|
-
-      next unless v
-      valid = true
-      using_slot = available_replacements.find { |r| r[:name] == v }
-      unless using_slot
-        valid = false
-        using_slot = {}
-      end
-      other_slots = using_slot[:slots] || 1
-      other_last_slot = other_i + other_slots - 1
-
-      # TODO: valid = false if other_last_slot is greater than the index of the last available slot.
-
-      next if other_i > last_slot || other_last_slot < index
-
-      uses_slot << [v, other_i, valid]
-
-    end
-
-    uses_slot
-
-  end
-
   # Public: List corner parts.
   # A part is either a Group or ComponentInstance.
   #
@@ -458,7 +371,7 @@ class Building
   #   :transformations   - (Only when calculate_transformations is true)
   #                        Transformations object defining instance placement
   #                        in local coordinates grouped by building segment.
-  def list_replaceable_parts(calculate_transformations = false)# TODO: CLEANUP PART LISTING: See if slots can be added as output ans use it in properties panel. also document as output from this method and document in what argument does.
+  def list_replaceable_parts(calculate_transformations = false)
 
     # Aligned (left, right, center and percentage) and "spread" (arrayed) parts
     # are considered replaceable. Other parts like gables and corners are only
