@@ -176,7 +176,7 @@ class Template
     files.each do |file|
       id = File.basename file, ".*"
       load_id id
-      # IDEA: add reload-button in select panel? requires removed templates to be unloaded (purged).
+      # FEATURE: add reload-button in select panel? requires removed templates to be unloaded (purged).
     end
 
     @@loaded = true
@@ -189,19 +189,16 @@ class Template
   # If a template by that id is already created, reload its data into existing
   # object.
   #
-  # id - The id of the template, same as the basename of its file excluding
-  #      extension.
+  # id - The id of the template, same as the basename of its .bldg file.
   #
   # Returns Template.
   def self.load_id(id)
 
-    t = get_from_id id
-    if t
-      t.load_data
-    else
+    unless t = get_from_id(id)
       t = new id
     end
-
+    t.load_data
+    
     t
 
   end
@@ -258,13 +255,8 @@ class Template
 
     # Add data.
     js ="var preview_dir = '#{PREVIEW_DIR}';"
-    js << "var templates=["
-    @@instances.sort.each do |t|
-      js << t.json_data
-      js << ","
-    end
-    js.chomp! unless @@instances.empty?
-    js << "];"
+    json = JSON.generate(@@instances.sort.map { |t| t.to_hash })
+    js << "var templates=#{json};"
     js << "var selected='#{selected ? selected.id : "null"}';"
     js << "var sorting='#{Sketchup.read_default(ID, "template_sorting", "0")}';"
     js << "var grouping='#{Sketchup.read_default(ID, "template_grouping", "country")}';"
@@ -443,19 +435,15 @@ class Template
 
   # Instance methods
 
-  # Public: Load a new Template object from library.
+  # Public: Load a Template object from library or create new Template object.
   #
   # id - The id string of the template to load.
   #      This is the same as the basename of the template file.
   def initialize(id)
 
     @id = id
-
-    # Load data from JSON file add save as attributes.
-    status = load_data
-
-    # Add object to template list if data could be loaded.
-    @@instances << self if status
+    
+    @@instances << self
 
   end
 
@@ -597,9 +585,9 @@ class Template
         UI.messagebox msg
         return false
       end
-      hash.each_pair do |key, value|
+      hash.each_pair do |k, v|
         # Keys not present in JSON will be regarded nil in ruby.
-        instance_variable_set("@" + key.to_s, value)
+        instance_variable_set("@" + k.to_s, v)
         # FIXME: if template is reloaded after depth has been changed from length to nil old value is still loaded.
       end
 
@@ -657,6 +645,71 @@ class Template
 
     # Look for materials in all groups in template root
     recursive.call(component_def.entities).flatten.uniq.compact
+
+  end
+
+  def save_component(definition)
+  
+    # The plugin is supported by SU 2015 and later. Save template as version
+    # 2015 so it can be used in 2015 even if it's created in a newer version.
+    version = Sketchup::Model::VERSION_2015
+    path = File.join Template::EXTRACT_DIR, "model.skp"#, version#TODO: FUTURE SU VERSION: add version parameter when supported
+    definition.save_as path
+    write_to_archive path
+    
+    nil
+    
+  end
+  
+  # Public: Update Template properties to Hash and save to library.
+  # Corresponding hash can be obtain from with the to_hash method.
+  #
+  # info - Hash containing template information to save.
+  #
+  # Returns nothing.
+  def save_info(info)
+  
+    # ID should not be saved to JSON file since it's defined as the basename
+    # of the whole archive containing the JSON.
+    info = info.dup
+    info.delete "id"
+    
+    info["su_file_version"] = Sketchup.version# TODO: FUTURE SU VERSION: Make this the oldest version supporting the plugin.
+    info["date_modified"] = Time.now.to_i
+    info["date_created"] ||= Time.now.to_i
+    
+    info.each_pair do |k, v|
+      instance_variable_set("@" + k.to_s, v)
+    end
+    
+    # Convert depth length to float.
+    # JSON.generate will otherwise convert it to a string.
+    info["depth"] = info["depth"].to_f if info["depth"]
+  
+    path = File.join EXTRACT_DIR, "info.json"
+    json_string = JSON.generate info
+    File.write path, json_string
+    write_to_archive path
+    
+    nil
+    
+  end
+
+  # Public: List all object attributes as Hash.
+  #
+  # Returns hash.
+  def to_hash
+
+    h = {}
+    instance_variables.each do |k|
+      v = instance_variable_get k
+      k = k.to_s  # Make string of symbol
+      k[0] = ""   # Remove @ sign from key
+      k = k.to_sym
+      h[k] = v
+    end
+    
+    h
 
   end
 
@@ -820,28 +873,6 @@ class Template
     Observers.enable
     
     nil
-
-  end
-
-  # Internal: List certain template data in JSON string to use for web dialogs.
-  #
-  # Returns JSON string.
-  def json_data#TODO: have a to_hash method that makes a hash of all instance variable? Make JSON of that hash for dialogs. Use same hash when creating attributes in editor.
-
-    json = "{"
-    # List keys to include in JSON object here.
-    %w(id name modeler architect country year stories source source_url description).each do |k|
-      v = self.send k
-      next if v.nil?
-      # Escape to avoid HTML injection.
-      v = v.gsub("<","&lt;").gsub(">","&gt;") if v.is_a? String
-      # Use inspect to add quotes to strings but not numbers or booleans.
-      json << "\"#{k}\":#{v.inspect},"
-    end
-    json.chomp!
-    json <<" }"
-
-    json
 
   end
 

@@ -81,11 +81,9 @@ module TemplateEditor
     model = instance.model
     model.start_operation "Attach template data", true, false, true
 
-    template.instance_variables.each do |key|
-      value = template.instance_variable_get(key)
-      key = key.to_s  # Make string of symbol
-      key[0] = ""     # Remove @ sign from key
-      instance.set_attribute ATTR_DICT_EDITING, key, value
+    template.to_hash.each_pair do |k, v|
+      k = k.to_s  # Make string of symbol
+      instance.set_attribute ATTR_DICT_EDITING, k, v
     end
 
     model.commit_operation
@@ -685,13 +683,6 @@ module TemplateEditor
   # Returns nothing.
   def self.save
   
-    # REVIEW: Should more of this stuff be moved to the Template class itself?
-    # Low level stuff like creating json text file and saving component as
-    # external skp file doesn't really belong in this user interface class.
-    # "model.skp" and "info.json" should not be mentioned outside Template.
-    # If this is changed, make sure Template does not show up in template
-    # browser unless it's saved to a file too.
-
     unless active_template_component
       msg =
         "No active Template.\n"\
@@ -724,62 +715,22 @@ module TemplateEditor
     end
 
     Template.require_all
-    if Template.get_from_id info["id"]
+    if t = Template.get_from_id(info["id"])
       msg =
         "The template '#{Template.filename(info["id"])}' already exists.\nReplace it?\n\n"\
         "To save by another name, change the ID field in template info dialog."
       return if UI.messagebox(msg, MB_YESNO) == IDNO
+    else
+      t = Template.new info["id"]
     end
     
     Sketchup.status_text = "Saving template..."
 
-    # If part data dialog is opened, save the values of it.
     save_part_data if part_info_opened?
-
-    # ID should not be saved in the json file since it's defined in the name of
-    # the whole template file.
-    id = info.delete "id"
     
-    # Convert depth length to float.
-    # JSON.generate will otherwise convert it to a string.
-    info["depth"] = info["depth"].to_f if info["depth"]
-    
-    info["su_file_version"] = Sketchup.version# TODO: FUTURE SU VERSION: Make this the oldest version supporting the plugin.
+    t.save_info info
+    t.save_component active_template_component.definition
 
-    # Empty temp directory.
-    FileUtils.rm_rf Dir.glob(File.join(Template::EXTRACT_DIR, "*"))
-
-    files = []
-
-    # Save component definition.
-    # The plugin is supported by SU 2015 and later. Save template as version
-    # 2015 so it can be used in 2015 even if it's created in a newer version.
-    version = Sketchup::Model::VERSION_2015
-    path = File.join Template::EXTRACT_DIR, "model.skp"#, version#TODO: FUTURE SU VERSION: add version parameter when supported
-    active_template_component.definition.save_as path
-    files << path
-
-    # Save data as json.
-    path = File.join Template::EXTRACT_DIR, "info.json"
-    json_string = JSON.generate info
-    File.write path, json_string
-    files << path
-
-    # Compress files into template archive file.
-    ###t.write_to_archive files# This requires Template object to be created and that currently requires the file to already exist.
-    full_path = Template.full_path id
-    EneBuildings.compress files, full_path
-
-    # Empty temp directory.
-    FileUtils.rm_rf Dir.glob(File.join(Template::EXTRACT_DIR, "*"))
-
-    # Load/reload Template object for this template.
-    t = Template.load_id id
-    
-    
-    # Update template preview.
-    # This draws a temporary Building using the Template and therefore must
-    # be called after the rest of the template data is saved.
     if @@update_previes
       Sketchup.status_text = "Creating Preview..."
       t.update_preview

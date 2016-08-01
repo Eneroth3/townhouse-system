@@ -635,7 +635,7 @@ class Building
       js << "offset_window(10);" if @@opened_dialogs.size > 1
 
       # Template info.
-      js << "var template_info=#{@template.json_data};"
+      js << "var template_info=#{JSON.generate(@template.to_hash)};"
       js << "update_template_section();";
 
       # Gables.

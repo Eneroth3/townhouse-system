@@ -147,7 +147,9 @@ module EneBuildings
   #
   # Returns nothing.
   def self.compress(files, target)
-
+  
+    files = [*files]
+    
     Zip::File.open(target, Zip::File::CREATE) do |zipfile|
       files.each do |file_path|
         file_name = File.basename file_path
