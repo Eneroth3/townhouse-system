@@ -700,6 +700,7 @@ class Template
     info.delete "id"
 
     info[:su_file_version] = Sketchup.version# TODO: FUTURE SU VERSION: Make this the oldest version supporting the plugin.
+    info[:plugin_version ] = VERSION
     info[:date_modified]   = Time.now.to_i
     info[:date_created]  ||= Time.now.to_i
 
@@ -709,7 +710,7 @@ class Template
 
     # Convert depth length to float.
     # JSON.generate will otherwise convert it to a string.
-    info["depth"] = info["depth"].to_f if info["depth"]
+    info[:depth] = info[:depth].to_f if info[depth]
 
     path = File.join EXTRACT_DIR, "info.json"
     json_string = JSON.generate info
