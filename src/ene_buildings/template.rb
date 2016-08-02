@@ -171,7 +171,7 @@ class Template
   #
   # Returns nothing.
   def self.load_all
-  
+
     purge
 
     files = Dir.glob(File.join(TEMPLATE_DIR, "*.#{FILE_EXTENSION}"))
@@ -217,13 +217,13 @@ class Template
   #
   # Returns nothing.
   def self.purge
-  
+
     @@instances.keep_if { |t| t.has_archive? }
-    
+
     nil
-    
+
   end
-  
+
   # Public: Load all installed templates unless they have already been loaded.
   # Called when building object is created and select_panel is opened.
   # By waiting to load templates until they are needed Sketchup startup is
@@ -323,7 +323,7 @@ class Template
     dlg.add_action_callback("open_dir") do
       open_dir
     end
-    
+
     # Reload templates from folder.
     dlg.add_action_callback("reload") do
       load_all
@@ -442,6 +442,9 @@ class Template
   # set).
   attr_reader :name
 
+  # Public: Returns the plugin version used when saving the template.
+  attr_reader :plugin_version
+
   # Public: Returns the source the modeler has used, e.g. a book,
   # or nil if not set.
   attr_reader :source
@@ -452,7 +455,7 @@ class Template
   # Public: Returns the number of stories or nil if not set.
   attr_reader :stories
 
-  # Public: What SU version is used for the template Sketchup file.
+  # Public: Returns the SU version used for the template's Sketchup model file.
   attr_reader :su_file_version
 
   # Public: Returns the year template was built or nil if not set.
@@ -674,7 +677,7 @@ class Template
   #
   # Returns nothing.
   def save_component(definition)
-    
+
     # The plugin is supported by SU 2015 and later. Save template as version
     # 2015 so it can be used in 2015 even if it's created in a newer version.
     version = Sketchup::Model::VERSION_2015
@@ -906,11 +909,11 @@ class Template
   #
   # Returns boolean.
   def has_archive?
-  
+
     File.exist?(File.join(TEMPLATE_DIR, "#{@id}.#{FILE_EXTENSION}"))
-  
+
   end
-  
+
   # Internal: Temporary decompresses template archive to EXTRACT_DIR so files
   # can be read. Also copies the preview images to the temp folder web dialogs
   # loads them from.
