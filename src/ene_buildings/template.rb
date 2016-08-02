@@ -620,12 +620,7 @@ class Template
       @name ||= @id
 
       # Make depth Length.
-      # Depth is saved as float in json.
-
-      # Extension failed Extension Warehouse review for publishing because of an
-      # error parsing depth as length that I cannot reproduce. Also the review
-      # feedback is sent from a f*****g no-reply account so I cannot get more
-      # information from the reviewer. Trying again with extra error handling.
+      # Depth is saved as float in JSON.
       if @depth
         begin
           @depth = @depth.to_l

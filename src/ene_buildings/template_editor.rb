@@ -202,7 +202,7 @@ module TemplateEditor
 
   end
 
-  # List names of all replacable parts in active drawing context.
+  # List names of all replaceable parts in active drawing context.
   #
   # Returns String Array.
   def self.list_replaceable_names
@@ -754,15 +754,15 @@ module TemplateEditor
     return unless @@component_inst
     return if @@component_inst.deleted?
 
-    # Get data already saved.
-    old_data = EneBuildings.attr_dict_to_hash(@@component_inst, ATTR_DICT_EDITING)
+    # Get info already saved.
+    old_info = EneBuildings.attr_dict_to_hash(@@component_inst, ATTR_DICT_EDITING)
 
     # Get settings from dialog.
-    data = {}#REVIEW:  use loop instead of repeating code.
+    info = {}#REVIEW:  use loop instead of repeating code.
     name = @@dlg.get_element_value "name"
-    data[:name] = name unless name.empty?
+    info[:name] = name unless name.empty?
     modeler = @@dlg.get_element_value "modeler"
-    data[:modeler] = modeler unless modeler.empty?
+    info[:modeler] = modeler unless modeler.empty?
     id = @@dlg.get_element_value "id"
     unless id.empty?
       if /\W/.match id
@@ -770,33 +770,33 @@ module TemplateEditor
           "'ID must only contain letters A-Z and underscore (_).\n"\
           "Keeping old value."
         UI.messagebox msg
-        id = old_data[:id]
+        id = old_info[:id]
       end
-      data[:id] = id if id
+      info[:id] = id if id
     end
     architect = @@dlg.get_element_value "architect"
-    data[:architect] = architect unless architect.empty?
+    info[:architect] = architect unless architect.empty?
     country = @@dlg.get_element_value "country"
-    data[:country] = country unless country.empty?
+    info[:country] = country unless country.empty?
     year = @@dlg.get_element_value("year")
-    data[:year] = year.to_i unless year.empty?
+    info[:year] = year.to_i unless year.empty?
     stories = @@dlg.get_element_value "stories"
-    data[:stories] = stories.to_i unless stories.empty?
+    info[:stories] = stories.to_i unless stories.empty?
     source = @@dlg.get_element_value "source"
-    data[:source] = source unless source.empty?
+    info[:source] = source unless source.empty?
     source_url = @@dlg.get_element_value "source_url"
-    data[:source_url] = source_url unless source_url.empty?
+    info[:source_url] = source_url unless source_url.empty?
     description = @@dlg.get_element_value "description"
-    data[:description] = description unless description.empty?
+    info[:description] = description unless description.empty?
     alignment = [nil, nil]
     alignment_front = @@dlg.get_element_value "alignment_front"
     alignment_back = @@dlg.get_element_value "alignment_back"
     alignment[0] = alignment_front.to_i unless alignment_front.empty?
     alignment[1] = alignment_back.to_i unless alignment_back.empty?
-    data[:alignment] = alignment
+    info[:alignment] = alignment
     depth = @@dlg.get_element_value "depth"
     if depth.start_with? "~"# Assume user didn't write value.
-      data[:depth] = old_data[:depth]
+      info[:depth] = old_info[:depth]
     elsif !depth.empty?
       begin
         depth = depth.to_l
@@ -805,22 +805,22 @@ module TemplateEditor
           "'#{depth}' could not be parsed as length.\n"\
           "Keeping old value depth."
         UI.messagebox msg
-        depth = old_data["depth"]
+        depth = old_info["depth"]
       end
-      data[:depth] = depth if depth && depth != 0
+      info[:depth] = depth if depth && depth != 0
     end
 
-    # Stop executing if data didn't change.
-    return if data == old_data
+    # Stop executing if info didn't change.
+    return if info == old_info
 
     # Save prefix for this author so it can be suggested in the future.
-    if data[:id] && data[:modeler]
-      prefix = /^[^_]*/.match(data[:id])[0]
-      EneBuildings.save_author_prefix data[:modeler], prefix
+    if info[:id] && info[:modeler]
+      prefix = /^[^_]*/.match(info[:id])[0]
+      EneBuildings.save_author_prefix info[:modeler], prefix
     end
 
     model = Sketchup.active_model
-    model.start_operation "Saving Template Data", true
+    model.start_operation "Saving Template Info", true
 
     # REVIEW: The very absence/presence of a key has a meaning as the
     # code is currently written.
@@ -830,21 +830,21 @@ module TemplateEditor
     # to get the effect of old attributes being replaced by nothingness.
     #
     # List attributes to always carry over (not included in dialog).
-    data[:su_file_version] = old_data[:su_file_version]
-    data[:date_modified]   = old_data[:date_modified]
-    data[:date_created]    = old_data[:date_created]
+    info[:su_file_version] = old_info[:su_file_version]
+    info[:date_modified]   = old_info[:date_modified]
+    info[:date_created]    = old_info[:date_created]
     ad = @@component_inst.attribute_dictionary ATTR_DICT_EDITING
     @@component_inst.attribute_dictionaries.delete(ad) if ad
 
     # Save attributes.
-    data.each_pair do |k, v|
+    info.each_pair do |k, v|
       @@component_inst.set_attribute ATTR_DICT_EDITING, k.to_s, v
     end
 
     # Update ComponentDefinition name to make it correspond to ID.
     # If ID changes buildings using the template by the old ID should no longer use
     # this component definition for drawing.
-    unless data["id"] == old_data["id"]
+    unless info[:id] == old_info[:id]
       name = Template::COMPONENT_NAME_PREFIX + id
       @@component_inst.definition.name = name
     end
@@ -989,7 +989,7 @@ module TemplateEditor
 
     Observers.disable
 
-    model.start_operation "Saving Part Data", true
+    model.start_operation "Saving Part Info", true
 
     # REVIEW: The very absence/presence of an attribute has a meaning as the
     # code is currently written.
