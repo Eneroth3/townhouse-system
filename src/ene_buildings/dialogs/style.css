@@ -12,6 +12,9 @@ button{
 abbr{
 	color: gray;
 }
+textarea, select, input{
+  font-size: inherit !important;/*Must use !important to override Win 8 stupidity*/
+}
 
 /*Container for main content that doesn't cover dialog buttons*/
 .main_scrollable_container{
