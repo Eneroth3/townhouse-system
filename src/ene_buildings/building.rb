@@ -1187,8 +1187,8 @@ class Building
         )
 
         # Values in local segment group's coordinates.
-        tangent_left     = tangent_left.transform(segment_trans.inverse)
-        tangent_right    = tangent_right.transform(segment_trans.inverse)
+        tangent_left     = tangent_left.transform segment_trans.inverse
+        tangent_right    = tangent_right.transform segment_trans.inverse
         plane_left       = [ORIGIN, tangent_left.reverse]
         plane_right      = [[segment_length, 0, 0], tangent_right]
         origin_leftmost  = Geom.intersect_line_plane line_origin, plane_left
@@ -1584,8 +1584,10 @@ class Building
       )
 
       # Values in local segment group's coordinates.
-      plane_left       = [ORIGIN, tangent_left.reverse.transform(segment_trans.inverse)]
-      plane_right      = [[segment_length, 0, 0], tangent_right.transform(segment_trans.inverse)]
+      tangent_left  = tangent_left.transform segment_trans.inverse
+      tangent_right = tangent_right.transform segment_trans.inverse
+      plane_left    = [ORIGIN, tangent_left.reverse]
+      plane_right   = [[segment_length, 0, 0], tangent_right]
 
       # Place template component in segment and explode it so it can be edited
       # without interfering with template.
@@ -1649,9 +1651,14 @@ class Building
       # Test code: chamfer and fillet corners.
       # Planes should be calculated before loop so they can be re-used,
       # preferably in method used both in draw_volume and calculate_replaceable_transformations.
-      projected_length = 2.m
-      cut_plane_left = [[projected_length, 0, 0], X_AXIS.reverse]
-      cut_plane_right = [[segment_length - projected_length, 0, 0], X_AXIS]
+      diagonal_length = 2.m
+      half_angle_left = Y_AXIS.angle_between(tangent_left)
+      half_angle_right = Y_AXIS.angle_between(tangent_right)
+      projected_length_left = diagonal_length/(2*Math.sin(half_angle_left))
+      projected_length_right = diagonal_length/(2*Math.sin(half_angle_right))
+      ###projected_length_left = projected_length_right = 2.m
+      cut_plane_left = [[projected_length_left, 0, 0], X_AXIS.reverse]
+      cut_plane_right = [[segment_length - projected_length_right, 0, 0], X_AXIS]
       MyGeom.cut(segment_ents, cut_plane_left) unless segment_index == 0
       MyGeom.cut(segment_ents, cut_plane_right) unless segment_index == path.size - 2
       
