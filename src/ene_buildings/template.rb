@@ -627,7 +627,7 @@ class Template
       if @depth
         begin
           @depth = @depth.to_l
-        rescue ArgumentError
+        rescue ArgumentError => e
             msg =
             "Template '#{@id}' could not be loaded due to invalid building depth.\n\n"\
             "Error message:\n#{e.message}"
@@ -713,7 +713,7 @@ class Template
 
     # Convert depth length to float.
     # JSON.generate will otherwise convert it to a string.
-    info[:depth] = info[:depth].to_f if info[depth]
+    info[:depth] = info[:depth].to_f if info[:depth]
 
     path = File.join EXTRACT_DIR, "info.json"
     json_string = JSON.generate info
