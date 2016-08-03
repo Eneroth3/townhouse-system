@@ -1623,16 +1623,6 @@ class Building
       face_left = faces_left.first
       face_right = faces_right.first
 
-      # Hide walls between segments.
-      unless segment_index == 0
-        face_left.hidden = true
-        face_left.edges.each { |e| e.hidden = true if e.line[1].perpendicular?(Z_AXIS) }
-      end
-      unless segment_index == path.size - 2
-        face_right.hidden = true
-        face_right.edges.each { |e| e.hidden = true if e.line[1].perpendicular?(Z_AXIS) }
-      end
-
       # Adapt building volume to fill this segment by moving and shearing side
       # walls.
 
@@ -1653,6 +1643,29 @@ class Building
 
       segment_ents.transform_entities trans_left, edges_left
       segment_ents.transform_entities trans_right, edges_right
+      
+      
+      
+      # Test code: chamfer and fillet corners.
+      # Planes should be calculated before loop so they can be re-used,
+      # preferably in method used both in draw_volume and calculate_replaceable_transformations.
+      projected_length = 2.m
+      cut_plane_left = [[projected_length, 0, 0], X_AXIS.reverse]
+      cut_plane_right = [[segment_length - projected_length, 0, 0], X_AXIS]
+      MyGeom.cut(segment_ents, cut_plane_left) unless segment_index == 0
+      MyGeom.cut(segment_ents, cut_plane_right) unless segment_index == path.size - 2
+      
+      
+
+      # Hide walls between segments.
+      unless segment_index == 0 || face_left.deleted?
+        face_left.hidden = true
+        face_left.edges.each { |e| e.hidden = true if e.line[1].perpendicular?(Z_AXIS) }
+      end
+      unless segment_index == path.size - 2 || face_right.deleted?
+        face_right.hidden = true
+        face_right.edges.each { |e| e.hidden = true if e.line[1].perpendicular?(Z_AXIS) }
+      end
 
     end
 
