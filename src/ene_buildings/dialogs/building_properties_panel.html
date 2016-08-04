@@ -46,12 +46,12 @@
       }
 
       //Gables.
-      //var has_gables = <boolean>.
+      //var has_gable_parts = <boolean>.
       //var gable_settings = <array>, each element is object with keys:
       // name, used_left and used_right.
       function update_gable_section(){
-        document.getElementById('gables').style.display = has_gables ? '' : 'none';
-        if(!has_gables) return(false);
+        document.getElementById('gables').style.display = has_gable_parts ? '' : 'none';
+        if(!has_gable_parts) return(false);
         var html = '<table class="leftmost-is-label">';
 
         for(var i=0; i<gable_settings.length; i++) {
@@ -70,26 +70,67 @@
       }
 
       //Corners.
-      //var has_corners = <boolean>.
+      //var has_corner_parts = <boolean>.
       //var corner_number = <int>
+      //var suggest_volume_corner = <boolean>.
+      //var corner_volume = <array>, each element is object with keys:
+      // type and length.
+      var corner_volume = [
+        null,
+        {"type": "chamfer", "length": "2,00m"}
+      ]
       //var corner_settings = <array>, each element is object with keys:
       // name and use. Use is an array of booleans.
       function update_corner_section(){
-        document.getElementById('corners').style.display = has_corners ? '' : 'none';
-        if(!has_corners) return(false);
+        document.getElementById('corners').style.display = (has_corner_parts || corner_number > 2) ? '' : 'none';
+        if(!has_corner_parts && corner_number <= 2) return(false);
         var html = '<table class="leftmost-is-label">';
 
-        for(var i=0; i<corner_settings.length; i++) {
-          var corner_data = corner_settings[i];
+        if(corner_number > 2) {
           html += '<tr>';
-          html += '<td>' + corner_data['name'] + ':</td>';
+          html += '<td>Volume:</td>';
           html += '<td>';
-          for(var j=0; j<corner_number; j++) {
-            var status = corner_data['use'][j];
-            html += '<input type="checkbox" ' + (status ? 'checked="checked"' : '') + ' onclick="toggle_corner(\'' + corner_data['name'] + '\', ' + j + ', this.checked);" />';
+          for(var i=0; i<corner_number-2; i++) {
+            var v = corner_volume[i];
+            var t = v ? v['type'] : null;
+            var l = v ? v['length'] : '';
+            html += '<select>';
+            html += '<option value="null">None</option>';
+            html += '<option value="chamfer">Chamfer (By radius)</option>';// TODO: Set selected, set disabled.
+            html += '<option value="fillet_d">Fillet (By diagonal length)</option>';
+            html += '<option value="fillet_p">Fillet (By projected length)</option>';
+            html += '</select>';
+            html += '<input type="text" onchange=";" value="' + l + '"  />';
           }
           html += '</td>';
           html += '</tr>';
+        }
+        
+        if(has_corner_parts && corner_number > 2) {
+          html += '<tr>';
+          html += '<td><input id="suggest_margins" type="checkbox" onclick="toggle_suggest_margins(this);"';
+          if(suggest_volume_corner) html += 'checked="checked" ';
+          html += '/></td>';
+          html += '<td>Suggest volume corner (based on corner parts)</td>';
+          html += '</tr>';
+          html += '</table>';
+          html += '<hr style="margin: 0;" />';
+          html += '<table class="leftmost-is-label">';
+        }
+        
+        if(has_corner_parts) {
+          for(var i=0; i<corner_settings.length; i++) {
+            var corner_data = corner_settings[i];
+            html += '<tr>';
+            html += '<td>' + corner_data['name'] + ':</td>';
+            html += '<td>';
+            for(var j=0; j<corner_number; j++) {
+              var status = corner_data['use'][j];
+              html += '<input type="checkbox" ' + (status ? 'checked="checked"' : '') + ' onclick="toggle_corner(\'' + corner_data['name'] + '\', ' + j + ', this.checked);" />';
+            }
+            html += '</td>';
+            html += '</tr>';
+          }
         }
 
         html += '</table>';
@@ -164,7 +205,7 @@
         }
         html += '</td>';
         html += '</tr>';
-        if(has_gables || has_corners) {
+        if(has_gable_parts || has_corner_parts) {
           html += '<tr>';
           html += '<td><input id="suggest_margins" type="checkbox" onclick="toggle_suggest_margins(this);"';
           if(suggest_margins) html += 'checked="checked" ';
@@ -483,11 +524,11 @@
         Based on module 20px. Half module as margin between sections.
         Make sure this matches module var in javascript.
       */
-      #facade_elemnets input[type="text"] {
+      input[type="text"], select {
         box-sizing: border-box;
-        width: 50px;
+        width: 60px;
       }
-      #facade_elemnets input[type="text"]:nth-child(even){
+      td input[type="text"]:nth-child(even){
         margin-right: 20px;
       }
       #facade_elemnets td > div {

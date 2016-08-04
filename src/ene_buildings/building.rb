@@ -639,7 +639,7 @@ class Building
       js << "update_template_section();";
 
       # Gables.
-      js << "var has_gables = #{@template.has_gables?};"
+      js << "var has_gable_parts = #{@template.has_gables?};"
       if @template.has_gables?
         gable_list = list_gable_parts.map do |g|
           {
@@ -652,8 +652,11 @@ class Building
       js << "update_gable_section();";
 
       # Corners.
-      js << "var has_corners = #{@template.has_corners?};"
+      js << "var has_corner_parts = #{@template.has_corners?};"
       js << "var corner_number = #{@path.size};"
+# TODO: ADVANCED CORNERS: List @volume_corners...
+js << "var suggest_volume_corner = true;"
+# corner_volume = ...
       if @template.has_corners?
         corner_list = list_corner_parts.map do |c|
           {
