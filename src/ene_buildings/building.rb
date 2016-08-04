@@ -156,6 +156,17 @@ class Building
       # corner (from left to tight) telling whether given corner part should be
       # drawn to that corner.
       @corners = {}
+      
+      # Defines how interioer corners should be drawn.
+      # Variable is Hash indexed by Template id String.
+      # Each value is an Array with elements corresponding to interior corners
+      # listed from left ro right.
+      # Elements is nil for sharp corners or a Hash conatining keys :type
+      # and length when a transition is used. Valid types are
+      # "fillet", "chamfer_d" and "chamfer_p".
+      @corner_transitions = {}
+
+      @suggest_corner_transitions = true
 
       # Defines what gable parts should be drawn to building.
       # Variable is Hash indexed by Template id String.
@@ -663,14 +674,9 @@ class Building
         end
         js << "var corner_part_settings = #{JSON.generate corner_list};"
       end
-      # TODO: ADVANCED CORNERS: Get from class instance variables.
-      corner_transitions = [
-        nil,
-        {:type => "fillet",  :length => 4.m },
-        {:type => "chamfer_d", :length => 2.m }
-      ]
+      corner_transitions = @corner_transitions[@template.id] || []
       js << "var corner_transitions=#{JSON.generate(corner_transitions)};"
-      js << "var suggest_corner_transitions = true;"
+      js << "var suggest_corner_transitions = #{@suggest_corner_transitions};"
       js << "update_corner_section();";
 
       # Margins.
@@ -832,6 +838,30 @@ class Building
         add_data.call
       end
     end
+    
+    # Change corner transition type.
+    dlg.add_action_callback("set_corner_transition_type") do |_, params|
+      set_corner_transition_type *JSON.parse(params)
+    end
+    
+    # Change corner transition length.
+    dlg.add_action_callback("set_corner_transition_length") do |_, params|
+      index, length = *JSON.parse(params)
+      begin
+        length = length.to_l
+      rescue ArgumentError
+        # Do nothing.
+      else
+        length = 0.to_l if length < 0
+        set_corner_transition_length index, length
+      end
+    end
+    
+    # Toggle transition suggestions.
+    dlg.add_action_callback("toggle_suggest_corner_transitions") do |_, params|
+      status = params == "true"
+      @suggest_corner_transitions = status
+    end
 
     # Setting margin
     dlg.add_action_callback("set_margin") do |_, params|
@@ -971,22 +1001,13 @@ class Building
       @group.set_attribute ATTR_DICT, key, value
     end
 
-    # Override template object reference with string.
+    # Override non-supported objects by serialized versions, e.g. String identifier, JSON String or Array.
     @group.set_attribute ATTR_DICT, "template", @template ? @template.id : nil
-
-    # Override corner Hash with JSON String.
     @group.set_attribute ATTR_DICT, "corners", JSON.generate(@corners)
-
-    # Override gable Hash with JSON String.
+    @group.set_attribute ATTR_DICT, "corner_transitions", JSON.generate(@corner_transitions)
     @group.set_attribute ATTR_DICT, "gables", JSON.generate(@gables)
-
-    # Override facade_margins Hash with Array.
     @group.set_attribute ATTR_DICT, "facade_margins", @facade_margins.to_a
-
-    # Override part_replacements Hash with JSON String.
     @group.set_attribute ATTR_DICT, "part_replacements", JSON.generate(@part_replacements)
-
-    # Override material replacements wit string identifiers.
     array = @material_replacement.to_a.map { |e| e.map{ |m| m.name } }
     @group.set_attribute ATTR_DICT, "material_replacement", array
 
@@ -1046,6 +1067,49 @@ class Building
 
   end
 
+  # Public: Sets what length a transition for a specific corner should use.
+  # Only applies to corners between facades, not building ends.
+  #
+  # index  - Int index of the corner (counting from left, starting at 0).
+  # length - Length used for transition. How length is interpreted depends on
+  #          what type has been set in #set_corner_transition_type.
+  #
+  # Returns nothing.
+  def set_corner_transition_length(index, length)
+  
+    @corner_transitions[@template.id] ||= []
+    @corner_transitions[@template.id][index] ||= {}
+    @corner_transitions[@template.id][index]["length"] = length
+    
+    nil
+  
+  end
+  
+  # Public: Sets what kind of transition to use on a specific corner.
+  # Only applies to corners between facades, not building ends.
+  #
+  # index - Int index of the corner (counting from left, starting at 0).
+  # type  - String "fillet", "chamfer_d", "chamfer_p" or nil.
+  #         Fillet uses the Length set by #set_corner_transition_length as
+  #         radius. chamfer_d uses it as the diagonal length and chamfer_p
+  #         as the projected length on the facade plane.
+  #         Nil means no transition (sharp corner).
+  #
+  # returns nothing.
+  def set_corner_transition_type(index, type)
+  
+    @corner_transitions[@template.id] ||= []
+    if type
+      @corner_transitions[@template.id][index] ||= {}
+      @corner_transitions[@template.id][index]["type"] = type
+    else
+      @corner_transitions[@template.id][index] = nil
+    end
+    
+    nil
+  
+  end
+  
   # Public: Sets whether a specific gable part should be drawn to a specific
   # side of building.
   #
@@ -1089,25 +1153,25 @@ class Building
   # segment         - Int segment index (counting from left, starting at 0).
   #                   If segment index is to high to represent a currently
   #                   existing segment, setting will be kept but not affect how
-  #                   buidling is drawn until the segment exists.
+  #                   building is drawn until the segment exists.
   # index           - Int slot index (counting from left, starting at 0).
-  #                   If replacment uses several slots, index is of the leftmost
+  #                   If replacement uses several slots, index is of the leftmost
   #                   one. If slot index is to high to represent a currently
   #                   existing slot, setting will be kept but not affect how
-  #                   buidling is drawn until the slot exists.
+  #                   building is drawn until the slot exists.
   # replacement     - String name of replacing part or nil when resetting to no
   #                   replacement.
-  # purge_colliding - Wether potential colliding replacements (those taking up
+  # purge_colliding - Werther potential colliding replacements (those taking up
   #                   the same slot(s)) should be purged to make space for this
-  #                   replacment. A collding replacement that currently wouldn't
+  #                   replacement. A colliding replacement that currently wouldn't
   #                   be drawn anyway because it requires slots that doesnn't_array
   #                   currently exist is always purged. (default: false)
   #
   # Returns nothing.
-  # Raises RuntimeError if replcement is invalid.
+  # Raises RuntimeError if replacement is invalid.
   # Raises RuntimeError if there is a slot collision and purge_colliding is
   # false.
-  def set_replacement(original, segment, index, replacement, purge_colliding = false)
+  def set_replacement(original, segment, index, replacement, purge_colliding = false)# TODO: lock over purge_colliding and docs.
 
     if replacement
       available_replacements = list_replacement_parts
@@ -1512,7 +1576,15 @@ class Building
     # Override corner JSON String with actual Hash object.
     # Backward compatibility: Set corners to empty Hash if not already set.
     h[:corners] = h[:corners] ? JSON.parse(h[:corners]) : {}
+    
+    # Override corner_transitions JSON String with actual Hash object.
+    # Backward compatibility: Set corner_transitions to empty Hash if not already set.
+    h[:corner_transitions] = h[:corner_transitions] ? JSON.parse(h[:corner_transitions]) : {}
+    # Hash the nested arrays too...
 
+    # Backward compatibility: Default suggest_corner_transitions to true.
+    h[:suggest_corner_transitions] = true if h[:suggest_corner_transitions].nil?
+    
     # Override gable JSON String with actual Hash object.
     # Backward compatibility: Set gables to empty Hash if not already set.
     h[:gables] = h[:gables] ? JSON.parse(h[:gables]) : {}
@@ -1521,7 +1593,7 @@ class Building
     # Backward compatibility: Set facade_margins to empty Hash if not already set.
     h[:facade_margins] = h[:facade_margins] ? Hash[h[:facade_margins]] : {}
 
-    # Backward compatibility: Default suggest margins to true.
+    # Backward compatibility: Default suggest_margins to true.
     h[:suggest_margins] = true if h[:suggest_margins].nil?
 
     # Override part replacements JSON String with actual Hash object.

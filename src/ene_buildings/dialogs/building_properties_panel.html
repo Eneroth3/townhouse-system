@@ -105,7 +105,7 @@
         }
 
         var options = [
-          [null,       'None'],
+          [null,       'Sharp'],
           ['fillet',  'Fillet (By radius)'],
           ['chamfer_d', 'Chamfer (By diagonal length)'],
           ['chamfer_p', 'Chamfer (By projected length)']
@@ -357,11 +357,12 @@
         var length_inputs = selector.parentNode.getElementsByTagName('input');
         var length_input = length_inputs[index];
         length_input.disabled = type == null;
+        if(type == null) length_input.value = '';
         var params = JSON.stringify([index, type]);
         window.location='skp:set_corner_transition_type@' + encodeURIComponent(params);
       }
       
-      function set_corner_transition_length(length) {
+      function set_corner_transition_length(input) {
         var index = parseInt(input.getAttribute('data-index'));
         var length  = input.value;
         var params = JSON.stringify([index, length]);
