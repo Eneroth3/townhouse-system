@@ -348,6 +348,8 @@ module TemplateEditor
       override_cut_planes     = data[:override_cut_planes]     || false
       replace_nested_mateials = data[:replace_nested_mateials] || false
       gable_margin            = data[:gable_margin]            || 0.to_l
+      transition_type         = data[:transition_type]         || ""
+      transition_length       = data[:transition_length]       || 0.to_l
       corner_margin           = data[:corner_margin]           || 0.to_l
       replaces                = data[:replaces]                || ""
       slots                   = data[:slots]                   || 1
@@ -380,12 +382,15 @@ module TemplateEditor
       js << "document.getElementById('align_percentage').value=#{percentage};"
       js << "override_cut_planes(#{override_cut_planes});"
       js << "document.getElementById('gable_margin').value=#{gable_margin.to_s.inspect};"
+      js << "document.getElementById('transition_type').value=#{transition_type.to_s.inspect};"
+      js << "document.getElementById('transition_length').value=#{transition_length.to_s.inspect};"
       js << "document.getElementById('corner_margin').value=#{corner_margin.to_s.inspect};"
       js << "document.getElementById('replaces').value=#{replaces.inspect};"
       js << "document.getElementById('slots').value=#{slots};"
       js << "replace_nested_mateials(#{replace_nested_mateials});"
       js << "is_group(#{@@part.is_a? Sketchup::Group});"
       js << "document.getElementById('solid').value=#{solid.inspect};"
+      js << "toggle_transition_length();"
       js << "toggle_solid();"
       js << "document.getElementById('solid_index').value=#{solid_index};"
       js << "var in_template_root = #{in_template_root?};"
@@ -923,21 +928,24 @@ module TemplateEditor
       data[:spread] = sp if sp
       rounding = @@dlg_part.get_element_value("rounding")
       data[:rounding] = rounding unless rounding.empty?
+      
     when "left", "right", "center"
       data[:align] = @@dlg_part.get_element_value "position_method"
+      
     when "percentage"
       data[:align] = @@dlg_part.get_element_value("align_percentage").gsub(",",".").to_f
+      
     when "gable"
       data[:gable] = true
       gable_margin = @@dlg_part.get_element_value("gable_margin")
       begin
-        gable_margin = gable_margin.start_with?("~") ? old_data["gable_margin"] : gable_margin.to_l
+        gable_margin = gable_margin.start_with?("~") ? old_data[:gable_margin] : gable_margin.to_l
       rescue ArgumentError
         msg =
           "'#{gable_margin}' could not be parsed as length.\n"\
           "Keeping old value for margin."
         UI.messagebox msg
-        gable_margin = old_data["gable_margin"] || 0
+        gable_margin = old_data[:gable_margin] || 0
       end
       data[:gable_margin] = gable_margin unless gable_margin == 0
       unless data[:name]
@@ -945,17 +953,33 @@ module TemplateEditor
          msg = "Gable must have a name.\nUsing '#{data[:name]}."
          UI.messagebox msg
       end
+      
     when "corner"
       data[:corner] = true
+      transition_type = @@dlg_part.get_element_value("transition_type")
+      unless transition_type == ""
+        data[:transition_type] = transition_type
+      end
+      transition_length = @@dlg_part.get_element_value("transition_length")
+      begin
+        transition_length = transition_length.start_with?("~") ? old_data[:transition_length] : transition_length.to_l
+      rescue ArgumentError
+        msg =
+          "'#{transition_length}' could not be parsed as length.\n"\
+          "Keeping old value for transition length."
+        UI.messagebox msg
+        transition_length = old_data[:transition_length] || 0
+      end
+      data[:transition_length] = transition_length unless transition_length == 0
       corner_margin = @@dlg_part.get_element_value("corner_margin")
       begin
-        corner_margin = corner_margin.start_with?("~") ? old_data["corner_margin"] : corner_margin.to_l
+        corner_margin = corner_margin.start_with?("~") ? old_data[:corner_margin] : corner_margin.to_l
       rescue ArgumentError
         msg =
           "'#{corner_margin}' could not be parsed as length.\n"\
           "Keeping old value for margin."
         UI.messagebox msg
-        corner_margin = old_data["corner_margin"] || 0
+        corner_margin = old_data[:corner_margin] || 0
       end
       data[:corner_margin] = corner_margin unless corner_margin == 0
       unless data[:name]
@@ -963,6 +987,7 @@ module TemplateEditor
          msg = "Corner must have a name.\nUsing '#{data[:name]}."
          UI.messagebox msg
       end
+      
     when "replacement"
       data[:replacement] = true
       data[:replaces] = @@dlg_part.get_element_value("replaces")
@@ -975,6 +1000,7 @@ module TemplateEditor
          UI.messagebox msg
       end
     end
+    
     data[:override_cut_planes] = true if @@dlg_part.get_element_value("override_cut_planes") == "true"
     data[:replace_nested_mateials] = true if @@dlg_part.get_element_value("replace_nested_mateials") == "true"
     solid = @@dlg_part.get_element_value("solid")
