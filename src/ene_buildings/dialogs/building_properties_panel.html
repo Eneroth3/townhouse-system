@@ -47,15 +47,15 @@
 
       //Gables.
       //var has_gable_parts = <boolean>.
-      //var gable_settings = <array>, each element is object with keys:
+      //var gable_part_settings = <array>, each element is object with keys:
       // name, used_left and used_right.
       function update_gable_section(){
         document.getElementById('gables').style.display = has_gable_parts ? '' : 'none';
         if(!has_gable_parts) return(false);
         var html = '<table class="leftmost-is-label">';
 
-        for(var i=0; i<gable_settings.length; i++) {
-          var gable_data = gable_settings[i];
+        for(var i=0; i<gable_part_settings.length; i++) {
+          var gable_data = gable_part_settings[i];
           html += '<tr>';
           html += '<td>' + gable_data['name'] + ':</td>';
           html += '<td>';
@@ -72,55 +72,20 @@
       //Corners.
       //var has_corner_parts = <boolean>.
       //var corner_number = <int>
-      //var suggest_volume_corner = <boolean>.
-      //var corner_volume = <array>, each element is object with keys:
-      // type and length.
-      var corner_volume = [
-        null,
-        {"type": "chamfer", "length": "2,00m"}
-      ]
-      //var corner_settings = <array>, each element is object with keys:
+      //var suggest_corner_transitions = <boolean>.
+      //var corner_transitions = <array>, each element is object with keys
+      // type and length or null.
+      //var corner_part_settings = <array>, each element is object with keys:
       // name and use. Use is an array of booleans.
       function update_corner_section(){
         document.getElementById('corners').style.display = (has_corner_parts || corner_number > 2) ? '' : 'none';
         if(!has_corner_parts && corner_number <= 2) return(false);
+
         var html = '<table class="leftmost-is-label">';
 
-        if(corner_number > 2) {
-          html += '<tr>';
-          html += '<td>Volume:</td>';
-          html += '<td>';
-          for(var i=0; i<corner_number-2; i++) {
-            var v = corner_volume[i];
-            var t = v ? v['type'] : null;
-            var l = v ? v['length'] : '';
-            html += '<select>';
-            html += '<option value="null">None</option>';
-            html += '<option value="chamfer">Chamfer (By radius)</option>';// TODO: Set selected, set disabled.
-            html += '<option value="fillet_d">Fillet (By diagonal length)</option>';
-            html += '<option value="fillet_p">Fillet (By projected length)</option>';
-            html += '</select>';
-            html += '<input type="text" onchange=";" value="' + l + '"  />';
-          }
-          html += '</td>';
-          html += '</tr>';
-        }
-        
-        if(has_corner_parts && corner_number > 2) {
-          html += '<tr>';
-          html += '<td><input id="suggest_margins" type="checkbox" onclick="toggle_suggest_margins(this);"';
-          if(suggest_volume_corner) html += 'checked="checked" ';
-          html += '/></td>';
-          html += '<td>Suggest volume corner (based on corner parts)</td>';
-          html += '</tr>';
-          html += '</table>';
-          html += '<hr style="margin: 0;" />';
-          html += '<table class="leftmost-is-label">';
-        }
-        
         if(has_corner_parts) {
-          for(var i=0; i<corner_settings.length; i++) {
-            var corner_data = corner_settings[i];
+          for(var i=0; i<corner_part_settings.length; i++) {
+            var corner_data = corner_part_settings[i];
             html += '<tr>';
             html += '<td>' + corner_data['name'] + ':</td>';
             html += '<td>';
@@ -131,6 +96,47 @@
             html += '</td>';
             html += '</tr>';
           }
+        }
+
+        if(has_corner_parts && corner_number > 2) {
+          html += '</table>';
+          html += '<hr style="margin: 0;" />';
+          html += '<table class="leftmost-is-label">';
+        }
+
+        var options = [
+          [null,       'None'],
+          ['fillet',  'Fillet (By radius)'],
+          ['chamfer_d', 'Chamfer (By diagonal length)'],
+          ['chamfer_p', 'Chamfer (By projected length)']
+        ]
+        if(corner_number > 2) {
+          html += '<tr>';
+          html += '<td>Transition:</td>';
+          html += '<td>';
+          for(var i=0; i<corner_number-2; i++) {
+            var v = corner_transitions[i];
+            var t = v ? v['type'] : null;
+            var l = v ? v['length'] : '';
+            html += '<select data-index="'+i+'" onchange="set_corner_transition_type(this);">';
+            for(var j=0; j<options.length; j++) {
+              var o = options[j];
+              html += '<option value="'+o[0]+'"'+(o[0]==t?' selected':'')+'>'+o[1]+'</option>';
+            }
+            html += '</select>';
+            html += '<input type="text" data-index="'+i+'" onchange="set_corner_transition_length(this);" value="'+l+'" '+(t==null?'disabled="disabled"':'')+'/>';
+          }
+          html += '</td>';
+          html += '</tr>';
+        }
+        
+        if(has_corner_parts && corner_number > 2) {
+          html += '<tr>';
+          html += '<td><input id="suggest_corner_transitions" type="checkbox" onclick="toggle_suggest_corner_transitions(this);"';
+          if(suggest_corner_transitions) html += 'checked="checked" ';
+          html += '/></td>';
+          html += '<td><label for="suggest_corner_transitions">Suggest transition (based on corner parts)</label></td>';
+          html += '</tr>';
         }
 
         html += '</table>';
@@ -210,7 +216,7 @@
           html += '<td><input id="suggest_margins" type="checkbox" onclick="toggle_suggest_margins(this);"';
           if(suggest_margins) html += 'checked="checked" ';
           html += '/></td>';
-          html += '<td>Suggest margins (based on gables and corners)</td>';
+          html += '<td><label for="suggest_margins">Suggest margins (based on gables and corners)</label></td>';
           html += '</tr>';
         }
         html += '</table>';
@@ -334,14 +340,38 @@
       //Handle user input.
       //Most input is handled by inline code in click attribute of input.
 
-      function toggle_gable(name, side, status){
+      function toggle_gable(name, side, status) {
         var params = JSON.stringify([name, side, status]);
         window.location='skp:toggle_gable@' + encodeURIComponent(params);
       }
 
-      function toggle_corner(name, index, status){
+      function toggle_corner(name, index, status) {
         var params = JSON.stringify([name, index, status]);
         window.location='skp:toggle_corner@' + encodeURIComponent(params);
+      }
+      
+      function set_corner_transition_type(selector) {
+        var index = parseInt(selector.getAttribute('data-index'));
+        var type  = selector.value;
+        if(type == 'null') type = null;
+        var length_inputs = selector.parentNode.getElementsByTagName('input');
+        var length_input = length_inputs[index];
+        length_input.disabled = type == null;
+        var params = JSON.stringify([index, type]);
+        window.location='skp:set_corner_transition_type@' + encodeURIComponent(params);
+      }
+      
+      function set_corner_transition_length(length) {
+        var index = parseInt(input.getAttribute('data-index'));
+        var length  = input.value;
+        var params = JSON.stringify([index, length]);
+        window.location='skp:set_corner_transition_length@' + encodeURIComponent(params);
+      }
+      
+      function toggle_suggest_corner_transitions(checkbox) {
+        var status = checkbox.checked;
+        var params = JSON.stringify(status);
+        window.location='skp:toggle_suggest_corner_transitions@' + params;
       }
 
       function set_margin(input) {

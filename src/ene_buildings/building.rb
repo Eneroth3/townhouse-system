@@ -647,16 +647,13 @@ class Building
             :use  => g[:use]
           }
         end
-        js << "var gable_settings = #{JSON.generate gable_list};"
+        js << "var gable_part_settings = #{JSON.generate gable_list};"
       end
       js << "update_gable_section();";
 
       # Corners.
       js << "var has_corner_parts = #{@template.has_corners?};"
       js << "var corner_number = #{@path.size};"
-# TODO: ADVANCED CORNERS: List @volume_corners...
-js << "var suggest_volume_corner = true;"
-# corner_volume = ...
       if @template.has_corners?
         corner_list = list_corner_parts.map do |c|
           {
@@ -664,8 +661,16 @@ js << "var suggest_volume_corner = true;"
             :use  => c[:use]
           }
         end
-        js << "var corner_settings = #{JSON.generate corner_list};"
+        js << "var corner_part_settings = #{JSON.generate corner_list};"
       end
+      # TODO: ADVANCED CORNERS: Get from class instance variables.
+      corner_transitions = [
+        nil,
+        {:type => "fillet",  :length => 4.m },
+        {:type => "chamfer_d", :length => 2.m }
+      ]
+      js << "var corner_transitions=#{JSON.generate(corner_transitions)};"
+      js << "var suggest_corner_transitions = true;"
       js << "update_corner_section();";
 
       # Margins.
