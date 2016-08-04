@@ -274,14 +274,16 @@ class Building
   #
   # Returns Array of Hash objects corresponding to each corner part.
   # Hash contains the following:
-  #   :definition        - ComponetDefinition defining the part.
-  #   :name              - String name used to identify part.
-  #   :original_instance - Group or ComponentInstance defining the part inside
-  #                        the Template's ComponentDefinition.
-  #   :margin            - Facade margin Length suggested for this corner.
-  #   :use               - Array of booleans telling what corners this part
-  #                        should be drawn to.
-  #   :transformations   - (Only when calculate_transformations is true)
+  #   :definition         - ComponetDefinition defining the part.
+  #   :name               - String name used to identify part.
+  #   :original_instance  - Group or ComponentInstance defining the part inside
+  #                         the Template's ComponentDefinition.
+  #   :margin             - Facade margin Length suggested for this corner.
+  #   :use                - Array of booleans telling what corners this part
+  #                         should be drawn to.
+  #   :transition_type    - #TODO: Document!
+  #   : transition_length -
+  #   :transformations    - (Only when calculate_transformations is true)
   #                        Transformations object defining instance placement
   #                        in local coordinates grouped by building segment.
   def list_corner_parts(calculate_transformations = false)
@@ -300,7 +302,9 @@ class Building
         :original_instance => e,
         :name => name,
         :use => use,
-        :margin => e.get_attribute(Template::ATTR_DICT_PART, "corner_margin")
+        :margin => e.get_attribute(Template::ATTR_DICT_PART, "corner_margin"),
+        :transition_type => e.get_attribute(Template::ATTR_DICT_PART, "transition_type"),
+        :transition_length => e.get_attribute(Template::ATTR_DICT_PART, "transition_length")
       }
 
       parts_data << part_data
@@ -833,8 +837,9 @@ class Building
     # Toggling a corner.
     dlg.add_action_callback("toggle_corner") do |_, params|
       set_corner *JSON.parse(params)
-      if @suggest_margins
-        suggest_margins
+      if @suggest_margins || @suggest_corner_transitions
+        suggest_margins if @suggest_margins
+        suggest_corner_transitions if @suggest_corner_transitions
         add_data.call
       end
     end
@@ -842,6 +847,8 @@ class Building
     # Change corner transition type.
     dlg.add_action_callback("set_corner_transition_type") do |_, params|
       set_corner_transition_type *JSON.parse(params)
+      @suggest_corner_transitions = false
+      add_data.call
     end
     
     # Change corner transition length.
@@ -854,6 +861,8 @@ class Building
       else
         length = 0.to_l if length < 0
         set_corner_transition_length index, length
+        @suggest_corner_transitions = false
+        add_data.call
       end
     end
     
@@ -861,6 +870,10 @@ class Building
     dlg.add_action_callback("toggle_suggest_corner_transitions") do |_, params|
       status = params == "true"
       @suggest_corner_transitions = status
+      if @suggest_corner_transitions
+        suggest_corner_transitions
+        add_data.call
+      end
     end
 
     # Setting margin
@@ -1016,9 +1029,9 @@ class Building
   end
 
   # Public: Sets facade margins to whatever is the biggest suggested margin for
-  # an adjacent gable or corner part.
+  # a used adjacent gable or corner part.
   #
-  # returns nothing.
+  # Returns nothing.
   def suggest_margins
 
     corners = list_corner_parts
@@ -1044,6 +1057,39 @@ class Building
 
   end
 
+  # Public: Sets corner transition type and length based on used corner parts.
+  #
+  # returns nothings.
+  def suggest_corner_transitions
+  
+    corners = list_corner_parts
+    
+    (0..@path.size-2).each do |i|
+    
+      corner = i+1
+      used_corner_parts = corners.select{ |c| c[:use][corner] }
+      
+      # Use the values of the first found corner that has any saved preferences
+      # for transition.
+      used_corner = used_corner_parts.find { |c| c[:transition_type] && c[:transition_length] }
+
+      @corner_transitions[@template.id] ||= []
+      @corner_transitions[@template.id][i] =
+        if used_corner
+          {
+            :type =>   used_corner[:transition_type],
+            :length => used_corner[:transition_length]
+          }
+        else
+          nil
+        end
+      
+    end
+  
+    nil
+    
+  end
+  
   # Public: Sets whether a specific corner part should be drawn to a specific
   # corner of building.
   #
@@ -1738,7 +1784,7 @@ class Building
       half_angle_right = Y_AXIS.angle_between(tangent_right.reverse)
       
       # Fillet by diagonal length.
-      diagonal_length = 2.m
+      diagonal_length = 4.m
       projected_length_left  = diagonal_length/(2*Math.sin(half_angle_left))
       projected_length_right = diagonal_length/(2*Math.sin(half_angle_right))
       
