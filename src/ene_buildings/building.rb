@@ -648,6 +648,8 @@ class Building
 
       # If more dialogs are opened, offset this one to avoid it being on top of others
       js << "offset_window(10);" if @@opened_dialogs.size > 1
+      
+      js << "remember_active_element();"
 
       # Template info.
       js << "var template_info=#{JSON.generate(@template.to_hash)};"
@@ -691,6 +693,7 @@ class Building
       # Part replacements.
       available_replacable   = list_replaceable_parts true
       available_replacements = list_replacement_parts
+      js << "var has_facade_elements = #{!list_replaceable_parts.empty?};"
       replacement_info = available_replacable.map do |r_able|
         r_ments = available_replacements.select { |r| r[:replaces] == r_able[:name] }
         next if r_ments.empty?
@@ -749,6 +752,8 @@ class Building
       js << "var perform_solids = #{@perform_solid_operations};"
       js << "update_solids_section();";
 
+      js << "fous_element();"
+      
       dlg.execute_script js
 
     end

@@ -9,6 +9,39 @@
 
       //Initialize each section.
       //Runs when showing dialog and when template has changed.
+      
+      // Remembering focused element and refocusing it.
+      // When changing innerHTML focus is lost.
+      // These methods re-focus element when updating form content,
+      // e.g. when margin changes.
+      var path;
+      function remember_active_element() {
+        var e = document.activeElement;
+        if (e.tagName == 'BODY') {
+          path = null;
+          return;
+        } else {
+          path = [];
+        }
+        
+        // Loop parent elements
+        while(e.parentNode.parentNode.parentNode) {// TODO: Watch of for of by one error.
+        
+          // Find index of element e inside parent.
+          var n = e
+          var i = 0;
+          while ((n = n.previousSibling)) i++;
+          
+          e = e.parentNode;
+          path.unshift(i);
+        }
+      }
+      function fous_element() {
+        if (!path) return;
+        var e = document.body;
+        for(var i=0;i<path.length;i++) e = e.childNodes[path[i]];
+        e.focus();
+      }
 
       //Template info.
       //var template_info = <json_object>;
@@ -117,7 +150,7 @@
           for(var i=0; i<corner_number-2; i++) {
             var v = corner_transitions[i];
             var t = v ? v['type'] : null;
-            var l = v ? v['length'] : '';
+            var l = v  && v['length'] ? v['length'] : '';
             html += '<select data-index="'+i+'" onchange="set_corner_transition_type(this);">';
             for(var j=0; j<options.length; j++) {
               var o = options[j];
@@ -144,6 +177,7 @@
       }
 
       //Part replacements and margins.
+      //var has_facade_elements = <boolean>.
       //var margins = <array> of Strings representing formatted lengths.
       //var suggest_margins = <boolean>.
       /*var replacement_info = [
@@ -197,7 +231,9 @@
         }
       ];*/
       function update_facade_section(){
-
+        document.getElementById('facade_elemnets').style.display = (has_facade_elements) ? '' : 'none';
+        if(!has_facade_elements) return(false);
+        
         // The width of one checkbox. Make sure it matches css.
         var module = 20;
 
