@@ -1783,40 +1783,58 @@ class Building
       
       
       
+      # TODO: Create planes in external loop, typically in calculate_local_path (that maybe should be renamed path_info or something) and use same planes for placing replaceable parts, identify faces to hide etc.
       
-      # Test code: chamfer and fillet corners.
-      # Planes should be calculated before loop so they can be re-used,
-      # preferably in method used both in draw_volume and calculate_replaceable_transformations.
+      cts = @corner_transitions[@template.id]
+      if cts
       
-      half_angle_left  = Y_AXIS.angle_between(tangent_left)
-      half_angle_right = Y_AXIS.angle_between(tangent_right.reverse)
+        # Left side of segment
+        ct = cts[segment_index-1]
+        if ct && ct["length"] > 0 && segment_index != 0
+          half_angle  = Y_AXIS.angle_between(tangent_left)
+          tangent_vector  = X_AXIS.reverse
+          bisector_vector = Geom.linear_combination 0.5, X_AXIS.reverse, 0.5, tangent_left.reverse
+          case ct["type"]
+          when "fillet"
+            radius           = ct["length"]
+            projected_length = -radius/Math.tan(half_angle)
+            cut_vector       = tangent_vector
+          when "chamfer_d"
+            diagonal_length  = ct["length"]
+            projected_length = diagonal_length/(2*Math.sin(half_angle))
+            cut_vector       = bisector_vector
+          when "chamfer_p"
+            projected_length = ct["length"]
+            cut_vector       = bisector_vector
+          end
+          cut_plane = [[projected_length, 0, 0], cut_vector]
+          MyGeom.cut(segment_ents, cut_plane)
+        end
+        
+        # Right side of segment
+        ct = cts[segment_index]
+        if ct && ct["length"] > 0 && segment_index != path.size - 2
+          half_angle  = Y_AXIS.angle_between(tangent_right.reverse)
+          tangent_vector  = X_AXIS
+          bisector_vector = Geom.linear_combination 0.5, X_AXIS, 0.5, tangent_right
+          case ct["type"]
+          when "fillet"
+            radius           =  ct["length"]
+            projected_length = -radius/Math.tan(half_angle)
+            cut_vector       = tangent_vector
+          when "chamfer_d"
+            diagonal_length  = ct["length"]
+            projected_length = diagonal_length/(2*Math.sin(half_angle))
+            cut_vector       = bisector_vector
+          when "chamfer_p"
+            projected_length = ct["length"]
+            cut_vector       = bisector_vector
+          end
+          cut_plane = [[segment_length - projected_length, 0, 0], cut_vector]
+          MyGeom.cut(segment_ents, cut_plane)
+        end
       
-      # Fillet by diagonal length.
-      diagonal_length = 4.m
-      projected_length_left  = diagonal_length/(2*Math.sin(half_angle_left))
-      projected_length_right = diagonal_length/(2*Math.sin(half_angle_right))
-      
-      # Fillet by projected length.
-      #projected_length_left = projected_length_right = 2.m
-      
-      # Chamfer by radius
-      radius = 3.m
-      #projected_length_left  = -radius/Math.tan(half_angle_left)
-      #projected_length_right = -radius/Math.tan(half_angle_right)
-      
-      # Cut perpendicular to facade (chamfer)
-      #cut_v_left  = X_AXIS.reverse
-      #cut_v_right = X_AXIS
-      
-      # Cut along bisector.
-      cut_v_left  = Geom.linear_combination 0.5, X_AXIS.reverse, 0.5, tangent_left.reverse
-      cut_v_right = Geom.linear_combination 0.5, X_AXIS, 0.5, tangent_right
-      
-      cut_plane_left  = [[projected_length_left, 0, 0], cut_v_left]
-      cut_plane_right = [[segment_length - projected_length_right, 0, 0], cut_v_right]
-      MyGeom.cut(segment_ents, cut_plane_left)  unless segment_index == 0
-      MyGeom.cut(segment_ents, cut_plane_right) unless segment_index == path.size - 2
-      
+      end
       
       
       
