@@ -1276,7 +1276,7 @@ class Building
   # Returns nil.
   def calculate_corner_transformations(parts_data)
 
-    path, tangents = calculate_local_path
+    _, _, segments_info  = calculate_local_path
 
     parts_data.each do |part_data|
 
@@ -1297,40 +1297,27 @@ class Building
       line_origin = [origin, X_AXIS]
 
       # Loop path segments.
-      (0..path.size - 2).each do |segment_index|
+      (0..@path.size - 2).each do |segment_index|
+      
+        segment_info = segments_info[segment_index]
+        #first_segment = segment_index == 0
+        last_segment  = segment_index == @path.size - 2
 
         transformations = []
         part_data[:transformations] << transformations
 
-        # Values in main building @group's coordinates.
-        corner_left    = path[segment_index]
-        corner_right   = path[segment_index + 1]
-        segment_vector = corner_right - corner_left
-        segment_length = segment_vector.length
-        tangent_left   = tangents[segment_index]
-        tangent_right  = tangents[segment_index + 1]
-        segment_trans  = Geom::Transformation.axes(
-          corner_left,
-          segment_vector,
-          Z_AXIS * segment_vector,
-          Z_AXIS
-        )
-
-        # Values in local segment group's coordinates.
-        tangent_left     = tangent_left.transform segment_trans.inverse
-        tangent_right    = tangent_right.transform segment_trans.inverse
-        plane_left       = [ORIGIN, tangent_left.reverse]
-        plane_right      = [[segment_length, 0, 0], tangent_right]
-        origin_leftmost  = Geom.intersect_line_plane line_origin, plane_left
-        origin_rightmost = Geom.intersect_line_plane line_origin, plane_right
+        plane_left  = segment_info[:side_planes][0]
+        plane_right = segment_info[:side_planes][1]
+        pt_left  = Geom.intersect_line_plane line_origin, plane_left
+        pt_right = Geom.intersect_line_plane line_origin, plane_right
 
         # All corner parts expect for that of the last corner is drawn at the
         # left side of the segment group by the same index.
         if part_data[:use][segment_index]
           transformations << Geom::Transformation.axes(
-            origin_leftmost,
-            tangent_left,
-            Z_AXIS*tangent_left,
+            pt_left,
+            segment_info[:tangent_left],
+            Z_AXIS*segment_info[:tangent_left],
             Z_AXIS
           )
         end
@@ -1338,11 +1325,11 @@ class Building
         # The rightmost corner part is drawn at the right side of the last
         # segment group. This group is the only one that may contain two
         # corner parts.
-        if segment_index == (@path.size - 2) && part_data[:use][segment_index + 1]
+        if segment_index == last_segment && part_data[:use][segment_index + 1]
           transformations << Geom::Transformation.axes(
-            origin_rightmost,
-            tangent_right,
-            Z_AXIS*tangent_right,
+            pt_right,
+            segments_info[:tangent_right],
+            Z_AXIS*segments_info[:tangent_right],
             Z_AXIS
           )
         end
@@ -1698,6 +1685,8 @@ class Building
         :all_planes      => all_planes,
         :left_planes     => left_planes,
         :right_planes    => right_planes,
+        :tangent_left    => tangent_left,
+        :tangent_right   => tangent_right
       }
       
     end
