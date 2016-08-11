@@ -1022,7 +1022,10 @@ class Building
     # Override non-supported objects by serialized versions, e.g. String identifier, JSON String or Array.
     @group.set_attribute ATTR_DICT, "template", @template ? @template.id : nil
     @group.set_attribute ATTR_DICT, "corners", JSON.generate(@corners)
-    @group.set_attribute ATTR_DICT, "corner_transitions", JSON.generate(@corner_transitions)
+    corner_transitions = Hash[@corner_transitions.map { |k, v|
+      [k, v.map { |c| next unless c; c = c.dup; c["length"] = c["length"].to_f; c }]
+    }]
+    @group.set_attribute ATTR_DICT, "corner_transitions", JSON.generate(corner_transitions)
     @group.set_attribute ATTR_DICT, "gables", JSON.generate(@gables)
     @group.set_attribute ATTR_DICT, "facade_margins", @facade_margins.to_a
     @group.set_attribute ATTR_DICT, "part_replacements", JSON.generate(@part_replacements)
@@ -1082,8 +1085,8 @@ class Building
       @corner_transitions[@template.id][i] =
         if used_corner
           {
-            :type =>   used_corner[:transition_type],
-            :length => used_corner[:transition_length]
+            "type" =>   used_corner[:transition_type],
+            "length" => used_corner[:transition_length]
           }
         else
           nil
@@ -1631,7 +1634,7 @@ class Building
     # Override corner_transitions JSON String with actual Hash object.
     # Backward compatibility: Set corner_transitions to empty Hash if not already set.
     h[:corner_transitions] = h[:corner_transitions] ? JSON.parse(h[:corner_transitions]) : {}
-    # Hash the nested arrays too...
+    h[:corner_transitions].each_value { |a| a.each { |c| c["length"] = c["length"].to_l if c }}
 
     # Backward compatibility: Default suggest_corner_transitions to true.
     h[:suggest_corner_transitions] = true if h[:suggest_corner_transitions].nil?
