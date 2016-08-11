@@ -1276,7 +1276,7 @@ class Building
   # Returns nil.
   def calculate_corner_transformations(parts_data)
 
-    _, _, segments_info  = calculate_local_path
+    segments_info = calculate_segment_info
 
     parts_data.each do |part_data|
 
@@ -1422,7 +1422,7 @@ class Building
   # Returns nil.
   def calculate_replaceable_transformations(parts_data)
 
-    _, _, segments_info = calculate_local_path
+    segments_info = calculate_segment_info
 
     parts_data.each do |part_data|
 
@@ -1543,11 +1543,10 @@ class Building
 
   end
 
-  # Internal: Convert path to local coordinates for building Group, calculate
-  # tangents and adapt direction according to @back_along_path.
-  #
-  # Returns Array of path (Point3d Array) and tangents (Vector3d Array).
-  def calculate_local_path
+  # Internal: Get information for building segments.
+  # A segment is the what is between two adjacent corners.
+  # TODO: clean up and document output.
+  def calculate_segment_info
 
     # Transform path to local building coordinates.
     trans_inverse = @group.transformation.inverse
@@ -1691,7 +1690,7 @@ class Building
       
     end
 
-    [path, tangents, segments_info]# TODO: maybe remove tangents reference? Maybe only return the segment info and nothing else?
+    segments_info
 
   end
 
@@ -1785,7 +1784,7 @@ class Building
     ents = @group.entities
     ents.clear!
 
-    _, _, segments_info = calculate_local_path
+    segments_info = calculate_segment_info
 
     # Loop path segments.
     (0..@path.size - 2).each do |segment_index|
