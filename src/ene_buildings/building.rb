@@ -231,6 +231,7 @@ class Building
       @back_along_path          != last_drawn_as[:back_along_path] ||
       @end_angles               != last_drawn_as[:end_angles] ||
       @perform_solid_operations != last_drawn_as[:perform_solid_operations] ||
+      @corner_transitions       != last_drawn_as[:corner_transitions] ||
       (
         @template.has_solids? &&
         last_drawn_as[:perform_solid_operations] &&
@@ -242,19 +243,22 @@ class Building
         )
       )
     )
+      # Complete redraw
       draw_volume
       draw_parts
       draw_solids write_status
       draw_material_replacement
-     elsif(
+    elsif(
       @gables  != last_drawn_as[:gables] ||
       @corners != last_drawn_as[:corners] ||
       !@facade_margins.eql?(last_drawn_as[:facade_margins]) ||
       @part_replacements != last_drawn_as[:part_replacements]
-     )
-       draw_parts
-       draw_material_replacement
+    )
+      # Part redraw (keep volume)
+      draw_parts
+      draw_material_replacement
     else
+      # Replace materials only (keep parts and volume)
       draw_material_replacement
     end
 
