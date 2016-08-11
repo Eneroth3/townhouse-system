@@ -1794,7 +1794,7 @@ class Building
       
         # Left side of segment
         ct = cts[segment_index-1]
-        if ct && ct["length"] > 0 && segment_index != 0
+        if ct && ct["length"] && ct["length"] > 0 && segment_index != 0
           half_angle  = Y_AXIS.angle_between(tangent_left)
           tangent_vector  = X_AXIS.reverse
           bisector_vector = Geom.linear_combination 0.5, X_AXIS.reverse, 0.5, tangent_left.reverse
@@ -1817,7 +1817,7 @@ class Building
         
         # Right side of segment
         ct = cts[segment_index]
-        if ct && ct["length"] > 0 && segment_index != path.size - 2
+        if ct && ct["length"] && ct["length"] > 0 && segment_index != path.size - 2
           half_angle  = Y_AXIS.angle_between(tangent_right.reverse)
           tangent_vector  = X_AXIS
           bisector_vector = Geom.linear_combination 0.5, X_AXIS, 0.5, tangent_right
