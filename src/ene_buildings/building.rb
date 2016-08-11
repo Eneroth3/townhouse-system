@@ -1607,8 +1607,105 @@ class Building
       tangents.reverse!
       tangents.each { |t| t.reverse! }
     end
+    
+    # Get segment information.
+    # Coordinates are relative to the segment group except for the group's
+    # Transformation itself which is relative to the building group coordinates.
+    segments_info = (0..path.size - 2).map do |segment_index|
+    
+      first_segment = segment_index == 0
+      last_segment  = segment_index == path.size - 2
+    
+      # Values in main building @group's coordinates.
+      corner_left    = path[segment_index]
+      corner_right   = path[segment_index + 1]
+      segment_vector = corner_right - corner_left
+      length         = segment_vector.length
+      tangent_left   = tangents[segment_index]
+      tangent_right  = tangents[segment_index + 1]
+      transformation = Geom::Transformation.axes(
+        corner_left,
+        segment_vector,
+        Z_AXIS * segment_vector,
+        Z_AXIS
+      )
 
-    [path, tangents]
+      # Values in local segment group's coordinates.
+      tangent_left  = tangent_left.transform transformation.inverse
+      tangent_right = tangent_right.transform transformation.inverse
+      plane_left    = [ORIGIN, tangent_left.reverse]
+      plane_right   = [[length, 0, 0], tangent_right]
+      
+      # Determine planes to cut volume with for corner transitions.
+      cts = @corner_transitions[@template.id]
+      cut_planes = nil
+      if cts
+        cut_planes = []
+      
+        # Left side of segment
+        ct = cts[segment_index-1]
+        if ct && ct["length"] && ct["length"] > 0 && !first_segment
+          half_angle  = Y_AXIS.angle_between(tangent_left)
+          tangent_vector  = X_AXIS.reverse
+          bisector_vector = Geom.linear_combination 0.5, X_AXIS.reverse, 0.5, tangent_left.reverse
+          case ct["type"]
+          when "fillet"
+            radius           = ct["length"]
+            projected_length = -radius/Math.tan(half_angle)
+            cut_vector       = tangent_vector
+          when "chamfer_d"
+            diagonal_length  = ct["length"]
+            projected_length = diagonal_length/(2*Math.sin(half_angle))
+            cut_vector       = bisector_vector
+          when "chamfer_p"
+            projected_length = ct["length"]
+            cut_vector       = bisector_vector
+          end
+          cut_planes[0] = [[projected_length, 0, 0], cut_vector]
+        end
+        
+        # Right side of segment
+        ct = cts[segment_index]
+        if ct && ct["length"] && ct["length"] > 0 && !last_segment
+          half_angle  = Y_AXIS.angle_between(tangent_right.reverse)
+          tangent_vector  = X_AXIS
+          bisector_vector = Geom.linear_combination 0.5, X_AXIS, 0.5, tangent_right
+          case ct["type"]
+          when "fillet"
+            radius           =  ct["length"]
+            projected_length = -radius/Math.tan(half_angle)
+            cut_vector       = tangent_vector
+          when "chamfer_d"
+            diagonal_length  = ct["length"]
+            projected_length = diagonal_length/(2*Math.sin(half_angle))
+            cut_vector       = bisector_vector
+          when "chamfer_p"
+            projected_length = ct["length"]
+            cut_vector       = bisector_vector
+          end
+          cut_planes[1] = [[length - projected_length, 0, 0], cut_vector]
+        end
+      
+      end
+
+      # List planes that are hidden within building.
+      # All side and cut planes except for gables.
+      internal_planes = []
+      internal_planes << plane_left unless first_segment
+      internal_planes << plane_right unless last_segment
+      internal_planes += cut_planes.compact
+      
+      {
+        :transformation  => transformation,
+        :length          => length,
+        :side_planes     => [plane_left, plane_right],
+        :cut_planes      => cut_planes,
+        :internal_planes => internal_planes
+      }
+      
+    end
+
+    [path, tangents, segments_info]# TODO: maybe remove tangents reference? Maybe only return the segment info and nothing else?
 
   end
 
@@ -1702,37 +1799,19 @@ class Building
     ents = @group.entities
     ents.clear!
 
-    path, tangents = calculate_local_path
+    _, _, segments_info = calculate_local_path
 
     # Loop path segments.
-    (0..path.size - 2).each do |segment_index|
+    (0..@path.size - 2).each do |segment_index|
 
-      # Values in main building @group's coordinates.
-      corner_left    = path[segment_index]
-      corner_right   = path[segment_index + 1]
-      segment_vector = corner_right - corner_left
-      segment_length = segment_vector.length
-      tangent_left   = tangents[segment_index]
-      tangent_right  = tangents[segment_index + 1]
-      segment_trans  = Geom::Transformation.axes(
-        corner_left,
-        segment_vector,
-        Z_AXIS * segment_vector,
-        Z_AXIS
-      )
-
-      # Values in local segment group's coordinates.
-      tangent_left  = tangent_left.transform segment_trans.inverse
-      tangent_right = tangent_right.transform segment_trans.inverse
-      plane_left    = [ORIGIN, tangent_left.reverse]
-      plane_right   = [[segment_length, 0, 0], tangent_right]
-
+      segment_info = segments_info[segment_index]
+      
       # Place template component in segment and explode it so it can be edited
       # without interfering with template.
       # Shift position along Y axis if the back of the building is what follows
       # the given path and not the front.
       segment_group                = ents.add_group
-      segment_group.transformation = segment_trans
+      segment_group.transformation = segment_info[:transformation]
       segment_ents                 = segment_group.entities
       component_trans = if @back_along_path
         Geom::Transformation.new [0, -(@template.depth || Template::FALLBACK_DEPTH), 0]
@@ -1763,7 +1842,7 @@ class Building
       face_left = faces_left.first
       face_right = faces_right.first
 
-      # Adapt building volume to fill this segment by moving and shearing side
+      # Adapt building volume to fill this segment by moving and skewing sides.
       # walls.
 
       x_min       = face_left.vertices.first.position.x
@@ -1772,88 +1851,30 @@ class Building
       edges_left  = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_min } } # All these edges may not bound the left face. For instance Landshövdingehus äldre has a rainwater pipe thingy.
       edges_right = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_max } }
 
-      trans_a = Geom::Transformation.new.to_a
-
-      y_axis = plane_left[1]*Z_AXIS
+      y_axis = segment_info[:side_planes][0][1]*Z_AXIS
       y_axis.length = 1/Math.cos(y_axis.angle_between(Y_AXIS))
       trans_left = MyGeom.transformation_axes [-x_min, 0, 0], X_AXIS, y_axis, Z_AXIS, true, true
-      y_axis = Z_AXIS*plane_right[1]
+      
+      y_axis = Z_AXIS*segment_info[:side_planes][1][1]
       y_axis.length = 1/Math.cos(y_axis.angle_between(Y_AXIS))
-      trans_right = MyGeom.transformation_axes [segment_length - x_max, 0, 0], X_AXIS, y_axis, Z_AXIS, true, true
+      trans_right = MyGeom.transformation_axes [segment_info[:length] - x_max, 0, 0], X_AXIS, y_axis, Z_AXIS, true, true
 
       segment_ents.transform_entities trans_left, edges_left
       segment_ents.transform_entities trans_right, edges_right
       
       # Cut away from volume for corner transition.
-      # TODO: Create planes in external loop, typically in calculate_local_path (that maybe should be renamed path_info or something) and use same planes for placing replaceable parts, identify faces to hide etc.
-      cts = @corner_transitions[@template.id]
-      if cts
-      
-        # Left side of segment
-        ct = cts[segment_index-1]
-        if ct && ct["length"] && ct["length"] > 0 && segment_index != 0
-          half_angle  = Y_AXIS.angle_between(tangent_left)
-          tangent_vector  = X_AXIS.reverse
-          bisector_vector = Geom.linear_combination 0.5, X_AXIS.reverse, 0.5, tangent_left.reverse
-          case ct["type"]
-          when "fillet"
-            radius           = ct["length"]
-            projected_length = -radius/Math.tan(half_angle)
-            cut_vector       = tangent_vector
-          when "chamfer_d"
-            diagonal_length  = ct["length"]
-            projected_length = diagonal_length/(2*Math.sin(half_angle))
-            cut_vector       = bisector_vector
-          when "chamfer_p"
-            projected_length = ct["length"]
-            cut_vector       = bisector_vector
-          end
-          cut_plane = [[projected_length, 0, 0], cut_vector]
-          MyGeom.cut(segment_ents, cut_plane)
-        end
-        
-        # Right side of segment
-        ct = cts[segment_index]
-        if ct && ct["length"] && ct["length"] > 0 && segment_index != path.size - 2
-          half_angle  = Y_AXIS.angle_between(tangent_right.reverse)
-          tangent_vector  = X_AXIS
-          bisector_vector = Geom.linear_combination 0.5, X_AXIS, 0.5, tangent_right
-          case ct["type"]
-          when "fillet"
-            radius           =  ct["length"]
-            projected_length = -radius/Math.tan(half_angle)
-            cut_vector       = tangent_vector
-          when "chamfer_d"
-            diagonal_length  = ct["length"]
-            projected_length = diagonal_length/(2*Math.sin(half_angle))
-            cut_vector       = bisector_vector
-          when "chamfer_p"
-            projected_length = ct["length"]
-            cut_vector       = bisector_vector
-          end
-          cut_plane = [[segment_length - projected_length, 0, 0], cut_vector]
-          MyGeom.cut(segment_ents, cut_plane)
-        end
-      
+      cut_planes = segment_info[:cut_planes]
+      if cut_planes
+        cut_planes.compact.each { |p| MyGeom.cut segment_ents, p }
       end
       
-      # Hide walls between segments.
-      # TODO: only loop entities once and compare vertices to all planes that are to be hidden. Include planes cut away for corner transition.
-      unless segment_index == 0
-        segment_ents.each do |e|
-          next unless e.respond_to? :vertices
-          next unless e.vertices.all? { |v| v.position.on_plane? plane_left }
-          next if e.is_a?(Sketchup::Edge) && !e.line[1].perpendicular?(Z_AXIS)
-          e.hidden = true
-        end
-      end
-      unless segment_index == path.size - 2
-        segment_ents.each do |e|
-          next unless e.respond_to? :vertices
-          next unless e.vertices.all? { |v| v.position.on_plane? plane_right }
-          next if e.is_a?(Sketchup::Edge) && !e.line[1].perpendicular?(Z_AXIS)
-          e.hidden = true
-        end
+      # Hide faces and edges where segments meet.
+      plns = segment_info[:internal_planes]
+      segment_ents.each do |e|
+        next unless e.respond_to? :vertices
+        next if e.is_a?(Sketchup::Edge) && !e.line[1].perpendicular?(Z_AXIS)
+        next unless plns.any?{ |p| e.vertices.all? { |v| v.position.on_plane? p }}
+        e.hidden = true
       end
 
     end
