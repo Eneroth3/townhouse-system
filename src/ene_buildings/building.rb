@@ -1435,7 +1435,7 @@ class Building
   # Returns nil.
   def calculate_replaceable_transformations(parts_data)
 
-    path, tangents = calculate_local_path
+    _, _, segments_info = calculate_local_path
 
     parts_data.each do |part_data|
 
@@ -1458,41 +1458,28 @@ class Building
       line_origin = [origin, X_AXIS]
 
       # Loop path segments.
-      (0..path.size - 2).each do |segment_index|
+      (0..@path.size - 2).each do |segment_index|
+      
+        segment_info = segments_info[segment_index]
 
         transformations = []
         part_data[:transformations] << transformations
-
-        # Values in main building @group's coordinates.
-        corner_left    = path[segment_index]
-        corner_right   = path[segment_index + 1]
-        segment_vector = corner_right - corner_left
-        segment_length = segment_vector.length
-        tangent_left   = tangents[segment_index]
-        tangent_right  = tangents[segment_index + 1]
-        segment_trans  = Geom::Transformation.axes(
-          corner_left,
-          segment_vector,
-          Z_AXIS * segment_vector,
-          Z_AXIS
-        )
-
-        # Values in local segment group's coordinates.
-        tangent_left     = tangent_left.transform(segment_trans.inverse)
-        tangent_right    = tangent_right.transform(segment_trans.inverse)
-        plane_left       = [ORIGIN, tangent_left.reverse]
-        plane_right      = [[segment_length, 0, 0], tangent_right]
-        origin_leftmost  = Geom.intersect_line_plane line_origin, plane_left
-        origin_rightmost = Geom.intersect_line_plane line_origin, plane_right
-
+        
+        # Project origin point to side planes and find outermost point in each
+        # direction.
+        pts_left     = segment_info[:left_planes].map { |p| Geom.intersect_line_plane line_origin, p}
+        pts_right    = segment_info[:right_planes].map { |p| Geom.intersect_line_plane line_origin, p}
+        pt_leftmost  = pts_left.max_by { |p| p.x }
+        pt_rightmost = pts_right.min_by { |p| p.x }
+        
         # Take facade margin into account.
         margin_left  = (@facade_margins[@template.id] || [])[2*segment_index]
         margin_right = (@facade_margins[@template.id] || [])[2*segment_index+1]
-        origin_leftmost.offset!(X_AXIS, margin_left) if margin_left
-        origin_rightmost.offset!(X_AXIS, -margin_right) if margin_right
+        pt_leftmost.offset!(X_AXIS, margin_left) if margin_left
+        pt_rightmost.offset!(X_AXIS, -margin_right) if margin_right
 
         # Skip segment for this part if leftmost is to the right of rightmost.
-        unless (origin_rightmost-origin_leftmost).samedirection?(X_AXIS)
+        unless (pt_rightmost-pt_leftmost).samedirection?(X_AXIS)
           next
         end
 
@@ -1504,13 +1491,13 @@ class Building
 
           new_origin =
             if ad["align"] == "left"
-              origin_leftmost
+              pt_leftmost
             elsif ad["align"] == "right"
-             origin_rightmost
+             pt_rightmost
             elsif ad["align"] == "center"
-              Geom.linear_combination 0.5, origin_leftmost, 0.5, origin_rightmost
+              Geom.linear_combination 0.5, pt_leftmost, 0.5, pt_rightmost
             elsif ad["align"].is_a? Float
-              Geom.linear_combination(1-ad["align"], origin_leftmost, ad["align"], origin_rightmost)
+              Geom.linear_combination(1-ad["align"], pt_leftmost, ad["align"], pt_rightmost)
             end
           tr_ary = tr_original_ary.dup
           tr_ary[12] = new_origin.x
@@ -1522,7 +1509,7 @@ class Building
           # approximate distance between (in inches). This distance will adapt
           # to fit available space.
 
-          available_distance = origin_leftmost.distance origin_rightmost
+          available_distance = pt_leftmost.distance pt_rightmost
           margin_l = ad["margin_left"] || ad["margin"] || 0
           margin_r = ad["margin_right"] || ad["margin"] || 0
           available_distance -= (margin_l + margin_r)
@@ -1545,7 +1532,7 @@ class Building
           distance_between = available_distance/total_number
           # Each copy has its origin at x = margin_l + (n + 0.5)*distance_between
           (0..total_number-1).each do |n|
-            x = origin_leftmost.x + margin_l + (n + 0.5) * distance_between
+            x = pt_leftmost.x + margin_l + (n + 0.5) * distance_between
             tr_ary = tr_original_ary.dup
             tr_ary[12] = x
             tr = Geom::Transformation.new tr_ary
@@ -1554,7 +1541,7 @@ class Building
             unless ad["override_cut_planes"]
               corners = MyGeom.bb_corners(part_data[:definition].bounds)
               corners.each { |c| c.transform! tr }
-              next if corners.any? { |c| MyGeom.front_of_plane?(plane_left, c) || MyGeom.front_of_plane?(plane_right, c) }
+              next if corners.any? { |c| segment_info[:all_planes].any? { |p| MyGeom.front_of_plane?(p, c) }}
             end
             transformations << tr
           end
@@ -1635,12 +1622,12 @@ class Building
       tangent_right = tangent_right.transform transformation.inverse
       plane_left    = [ORIGIN, tangent_left.reverse]
       plane_right   = [[length, 0, 0], tangent_right]
+      side_planes   = [plane_left, plane_right]
       
       # Determine planes to cut volume with for corner transitions.
       cts = @corner_transitions[@template.id]
-      cut_planes = nil
+      cut_planes = []
       if cts
-        cut_planes = []
       
         # Left side of segment
         ct = cts[segment_index-1]
@@ -1695,12 +1682,22 @@ class Building
       internal_planes << plane_right unless last_segment
       internal_planes += cut_planes.compact
       
-      {
+      # List all planes defining the perimeter of segment.
+      all_planes = side_planes + cut_planes.compact
+      
+      # List all planes for each side.
+      left_planes  = [plane_left, cut_planes[0]].compact
+      right_planes = [plane_right, cut_planes[1]].compact
+      
+      {# TODO: Better var names!
         :transformation  => transformation,
         :length          => length,
-        :side_planes     => [plane_left, plane_right],
+        :side_planes     => side_planes,
         :cut_planes      => cut_planes,
-        :internal_planes => internal_planes
+        :internal_planes => internal_planes,
+        :all_planes      => all_planes,
+        :left_planes     => left_planes,
+        :right_planes    => right_planes,
       }
       
     end
