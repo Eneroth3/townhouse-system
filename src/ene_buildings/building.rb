@@ -1784,11 +1784,8 @@ class Building
       segment_ents.transform_entities trans_left, edges_left
       segment_ents.transform_entities trans_right, edges_right
       
-      
-      
-      
+      # Cut away from volume for corner transition.
       # TODO: Create planes in external loop, typically in calculate_local_path (that maybe should be renamed path_info or something) and use same planes for placing replaceable parts, identify faces to hide etc.
-      
       cts = @corner_transitions[@template.id]
       if cts
       
@@ -1840,17 +1837,23 @@ class Building
       
       end
       
-      
-      
-
       # Hide walls between segments.
-      unless segment_index == 0 || face_left.deleted?
-        face_left.hidden = true
-        face_left.edges.each { |e| e.hidden = true if e.line[1].perpendicular?(Z_AXIS) }
+      # TODO: only loop entities once and compare vertices to all planes that are to be hidden. Include planes cut away for corner transition.
+      unless segment_index == 0
+        segment_ents.each do |e|
+          next unless e.respond_to? :vertices
+          next unless e.vertices.all? { |v| v.position.on_plane? plane_left }
+          next if e.is_a?(Sketchup::Edge) && !e.line[1].perpendicular?(Z_AXIS)
+          e.hidden = true
+        end
       end
-      unless segment_index == path.size - 2 || face_right.deleted?
-        face_right.hidden = true
-        face_right.edges.each { |e| e.hidden = true if e.line[1].perpendicular?(Z_AXIS) }
+      unless segment_index == path.size - 2
+        segment_ents.each do |e|
+          next unless e.respond_to? :vertices
+          next unless e.vertices.all? { |v| v.position.on_plane? plane_right }
+          next if e.is_a?(Sketchup::Edge) && !e.line[1].perpendicular?(Z_AXIS)
+          e.hidden = true
+        end
       end
 
     end
