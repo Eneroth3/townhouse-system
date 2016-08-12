@@ -395,14 +395,18 @@
         length_input.disabled = type == null;
         if(type == null) length_input.value = '';
         var params = JSON.stringify([index, type]);
-        window.location='skp:set_corner_transition_type@' + encodeURIComponent(params);
+        setTimeout(function(){ // HACK: Let the newly focused element "fully" gain focus before calling ruby side to change form content. New element must be  "fully" focused for reference to be saved so focus can be restored once the fotm has been updated.
+          window.location='skp:set_corner_transition_type@' + encodeURIComponent(params);
+        }, 0);
       }
       
       function set_corner_transition_length(input) {
         var index = parseInt(input.getAttribute('data-index'));
         var length  = input.value;
         var params = JSON.stringify([index, length]);
-        window.location='skp:set_corner_transition_length@' + encodeURIComponent(params);
+        setTimeout(function(){ // HACK: Let the newly focused element "fully" gain focus before calling ruby side to change form content. New element must be  "fully" focused for reference to be saved so focus can be restored once the fotm has been updated.
+          window.location='skp:set_corner_transition_length@' + encodeURIComponent(params);
+        }, 0);
       }
       
       function toggle_suggest_corner_transitions(checkbox) {
@@ -415,7 +419,9 @@
         var index  = parseInt(input.getAttribute('data-index'));
         var length = input.value;
         var params = JSON.stringify([index, length]);
-        window.location='skp:set_margin@' + encodeURIComponent(params);
+        setTimeout(function(){ // HACK: Let the newly focused element "fully" gain focus before calling ruby side to change form content. New element must be  "fully" focused for reference to be saved so focus can be restored once the fotm has been updated.
+          window.location='skp:set_margin@' + encodeURIComponent(params);
+        }, 0);
       }
 
       function toggle_suggest_margins(checkbox) {
