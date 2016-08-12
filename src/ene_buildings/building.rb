@@ -1545,22 +1545,24 @@ class Building
 
   # Internal: Get information for building segments.
   # A segment is the what is between two adjacent corners.
-  # TODO: clean up and document output.
+  #
+  # Returns Array with information for each segment starting from the left.
+  # Information is a Hash. For Hash content, see the comments inside method.
   def calculate_segment_info
 
     # Transform path to local building coordinates.
-    trans_inverse = @group.transformation.inverse
-    path = @path.map { |p| p.transform trans_inverse }
+    building_tr = @group.transformation
+    path = @path.map { |p| p.transform building_tr.inverse }
 
     # Get tangent for each point in path.
     # Tangents point in the positive direction of path.
     tangents = []
     tangents << path[1] - path[0]
     if path.size > 2
-      (1..path.size - 2).each do |corner|
-        p_prev = path[corner - 1]
-        p_this = path[corner]
-        p_next = path[corner + 1]
+      (1..path.size - 2).each do |corner_index|
+        p_prev = path[corner_index - 1]
+        p_this = path[corner_index]
+        p_next = path[corner_index + 1]
         v_prev = p_this - p_prev
         v_next = p_next - p_this
         tangents << Geom.linear_combination(0.5, v_prev, 0.5, v_next)
@@ -1579,6 +1581,16 @@ class Building
       path.reverse!
       tangents.reverse!
       tangents.each { |t| t.reverse! }
+    end
+    
+    # Determine if interior corners (all but the building ends) are convex.
+    convex = (1..path.size - 2).map do |corner_index|
+      p_prev = path[corner_index - 1]
+      p_this = path[corner_index]
+      p_next = path[corner_index + 1]
+      v_prev = p_this - p_prev
+      v_next = p_next - p_this
+      (v_prev * v_next).z > 0
     end
     
     # Get segment information.
@@ -1609,7 +1621,7 @@ class Building
       plane_left    = [ORIGIN, tangent_left.reverse]
       plane_right   = [[length, 0, 0], tangent_right]
       side_planes   = [plane_left, plane_right]
-      
+
       # Determine planes to cut volume with for corner transitions.
       cts = @corner_transitions[@template.id]
       cut_planes = []
@@ -1617,7 +1629,7 @@ class Building
       
         # Left side of segment
         ct = cts[segment_index-1]
-        if ct && ct["length"] && ct["length"] > 0 && !first_segment
+        if ct && ct["length"] && ct["length"] > 0 && !first_segment && convex[segment_index-1]
           half_angle  = Y_AXIS.angle_between(tangent_left)
           tangent_vector  = X_AXIS.reverse
           bisector_vector = Geom.linear_combination 0.5, X_AXIS.reverse, 0.5, tangent_left.reverse
@@ -1639,7 +1651,7 @@ class Building
         
         # Right side of segment
         ct = cts[segment_index]
-        if ct && ct["length"] && ct["length"] > 0 && !last_segment
+        if ct && ct["length"] && ct["length"] > 0 && !last_segment && convex[segment_index]
           half_angle  = Y_AXIS.angle_between(tangent_right.reverse)
           tangent_vector  = X_AXIS
           bisector_vector = Geom.linear_combination 0.5, X_AXIS, 0.5, tangent_right
@@ -1675,7 +1687,7 @@ class Building
       left_planes  = [plane_left, cut_planes[0]].compact
       right_planes = [plane_right, cut_planes[1]].compact
       
-      {# TODO: Better var names!
+      {
         :transformation  => transformation,
         :length          => length,
         :side_planes     => side_planes,
