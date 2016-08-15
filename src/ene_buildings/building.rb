@@ -1596,7 +1596,11 @@ class Building
     # Get segment information.
     # Coordinates are relative to the segment group except for the group's
     # Transformation itself which is relative to the building group coordinates.
-    segments_info = (0..path.size - 2).map do |segment_index|
+    segments_info = []
+    (0..path.size - 2).each do |segment_index|
+    
+      segment_info = {}
+      segments_info << segment_info
     
       first_segment = segment_index == 0
       last_segment  = segment_index == path.size - 2
@@ -1614,6 +1618,12 @@ class Building
         Z_AXIS * segment_vector,
         Z_AXIS
       )
+      
+      # Transformation of segment group.
+      segment_info[:transformation] = transformation
+      
+      # The Length of the segment in the facade plane.
+      segment_info[:length]         = length
 
       # Values in local segment group's coordinates.
       tangent_left  = tangent_left.transform transformation.inverse
@@ -1621,6 +1631,18 @@ class Building
       plane_left    = [ORIGIN, tangent_left.reverse]
       plane_right   = [[length, 0, 0], tangent_right]
       side_planes   = [plane_left, plane_right]
+      
+      # Tangents of the corners for this segment.
+      segment_info[:tangent_left]  = tangent_left
+      segment_info[:tangent_right] = tangent_right
+      
+      # Planes defining main sides of this segment.
+      segment_info[:plane_left]  = plane_left
+      segment_info[:plane_right] = plane_right
+      
+      # Array of planes defining the main sides of the segment. 0th element is
+      # left plane, 1st is right.
+      segment_info[:side_planes] = side_planes
 
       # Determine planes to cut volume with for corner transitions.
       cts = @corner_transitions[@template.id]
@@ -1672,6 +1694,10 @@ class Building
         end
       
       end
+      
+      # Array of planes defining how segment should be cut to leave space for
+      # corner transition. 0th element is left plane, 1st is right.
+      segment_info[:cut_planes] = cut_planes
 
       # List planes that are hidden within building.
       # All side and cut planes except for gables.
@@ -1679,27 +1705,34 @@ class Building
       internal_planes << plane_left unless first_segment
       internal_planes << plane_right unless last_segment
       internal_planes += cut_planes.compact
+      segment_info[:internal_planes] = internal_planes
       
       # List all planes defining the perimeter of segment.
       all_planes = side_planes + cut_planes.compact
+      segment_info[:all_planes] = all_planes
       
       # List all planes for each side.
-      left_planes  = [plane_left, cut_planes[0]].compact
-      right_planes = [plane_right, cut_planes[1]].compact
+      segment_info[:left_planes]  = [plane_left, cut_planes[0]].compact
+      segment_info[:right_planes] = [plane_right, cut_planes[1]].compact
       
-      {
-        :transformation  => transformation,
-        :length          => length,
-        :side_planes     => side_planes,
-        :cut_planes      => cut_planes,
-        :internal_planes => internal_planes,
-        :all_planes      => all_planes,
-        :left_planes     => left_planes,
-        :right_planes    => right_planes,
-        :tangent_left    => tangent_left,
-        :tangent_right   => tangent_right
-      }
-      
+      # Information for the group the transition geometry is drawn to.
+      # Group should be drawn at the left side of segment similar to how corner
+      # parts are placed.
+      if cts
+        ct = cts[segment_index-1]
+        if ct && ct["length"] && ct["length"] > 0 && !first_segment && convex[segment_index-1]
+          prev_segment = segments_info[segment_index-1]
+          transition_group = {}
+          tr_correction = transformation.inverse*prev_segment[:transformation]
+          transition_group[:plane_left] = prev_segment[:cut_planes][1].map { |c| c.transform tr_correction }
+          transition_group[:plane_left][1].reverse!
+          transition_group[:plane_right] = cut_planes[0].dup
+          transition_group[:plane_right][1] = transition_group[:plane_right][1].reverse
+          
+          segment_info[:transition_group] = transition_group
+        end
+      end
+       
     end
 
     segments_info
@@ -1848,11 +1881,11 @@ class Building
       edges_left  = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_min } } # All these edges may not bound the left face. For instance Landshövdingehus äldre has a rainwater pipe thingy.
       edges_right = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_max } }
 
-      y_axis = segment_info[:side_planes][0][1]*Z_AXIS
+      y_axis = segment_info[:plane_left][1]*Z_AXIS
       y_axis.length = 1/Math.cos(y_axis.angle_between(Y_AXIS))
       trans_left = MyGeom.transformation_axes [-x_min, 0, 0], X_AXIS, y_axis, Z_AXIS, true, true
       
-      y_axis = Z_AXIS*segment_info[:side_planes][1][1]
+      y_axis = Z_AXIS*segment_info[:plane_right][1]
       y_axis.length = 1/Math.cos(y_axis.angle_between(Y_AXIS))
       trans_right = MyGeom.transformation_axes [segment_info[:length] - x_max, 0, 0], X_AXIS, y_axis, Z_AXIS, true, true
 
@@ -1873,6 +1906,32 @@ class Building
         next unless plns.any?{ |p| e.vertices.all? { |v| v.position.on_plane? p }}
         e.hidden = true
       end
+      
+      
+      
+      
+      
+      # Draw volume for corner transition.
+      if segment_info[:transition_group]
+      transition_group = segment_ents.add_group
+        transition_ents = transition_group.entities
+
+        # Test code
+        plane_left  = segment_info[:transition_group][:plane_left]
+        plane_right = segment_info[:transition_group][:plane_right]
+        plane_front = [plane_left[0], segment_info[:tangent_left]*Z_AXIS]
+        lines = [
+          Geom.intersect_plane_plane(plane_front, plane_left),
+          Geom.intersect_plane_plane(plane_left,  plane_right),
+          Geom.intersect_plane_plane(plane_right, plane_front)
+        ]
+        base_plane = [ORIGIN, Z_AXIS]
+        corners = lines.map { |l| Geom.intersect_line_plane l, base_plane }
+        transition_ents.add_face corners
+      
+      end
+      
+      
 
     end
 
@@ -1908,7 +1967,7 @@ class Building
       # Purge all existing parts in segment.
       # This method can be called if part settings are changed without first
       # calling draw_volume.
-      instances = segment_ents.select { |e| [Sketchup::Group, Sketchup::ComponentInstance].include? e.class }
+      instances = segment_ents.select { |e| e.attribute_dictionary Template::ATTR_DICT_PART }
       segment_ents.erase_entities instances
 
       # Place instances of all spread or aligned parts that has transformations
