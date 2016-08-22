@@ -283,10 +283,14 @@ class Building
   #   :original_instance  - Group or ComponentInstance defining the part inside
   #                         the Template's ComponentDefinition.
   #   :margin             - Facade margin Length suggested for this corner.
+  #   :skewed             - true when the part should be skewed with X and
+  #                         Y axes along following building path, false
+  #                         when part should be drawn with Y axis along
+  #                         bisector of corner.
   #   :use                - Array of booleans telling what corners this part
   #                         should be drawn to.
   #   :transition_type    - #TODO: Document!
-  #   : transition_length -
+  #   :transition_length  -
   #   :transformations    - (Only when calculate_transformations is true)
   #                        Transformations object defining instance placement
   #                        in local coordinates grouped by building segment.
@@ -307,6 +311,7 @@ class Building
         :name => name,
         :use => use,
         :margin => e.get_attribute(Template::ATTR_DICT_PART, "corner_margin"),
+        :skewed => !!e.get_attribute(Template::ATTR_DICT_PART, "corner_skewed"),
         :transition_type => e.get_attribute(Template::ATTR_DICT_PART, "transition_type"),
         :transition_length => e.get_attribute(Template::ATTR_DICT_PART, "transition_length")
       }
@@ -1306,26 +1311,39 @@ class Building
         transformations = []
         part_data[:transformations] << transformations
 
-        plane_left  = segment_info[:side_planes][0]
-        plane_right = segment_info[:side_planes][1]
+        plane_left  = segment_info[:plane_left]
+        plane_right = segment_info[:plane_right]
         pt_left  = Geom.intersect_line_plane line_origin, plane_left
         pt_right = Geom.intersect_line_plane line_origin, plane_right
 
         # All corner parts expect for that of the last corner is drawn at the
         # left side of the segment group by the same index.
         if part_data[:use][segment_index]
-          transformations << Geom::Transformation.axes(
-            pt_left,
-            segment_info[:tangent_left],
-            Z_AXIS*segment_info[:tangent_left],
-            Z_AXIS
-          )
+          if part_data[:skewed]
+            transformations << MyGeom.transformation_axes(
+              [0, 0, origin.z],# TODO: Use z coordinate from original on gable too?
+              X_AXIS,
+              segment_info[:adjacent_vector_left],
+              Z_AXIS,
+              false,
+              true
+            )
+          else
+            transformations << Geom::Transformation.axes(
+              pt_left,
+              segment_info[:tangent_left],
+              Z_AXIS*segment_info[:tangent_left],
+              Z_AXIS
+            )
+          end
+          
         end
 
         # The rightmost corner part is drawn at the right side of the last
         # segment group. This group is the only one that may contain two
         # corner parts.
         if segment_index == last_segment && part_data[:use][segment_index + 1]
+          # TODO: Create different transformations depending on if skewed or not.
           transformations << Geom::Transformation.axes(
             pt_right,
             segments_info[:tangent_right],
@@ -1454,8 +1472,8 @@ class Building
         
         # Project origin point to side planes and find outermost point in each
         # direction.
-        pts_left     = segment_info[:left_planes].map { |p| Geom.intersect_line_plane line_origin, p}
-        pts_right    = segment_info[:right_planes].map { |p| Geom.intersect_line_plane line_origin, p}
+        pts_left     = segment_info[:planes_left].map { |p| Geom.intersect_line_plane line_origin, p}
+        pts_right    = segment_info[:planes_right].map { |p| Geom.intersect_line_plane line_origin, p}
         pt_leftmost  = pts_left.max_by { |p| p.x }
         pt_rightmost = pts_right.min_by { |p| p.x }
         
@@ -1602,8 +1620,8 @@ class Building
       segment_info = {}
       segments_info << segment_info
     
-      first_segment = segment_index == 0
-      last_segment  = segment_index == path.size - 2
+      first = segment_index == 0
+      last  = segment_index == path.size - 2
     
       # Values in main building @group's coordinates.
       corner_left    = path[segment_index]
@@ -1632,6 +1650,23 @@ class Building
       plane_right   = [[length, 0, 0], tangent_right]
       side_planes   = [plane_left, plane_right]
       
+      # Vectors of adjacent path segments (in coordinates of local group).
+      adjacent_vector_left = 
+        if first
+          tangents.first.reverse
+        else
+          (path[segment_index]-path[segment_index-1]).transform(transformation.inverse).reverse
+        end
+      adjacent_vector_right = 
+        if last
+          tangents.last
+        else
+          (path[segment_index+2]-path[segment_index+1]).transform transformation.inverse
+        end
+      segment_info[:adjacent_vector_left]  = adjacent_vector_left
+      segment_info[:adjacent_vector_right] = adjacent_vector_right
+      segment_info[:adjacent_vectors]      = [adjacent_vector_left, adjacent_vector_right]
+      
       # Tangents of the corners for this segment.
       segment_info[:tangent_left]  = tangent_left
       segment_info[:tangent_right] = tangent_right
@@ -1651,7 +1686,7 @@ class Building
       
         # Left side of segment
         ct = cts[segment_index-1]
-        if ct && ct["length"] && ct["length"] > 0 && !first_segment && convex[segment_index-1]
+        if ct && ct["length"] && ct["length"] > 0 && !first && convex[segment_index-1]
           half_angle  = Y_AXIS.angle_between(tangent_left)
           tangent_vector  = X_AXIS.reverse
           bisector_vector = Geom.linear_combination 0.5, X_AXIS.reverse, 0.5, tangent_left.reverse
@@ -1673,7 +1708,7 @@ class Building
         
         # Right side of segment
         ct = cts[segment_index]
-        if ct && ct["length"] && ct["length"] > 0 && !last_segment && convex[segment_index]
+        if ct && ct["length"] && ct["length"] > 0 && !last && convex[segment_index]
           half_angle  = Y_AXIS.angle_between(tangent_right.reverse)
           tangent_vector  = X_AXIS
           bisector_vector = Geom.linear_combination 0.5, X_AXIS, 0.5, tangent_right
@@ -1702,8 +1737,8 @@ class Building
       # List planes that are hidden within building.
       # All side and cut planes except for gables.
       internal_planes = []
-      internal_planes << plane_left unless first_segment
-      internal_planes << plane_right unless last_segment
+      internal_planes << plane_left unless first
+      internal_planes << plane_right unless last
       internal_planes += cut_planes.compact
       segment_info[:internal_planes] = internal_planes
       
@@ -1712,15 +1747,15 @@ class Building
       segment_info[:all_planes] = all_planes
       
       # List all planes for each side.
-      segment_info[:left_planes]  = [plane_left, cut_planes[0]].compact
-      segment_info[:right_planes] = [plane_right, cut_planes[1]].compact
+      segment_info[:planes_left]  = [plane_left, cut_planes[0]].compact
+      segment_info[:planes_right] = [plane_right, cut_planes[1]].compact
       
       # Information for the group the transition geometry is drawn to.
       # Group should be drawn at the left side of segment similar to how corner
       # parts are placed.
       if cts
         ct = cts[segment_index-1]
-        if ct && ct["length"] && ct["length"] > 0 && !first_segment && convex[segment_index-1]
+        if ct && ct["length"] && ct["length"] > 0 && !first && convex[segment_index-1]
           prev_segment = segments_info[segment_index-1]
           transition_group = {}
           tr_correction = transformation.inverse*prev_segment[:transformation]

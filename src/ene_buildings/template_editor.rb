@@ -336,6 +336,7 @@ module TemplateEditor
           "gable"
         elsif data[:corner]
           "corner"
+          data[:corner_skewed] ? "corner_skewed" : "corner"
         elsif data[:replacement]
           "replacement"
         else
@@ -383,8 +384,11 @@ module TemplateEditor
       js << "override_cut_planes(#{override_cut_planes});"
       js << "document.getElementById('gable_margin').value=#{gable_margin.to_s.inspect};"
       js << "document.getElementById('transition_type').value=#{transition_type.to_s.inspect};"
+      js << "document.getElementById('transition_type_skewed').value=#{transition_type.to_s.inspect};"
       js << "document.getElementById('transition_length').value=#{transition_length.to_s.inspect};"
+      js << "document.getElementById('transition_length_skewed').value=#{transition_length.to_s.inspect};"
       js << "document.getElementById('corner_margin').value=#{corner_margin.to_s.inspect};"
+      js << "document.getElementById('corner_margin_skewed').value=#{corner_margin.to_s.inspect};"
       js << "document.getElementById('replaces').value=#{replaces.inspect};"
       js << "document.getElementById('slots').value=#{slots};"
       js << "replace_nested_mateials(#{replace_nested_mateials});"
@@ -972,6 +976,41 @@ module TemplateEditor
       end
       data[:transition_length] = transition_length unless transition_length == 0
       corner_margin = @@dlg_part.get_element_value("corner_margin")
+      begin
+        corner_margin = corner_margin.start_with?("~") ? old_data[:corner_margin] : corner_margin.to_l
+      rescue ArgumentError
+        msg =
+          "'#{corner_margin}' could not be parsed as length.\n"\
+          "Keeping old value for margin."
+        UI.messagebox msg
+        corner_margin = old_data[:corner_margin] || 0
+      end
+      data[:corner_margin] = corner_margin unless corner_margin == 0
+      unless data[:name]
+         data[:name] = unique_part_name(@@part, "Corner")
+         msg = "Corner must have a name.\nUsing '#{data[:name]}."
+         UI.messagebox msg
+      end      
+      
+    when "corner_skewed"
+      data[:corner] = true
+      data[:corner_skewed] = true
+      transition_type = @@dlg_part.get_element_value("transition_type_skewed")
+      unless transition_type == ""
+        data[:transition_type] = transition_type
+      end
+      transition_length = @@dlg_part.get_element_value("transition_length_skewed")
+      begin
+        transition_length = transition_length.start_with?("~") ? old_data[:transition_length] : transition_length.to_l
+      rescue ArgumentError
+        msg =
+          "'#{transition_length}' could not be parsed as length.\n"\
+          "Keeping old value for transition length."
+        UI.messagebox msg
+        transition_length = old_data[:transition_length] || 0
+      end
+      data[:transition_length] = transition_length unless transition_length == 0
+      corner_margin = @@dlg_part.get_element_value("corner_margin_skewed")
       begin
         corner_margin = corner_margin.start_with?("~") ? old_data[:corner_margin] : corner_margin.to_l
       rescue ArgumentError
