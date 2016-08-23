@@ -1703,7 +1703,14 @@ class Building
             projected_length = ct["length"]
             cut_vector       = bisector_vector
           end
-          cut_planes[0] = [[projected_length, 0, 0], cut_vector]
+          if @back_along_path
+            y = -(@template.depth || Template::FALLBACK_DEPTH)
+            x = y*Math.tan(half_angle-90.degrees) + projected_length
+          else
+            x = projected_length
+            y = 0
+          end
+          cut_planes[0] = [[x, y, 0], cut_vector]
         end
         
         # Right side of segment
@@ -1725,7 +1732,14 @@ class Building
             projected_length = ct["length"]
             cut_vector       = bisector_vector
           end
-          cut_planes[1] = [[length - projected_length, 0, 0], cut_vector]
+          if @back_along_path
+            y = -(@template.depth || Template::FALLBACK_DEPTH)
+            x = length - y*Math.tan(half_angle-90.degrees) - projected_length
+          else
+            x = length - projected_length
+            y = 0
+          end
+          cut_planes[1] = [[x, y, 0], cut_vector]
         end
       
       end
