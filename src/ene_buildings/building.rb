@@ -1321,7 +1321,7 @@ class Building
         if part_data[:use][segment_index]
           if part_data[:skewed]
             transformations << MyGeom.transformation_axes(
-              [0, 0, origin.z],# TODO: Use z coordinate from original on gable too?
+              pt_left,
               X_AXIS,
               segment_info[:adjacent_vector_left],
               Z_AXIS,
@@ -1345,7 +1345,7 @@ class Building
         if last_segment && part_data[:use][segment_index + 1]
           if part_data[:skewed]
             transformations << MyGeom.transformation_axes(
-              [segment_info[:length], 0, origin.z],# TODO: Use z coordinate from original on gable too?
+              pt_right,
               segment_info[:adjacent_vector_right],
               X_AXIS.reverse,
               Z_AXIS,
