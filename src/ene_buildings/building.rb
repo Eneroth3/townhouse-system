@@ -1998,23 +1998,21 @@ class Building
         )
         component_inst.explode
         transition_ents.erase_entities transition_ents.select { |e| !allowed_classes.include? e.class }
-        MyGeom.cut transition_ents, [[0, depth, 0], Y_AXIS], false
         
-        # Skew ends.
+        # Move ends.
         edges       = transition_ents.select { |e| e.is_a? Sketchup::Edge }
         edges_left  = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_min }}
         edges_right = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_max }}
-        y_axis = plane_left[1].transform(transition_trans.inverse)*Z_AXIS
-        y_axis.length = 1/Math.cos(y_axis.angle_between(Y_AXIS))
-        trans_left = MyGeom.transformation_axes [-x_min, 0, 0], X_AXIS, y_axis, Z_AXIS, true, true
-        y_axis = Z_AXIS*plane_right[1].transform(transition_trans.inverse)
-        y_axis.length = 1/Math.cos(y_axis.angle_between(Y_AXIS))
-        trans_right = MyGeom.transformation_axes [length - x_max, 0, 0], X_AXIS, y_axis, Z_AXIS, true, true
+        trans_left  = Geom::Transformation.new([-x_min - 1.m, 0, 0])
+        trans_right = Geom::Transformation.new([length - x_max + 1.m, 0, 0])
         transition_ents.transform_entities trans_left, edges_left
         transition_ents.transform_entities trans_right, edges_right
-      
-        # Hide ends.
+        
+        # Cut sides.
         plns = segment_info[:transition_group][:planes].map { |p| p.map { |c| c.transform transition_trans.inverse }}
+        plns.each { |p| MyGeom.cut transition_ents, p }
+      
+        # Hide sides.
         transition_ents.each do |e|
           next unless e.respond_to? :vertices
           next if e.is_a?(Sketchup::Edge) && (!e.line[1].valid? || !e.line[1].perpendicular?(Z_AXIS))
