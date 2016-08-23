@@ -1773,10 +1773,13 @@ class Building
           prev_segment = segments_info[segment_index-1]
           transition_group = {}
           tr_correction = transformation.inverse*prev_segment[:transformation]
-          transition_group[:plane_left] = prev_segment[:cut_planes][1].map { |c| c.transform tr_correction }
-          transition_group[:plane_left][1].reverse!
-          transition_group[:plane_right] = cut_planes[0].dup
-          transition_group[:plane_right][1] = transition_group[:plane_right][1].reverse
+          plane_left = prev_segment[:cut_planes][1].map { |c| c.transform tr_correction }
+          plane_left[1].reverse!
+          transition_group[:plane_left] = plane_left
+          plane_right = cut_planes[0].dup
+          plane_right[1] = plane_right[1].reverse
+          transition_group[:plane_right] = plane_right
+          transition_group[:planes] = [plane_left, plane_right]
           
           segment_info[:transition_group] = transition_group
         end
@@ -1900,10 +1903,10 @@ class Building
       component_inst = segment_ents.add_instance @template.component_def, component_trans
       component_inst.explode
 
-      # Remove all Groups and ComponentInstances from segment.
+      # Purge everything but edges and faces from template.
       # This method only draws the volume and another methods add the details.
-      instances = segment_ents.select { |e| [Sketchup::Group, Sketchup::ComponentInstance].include? e.class }
-      segment_ents.erase_entities instances
+      allowed_classes = [Sketchup::Face, Sketchup::Edge]
+      segment_ents.erase_entities segment_ents.select { |e| !allowed_classes.include? e.class }
 
       # Allow material replacement in segment group.
       segment_group.set_attribute Template::ATTR_DICT_PART, "replace_nested_mateials", true
@@ -1965,18 +1968,59 @@ class Building
       transition_group = segment_ents.add_group
         transition_ents = transition_group.entities
 
-        # Test code
         plane_left  = segment_info[:transition_group][:plane_left]
         plane_right = segment_info[:transition_group][:plane_right]
         plane_front = [plane_left[0], segment_info[:tangent_left]*Z_AXIS]
-        lines = [
+        lines       = [
           Geom.intersect_plane_plane(plane_front, plane_left),
           Geom.intersect_plane_plane(plane_left,  plane_right),
           Geom.intersect_plane_plane(plane_right, plane_front)
         ]
-        base_plane = [ORIGIN, Z_AXIS]
-        corners = lines.map { |l| Geom.intersect_line_plane l, base_plane }
-        transition_ents.add_face corners
+        base_plane  = [ORIGIN, Z_AXIS]
+        corners     = lines.map { |l| Geom.intersect_line_plane l, base_plane }
+        depth       = corners[1].distance_to_plane plane_front
+        length      = corners[0].distance corners[2]
+        
+        # Place template.
+        # TODO: Add support for chamfer or comment out on all places in UI.
+        transition_trans = Geom::Transformation.axes(
+          corners[0],
+          corners[2] - corners[0],
+          plane_front[1].reverse,
+          Z_AXIS
+        )
+        transition_group                = segment_ents.add_group
+        transition_group.transformation = transition_trans
+        transition_ents                 = transition_group.entities
+        component_inst                  = transition_ents.add_instance(
+          @template.component_def,
+          Geom::Transformation.new
+        )
+        component_inst.explode
+        transition_ents.erase_entities transition_ents.select { |e| !allowed_classes.include? e.class }
+        MyGeom.cut transition_ents, [[0, depth, 0], Y_AXIS], false
+        
+        # Skew ends.
+        edges       = transition_ents.select { |e| e.is_a? Sketchup::Edge }
+        edges_left  = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_min }}
+        edges_right = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_max }}
+        y_axis = plane_left[1].transform(transition_trans.inverse)*Z_AXIS
+        y_axis.length = 1/Math.cos(y_axis.angle_between(Y_AXIS))
+        trans_left = MyGeom.transformation_axes [-x_min, 0, 0], X_AXIS, y_axis, Z_AXIS, true, true
+        y_axis = Z_AXIS*plane_right[1].transform(transition_trans.inverse)
+        y_axis.length = 1/Math.cos(y_axis.angle_between(Y_AXIS))
+        trans_right = MyGeom.transformation_axes [length - x_max, 0, 0], X_AXIS, y_axis, Z_AXIS, true, true
+        transition_ents.transform_entities trans_left, edges_left
+        transition_ents.transform_entities trans_right, edges_right
+      
+        # Hide ends.
+        plns = segment_info[:transition_group][:planes].map { |p| p.map { |c| c.transform transition_trans.inverse }}
+        transition_ents.each do |e|
+          next unless e.respond_to? :vertices
+          next if e.is_a?(Sketchup::Edge) && (!e.line[1].valid? || !e.line[1].perpendicular?(Z_AXIS))
+          next unless plns.any?{ |p| e.vertices.all? { |v| v.position.on_plane? p }}
+          e.hidden = true
+        end
       
       end
       
