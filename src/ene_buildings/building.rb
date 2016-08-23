@@ -1342,14 +1342,24 @@ class Building
         # The rightmost corner part is drawn at the right side of the last
         # segment group. This group is the only one that may contain two
         # corner parts.
-        if segment_index == last_segment && part_data[:use][segment_index + 1]
-          # TODO: Create different transformations depending on if skewed or not.
-          transformations << Geom::Transformation.axes(
-            pt_right,
-            segments_info[:tangent_right],
-            Z_AXIS*segments_info[:tangent_right],
-            Z_AXIS
-          )
+        if last_segment && part_data[:use][segment_index + 1]
+          if part_data[:skewed]
+            transformations << MyGeom.transformation_axes(
+              [segment_info[:length], 0, origin.z],# TODO: Use z coordinate from original on gable too?
+              segment_info[:adjacent_vector_right],
+              X_AXIS.reverse,
+              Z_AXIS,
+              false,
+              true
+            )
+          else
+            transformations << Geom::Transformation.axes(
+              pt_right,
+              segment_info[:tangent_right],
+              Z_AXIS*segment_info[:tangent_right],
+              Z_AXIS
+            )
+          end
         end
 
       end
@@ -1653,13 +1663,13 @@ class Building
       # Vectors of adjacent path segments (in coordinates of local group).
       adjacent_vector_left = 
         if first
-          tangents.first.reverse
+          Z_AXIS*tangents.first.transform(transformation.inverse)
         else
           (path[segment_index]-path[segment_index-1]).transform(transformation.inverse).reverse
         end
       adjacent_vector_right = 
         if last
-          tangents.last
+          Z_AXIS*tangents.last.transform(transformation.inverse)
         else
           (path[segment_index+2]-path[segment_index+1]).transform transformation.inverse
         end
