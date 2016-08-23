@@ -163,7 +163,7 @@ class Building
       # listed from left ro right.
       # Elements is nil for sharp corners or a Hash conatining keys :type
       # and length when a transition is used. Valid types are
-      # "fillet", "chamfer_d" and "chamfer_p".
+      # "chamfer_d" and "chamfer_p".
       @corner_transitions = {}
 
       @suggest_corner_transitions = true
@@ -1152,10 +1152,10 @@ class Building
   # Only applies to corners between facades, not building ends.
   #
   # index - Int index of the corner (counting from left, starting at 0).
-  # type  - String "fillet", "chamfer_d", "chamfer_p" or nil.
-  #         Fillet uses the Length set by #set_corner_transition_length as
-  #         radius. chamfer_d uses it as the diagonal length and chamfer_p
-  #         as the projected length on the facade plane.
+  # type  - String "chamfer_d", "chamfer_p" or nil.
+  #         chamfer_d uses Length set by #set_corner_transition_length as the
+  #         diagonal length and chamfer_p uses it as the projected length on the
+  #         facade plane.
   #         Nil means no transition (sharp corner).
   #
   # returns nothing.
@@ -1691,10 +1691,6 @@ class Building
           tangent_vector  = X_AXIS.reverse
           bisector_vector = Geom.linear_combination 0.5, X_AXIS.reverse, 0.5, tangent_left.reverse
           case ct["type"]
-          when "fillet"
-            radius           = ct["length"]
-            projected_length = -radius/Math.tan(half_angle)
-            cut_vector       = tangent_vector
           when "chamfer_d"
             diagonal_length  = ct["length"]
             projected_length = diagonal_length/(2*Math.sin(half_angle))
@@ -1720,10 +1716,6 @@ class Building
           tangent_vector  = X_AXIS
           bisector_vector = Geom.linear_combination 0.5, X_AXIS, 0.5, tangent_right
           case ct["type"]
-          when "fillet"
-            radius           =  ct["length"]
-            projected_length = -radius/Math.tan(half_angle)
-            cut_vector       = tangent_vector
           when "chamfer_d"
             diagonal_length  = ct["length"]
             projected_length = diagonal_length/(2*Math.sin(half_angle))
