@@ -200,7 +200,7 @@
         var index_input = document.getElementById('solid_index');
         var index_label = label_for(index_input.id)
 
-        if (positioning == 'corner') {
+        if (positioning == 'corner' || positioning == 'corner_skewed') {
 
           solid_input.disabled = 'disabled';
           solid_label.className = 'disabled';
