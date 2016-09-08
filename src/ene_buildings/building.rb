@@ -156,6 +156,17 @@ class Building
       # corner (from left to tight) telling whether given corner part should be
       # drawn to that corner.
       @corners = {}
+      
+      # Defines how interioer corners should be drawn.
+      # Variable is Hash indexed by Template id String.
+      # Each value is an Array with elements corresponding to interior corners
+      # listed from left ro right.
+      # Elements is nil for sharp corners or a Hash conatining keys :type
+      # and length when a transition is used. Valid types are
+      # "chamfer_d" and "chamfer_p".
+      @corner_transitions = {}
+
+      @suggest_corner_transitions = true
 
       # Defines what gable parts should be drawn to building.
       # Variable is Hash indexed by Template id String.
@@ -220,6 +231,7 @@ class Building
       @back_along_path          != last_drawn_as[:back_along_path] ||
       @end_angles               != last_drawn_as[:end_angles] ||
       @perform_solid_operations != last_drawn_as[:perform_solid_operations] ||
+      @corner_transitions       != last_drawn_as[:corner_transitions] ||
       (
         @template.has_solids? &&
         last_drawn_as[:perform_solid_operations] &&
@@ -231,19 +243,22 @@ class Building
         )
       )
     )
+      # Complete redraw
       draw_volume
       draw_parts
       draw_solids write_status
       draw_material_replacement
-     elsif(
+    elsif(
       @gables  != last_drawn_as[:gables] ||
       @corners != last_drawn_as[:corners] ||
       !@facade_margins.eql?(last_drawn_as[:facade_margins]) ||
       @part_replacements != last_drawn_as[:part_replacements]
-     )
-       draw_parts
-       draw_material_replacement
+    )
+      # Part redraw (keep volume)
+      draw_parts
+      draw_material_replacement
     else
+      # Replace materials only (keep parts and volume)
       draw_material_replacement
     end
 
@@ -263,14 +278,20 @@ class Building
   #
   # Returns Array of Hash objects corresponding to each corner part.
   # Hash contains the following:
-  #   :definition        - ComponetDefinition defining the part.
-  #   :name              - String name used to identify part.
-  #   :original_instance - Group or ComponentInstance defining the part inside
-  #                        the Template's ComponentDefinition.
-  #   :margin            - Facade margin Length suggested for this corner.
-  #   :use               - Array of booleans telling what corners this part
-  #                        should be drawn to.
-  #   :transformations   - (Only when calculate_transformations is true)
+  #   :definition         - ComponetDefinition defining the part.
+  #   :name               - String name used to identify part.
+  #   :original_instance  - Group or ComponentInstance defining the part inside
+  #                         the Template's ComponentDefinition.
+  #   :margin             - Facade margin Length suggested for this corner.
+  #   :skewed             - true when the part should be skewed with X and
+  #                         Y axes along following building path, false
+  #                         when part should be drawn with Y axis along
+  #                         bisector of corner.
+  #   :use                - Array of booleans telling what corners this part
+  #                         should be drawn to.
+  #   :transition_type    - #TODO: Document!
+  #   :transition_length  -
+  #   :transformations    - (Only when calculate_transformations is true)
   #                        Transformations object defining instance placement
   #                        in local coordinates grouped by building segment.
   def list_corner_parts(calculate_transformations = false)
@@ -289,7 +310,10 @@ class Building
         :original_instance => e,
         :name => name,
         :use => use,
-        :margin => e.get_attribute(Template::ATTR_DICT_PART, "corner_margin")
+        :margin => e.get_attribute(Template::ATTR_DICT_PART, "corner_margin"),
+        :skewed => !!e.get_attribute(Template::ATTR_DICT_PART, "corner_skewed"),
+        :transition_type => e.get_attribute(Template::ATTR_DICT_PART, "transition_type"),
+        :transition_length => e.get_attribute(Template::ATTR_DICT_PART, "transition_length")
       }
 
       parts_data << part_data
@@ -633,13 +657,15 @@ class Building
 
       # If more dialogs are opened, offset this one to avoid it being on top of others
       js << "offset_window(10);" if @@opened_dialogs.size > 1
+      
+      js << "remember_active_element();"
 
       # Template info.
       js << "var template_info=#{JSON.generate(@template.to_hash)};"
       js << "update_template_section();";
 
       # Gables.
-      js << "var has_gables = #{@template.has_gables?};"
+      js << "var has_gable_parts = #{@template.has_gables?};"
       if @template.has_gables?
         gable_list = list_gable_parts.map do |g|
           {
@@ -647,12 +673,12 @@ class Building
             :use  => g[:use]
           }
         end
-        js << "var gable_settings = #{JSON.generate gable_list};"
+        js << "var gable_part_settings = #{JSON.generate gable_list};"
       end
       js << "update_gable_section();";
 
       # Corners.
-      js << "var has_corners = #{@template.has_corners?};"
+      js << "var has_corner_parts = #{@template.has_corners?};"
       js << "var corner_number = #{@path.size};"
       if @template.has_corners?
         corner_list = list_corner_parts.map do |c|
@@ -661,8 +687,11 @@ class Building
             :use  => c[:use]
           }
         end
-        js << "var corner_settings = #{JSON.generate corner_list};"
+        js << "var corner_part_settings = #{JSON.generate corner_list};"
       end
+      corner_transitions = @corner_transitions[@template.id] || []
+      js << "var corner_transitions=#{JSON.generate(corner_transitions)};"
+      js << "var suggest_corner_transitions = #{@suggest_corner_transitions};"
       js << "update_corner_section();";
 
       # Margins.
@@ -673,6 +702,7 @@ class Building
       # Part replacements.
       available_replacable   = list_replaceable_parts true
       available_replacements = list_replacement_parts
+      js << "var has_facade_elements = #{!list_replaceable_parts.empty?};"
       replacement_info = available_replacable.map do |r_able|
         r_ments = available_replacements.select { |r| r[:replaces] == r_able[:name] }
         next if r_ments.empty?
@@ -731,6 +761,8 @@ class Building
       js << "var perform_solids = #{@perform_solid_operations};"
       js << "update_solids_section();";
 
+      js << "fous_element();"
+      
       dlg.execute_script js
 
     end
@@ -819,8 +851,41 @@ class Building
     # Toggling a corner.
     dlg.add_action_callback("toggle_corner") do |_, params|
       set_corner *JSON.parse(params)
-      if @suggest_margins
-        suggest_margins
+      if @suggest_margins || @suggest_corner_transitions
+        suggest_margins if @suggest_margins
+        suggest_corner_transitions if @suggest_corner_transitions
+        add_data.call
+      end
+    end
+    
+    # Change corner transition type.
+    dlg.add_action_callback("set_corner_transition_type") do |_, params|
+      set_corner_transition_type *JSON.parse(params)
+      @suggest_corner_transitions = false
+      add_data.call
+    end
+    
+    # Change corner transition length.
+    dlg.add_action_callback("set_corner_transition_length") do |_, params|
+      index, length = *JSON.parse(params)
+      begin
+        length = length.to_l
+      rescue ArgumentError
+        # Do nothing.
+      else
+        length = 0.to_l if length < 0
+        set_corner_transition_length index, length
+        @suggest_corner_transitions = false
+        add_data.call
+      end
+    end
+    
+    # Toggle transition suggestions.
+    dlg.add_action_callback("toggle_suggest_corner_transitions") do |_, params|
+      status = params == "true"
+      @suggest_corner_transitions = status
+      if @suggest_corner_transitions
+        suggest_corner_transitions
         add_data.call
       end
     end
@@ -963,22 +1028,16 @@ class Building
       @group.set_attribute ATTR_DICT, key, value
     end
 
-    # Override template object reference with string.
+    # Override non-supported objects by serialized versions, e.g. String identifier, JSON String or Array.
     @group.set_attribute ATTR_DICT, "template", @template ? @template.id : nil
-
-    # Override corner Hash with JSON String.
     @group.set_attribute ATTR_DICT, "corners", JSON.generate(@corners)
-
-    # Override gable Hash with JSON String.
+    corner_transitions = Hash[@corner_transitions.map { |k, v|
+      [k, v.map { |c| next unless c; c = c.dup; c["length"] = c["length"].to_f; c }]
+    }]
+    @group.set_attribute ATTR_DICT, "corner_transitions", JSON.generate(corner_transitions)
     @group.set_attribute ATTR_DICT, "gables", JSON.generate(@gables)
-
-    # Override facade_margins Hash with Array.
     @group.set_attribute ATTR_DICT, "facade_margins", @facade_margins.to_a
-
-    # Override part_replacements Hash with JSON String.
     @group.set_attribute ATTR_DICT, "part_replacements", JSON.generate(@part_replacements)
-
-    # Override material replacements wit string identifiers.
     array = @material_replacement.to_a.map { |e| e.map{ |m| m.name } }
     @group.set_attribute ATTR_DICT, "material_replacement", array
 
@@ -987,9 +1046,9 @@ class Building
   end
 
   # Public: Sets facade margins to whatever is the biggest suggested margin for
-  # an adjacent gable or corner part.
+  # a used adjacent gable or corner part.
   #
-  # returns nothing.
+  # Returns nothing.
   def suggest_margins
 
     corners = list_corner_parts
@@ -1015,6 +1074,39 @@ class Building
 
   end
 
+  # Public: Sets corner transition type and length based on used corner parts.
+  #
+  # returns nothings.
+  def suggest_corner_transitions
+  
+    corners = list_corner_parts
+    
+    (0..@path.size-2).each do |i|
+    
+      corner = i+1
+      used_corner_parts = corners.select{ |c| c[:use][corner] }
+      
+      # Use the values of the first found corner that has any saved preferences
+      # for transition.
+      used_corner = used_corner_parts.find { |c| c[:transition_type] && c[:transition_length] }
+
+      @corner_transitions[@template.id] ||= []
+      @corner_transitions[@template.id][i] =
+        if used_corner
+          {
+            "type" =>   used_corner[:transition_type],
+            "length" => used_corner[:transition_length]
+          }
+        else
+          nil
+        end
+      
+    end
+  
+    nil
+    
+  end
+  
   # Public: Sets whether a specific corner part should be drawn to a specific
   # corner of building.
   #
@@ -1038,6 +1130,49 @@ class Building
 
   end
 
+  # Public: Sets what length a transition for a specific corner should use.
+  # Only applies to corners between facades, not building ends.
+  #
+  # index  - Int index of the corner (counting from left, starting at 0).
+  # length - Length used for transition. How length is interpreted depends on
+  #          what type has been set in #set_corner_transition_type.
+  #
+  # Returns nothing.
+  def set_corner_transition_length(index, length)
+  
+    @corner_transitions[@template.id] ||= []
+    @corner_transitions[@template.id][index] ||= {}
+    @corner_transitions[@template.id][index]["length"] = length
+    
+    nil
+  
+  end
+  
+  # Public: Sets what kind of transition to use on a specific corner.
+  # Only applies to corners between facades, not building ends.
+  #
+  # index - Int index of the corner (counting from left, starting at 0).
+  # type  - String "chamfer_d", "chamfer_p" or nil.
+  #         chamfer_d uses Length set by #set_corner_transition_length as the
+  #         diagonal length and chamfer_p uses it as the projected length on the
+  #         facade plane.
+  #         Nil means no transition (sharp corner).
+  #
+  # returns nothing.
+  def set_corner_transition_type(index, type)
+  
+    @corner_transitions[@template.id] ||= []
+    if type
+      @corner_transitions[@template.id][index] ||= {}
+      @corner_transitions[@template.id][index]["type"] = type
+    else
+      @corner_transitions[@template.id][index] = nil
+    end
+    
+    nil
+  
+  end
+  
   # Public: Sets whether a specific gable part should be drawn to a specific
   # side of building.
   #
@@ -1081,25 +1216,25 @@ class Building
   # segment         - Int segment index (counting from left, starting at 0).
   #                   If segment index is to high to represent a currently
   #                   existing segment, setting will be kept but not affect how
-  #                   buidling is drawn until the segment exists.
+  #                   building is drawn until the segment exists.
   # index           - Int slot index (counting from left, starting at 0).
-  #                   If replacment uses several slots, index is of the leftmost
+  #                   If replacement uses several slots, index is of the leftmost
   #                   one. If slot index is to high to represent a currently
   #                   existing slot, setting will be kept but not affect how
-  #                   buidling is drawn until the slot exists.
+  #                   building is drawn until the slot exists.
   # replacement     - String name of replacing part or nil when resetting to no
   #                   replacement.
-  # purge_colliding - Wether potential colliding replacements (those taking up
+  # purge_colliding - Werther potential colliding replacements (those taking up
   #                   the same slot(s)) should be purged to make space for this
-  #                   replacment. A collding replacement that currently wouldn't
+  #                   replacement. A colliding replacement that currently wouldn't
   #                   be drawn anyway because it requires slots that doesnn't_array
   #                   currently exist is always purged. (default: false)
   #
   # Returns nothing.
-  # Raises RuntimeError if replcement is invalid.
+  # Raises RuntimeError if replacement is invalid.
   # Raises RuntimeError if there is a slot collision and purge_colliding is
   # false.
-  def set_replacement(original, segment, index, replacement, purge_colliding = false)
+  def set_replacement(original, segment, index, replacement, purge_colliding = false)# TODO: lock over purge_colliding and docs.
 
     if replacement
       available_replacements = list_replacement_parts
@@ -1146,7 +1281,7 @@ class Building
   # Returns nil.
   def calculate_corner_transformations(parts_data)
 
-    path, tangents = calculate_local_path
+    segments_info = calculate_segment_info
 
     parts_data.each do |part_data|
 
@@ -1167,54 +1302,64 @@ class Building
       line_origin = [origin, X_AXIS]
 
       # Loop path segments.
-      (0..path.size - 2).each do |segment_index|
+      (0..@path.size - 2).each do |segment_index|
+      
+        segment_info = segments_info[segment_index]
+        #first_segment = segment_index == 0
+        last_segment  = segment_index == @path.size - 2
 
         transformations = []
         part_data[:transformations] << transformations
 
-        # Values in main building @group's coordinates.
-        corner_left    = path[segment_index]
-        corner_right   = path[segment_index + 1]
-        segment_vector = corner_right - corner_left
-        segment_length = segment_vector.length
-        tangent_left   = tangents[segment_index]
-        tangent_right  = tangents[segment_index + 1]
-        segment_trans  = Geom::Transformation.axes(
-          corner_left,
-          segment_vector,
-          Z_AXIS * segment_vector,
-          Z_AXIS
-        )
-
-        # Values in local segment group's coordinates.
-        tangent_left     = tangent_left.transform(segment_trans.inverse)
-        tangent_right    = tangent_right.transform(segment_trans.inverse)
-        plane_left       = [ORIGIN, tangent_left.reverse]
-        plane_right      = [[segment_length, 0, 0], tangent_right]
-        origin_leftmost  = Geom.intersect_line_plane line_origin, plane_left
-        origin_rightmost = Geom.intersect_line_plane line_origin, plane_right
+        plane_left  = segment_info[:plane_left]
+        plane_right = segment_info[:plane_right]
+        pt_left  = Geom.intersect_line_plane line_origin, plane_left
+        pt_right = Geom.intersect_line_plane line_origin, plane_right
 
         # All corner parts expect for that of the last corner is drawn at the
         # left side of the segment group by the same index.
         if part_data[:use][segment_index]
-          transformations << Geom::Transformation.axes(
-            origin_leftmost,
-            tangent_left,
-            Z_AXIS*tangent_left,
-            Z_AXIS
-          )
+          if part_data[:skewed]
+            transformations << MyGeom.transformation_axes(
+              pt_left,
+              X_AXIS,
+              segment_info[:adjacent_vector_left],
+              Z_AXIS,
+              false,
+              true
+            )
+          else
+            transformations << Geom::Transformation.axes(
+              pt_left,
+              segment_info[:tangent_left],
+              Z_AXIS*segment_info[:tangent_left],
+              Z_AXIS
+            )
+          end
+          
         end
 
         # The rightmost corner part is drawn at the right side of the last
         # segment group. This group is the only one that may contain two
         # corner parts.
-        if segment_index == (@path.size - 2) && part_data[:use][segment_index + 1]
-          transformations << Geom::Transformation.axes(
-            origin_rightmost,
-            tangent_right,
-            Z_AXIS*tangent_right,
-            Z_AXIS
-          )
+        if last_segment && part_data[:use][segment_index + 1]
+          if part_data[:skewed]
+            transformations << MyGeom.transformation_axes(
+              pt_right,
+              segment_info[:adjacent_vector_right],
+              X_AXIS.reverse,
+              Z_AXIS,
+              false,
+              true
+            )
+          else
+            transformations << Geom::Transformation.axes(
+              pt_right,
+              segment_info[:tangent_right],
+              Z_AXIS*segment_info[:tangent_right],
+              Z_AXIS
+            )
+          end
         end
 
       end
@@ -1305,7 +1450,7 @@ class Building
   # Returns nil.
   def calculate_replaceable_transformations(parts_data)
 
-    path, tangents = calculate_local_path
+    segments_info = calculate_segment_info
 
     parts_data.each do |part_data|
 
@@ -1328,41 +1473,28 @@ class Building
       line_origin = [origin, X_AXIS]
 
       # Loop path segments.
-      (0..path.size - 2).each do |segment_index|
+      (0..@path.size - 2).each do |segment_index|
+      
+        segment_info = segments_info[segment_index]
 
         transformations = []
         part_data[:transformations] << transformations
-
-        # Values in main building @group's coordinates.
-        corner_left    = path[segment_index]
-        corner_right   = path[segment_index + 1]
-        segment_vector = corner_right - corner_left
-        segment_length = segment_vector.length
-        tangent_left   = tangents[segment_index]
-        tangent_right  = tangents[segment_index + 1]
-        segment_trans  = Geom::Transformation.axes(
-          corner_left,
-          segment_vector,
-          Z_AXIS * segment_vector,
-          Z_AXIS
-        )
-
-        # Values in local segment group's coordinates.
-        tangent_left     = tangent_left.transform(segment_trans.inverse)
-        tangent_right    = tangent_right.transform(segment_trans.inverse)
-        plane_left       = [ORIGIN, tangent_left.reverse]
-        plane_right      = [[segment_length, 0, 0], tangent_right]
-        origin_leftmost  = Geom.intersect_line_plane line_origin, plane_left
-        origin_rightmost = Geom.intersect_line_plane line_origin, plane_right
-
+        
+        # Project origin point to side planes and find outermost point in each
+        # direction.
+        pts_left     = segment_info[:planes_left].map { |p| Geom.intersect_line_plane line_origin, p}
+        pts_right    = segment_info[:planes_right].map { |p| Geom.intersect_line_plane line_origin, p}
+        pt_leftmost  = pts_left.max_by { |p| p.x }
+        pt_rightmost = pts_right.min_by { |p| p.x }
+        
         # Take facade margin into account.
         margin_left  = (@facade_margins[@template.id] || [])[2*segment_index]
         margin_right = (@facade_margins[@template.id] || [])[2*segment_index+1]
-        origin_leftmost.offset!(X_AXIS, margin_left) if margin_left
-        origin_rightmost.offset!(X_AXIS, -margin_right) if margin_right
+        pt_leftmost.offset!(X_AXIS, margin_left) if margin_left
+        pt_rightmost.offset!(X_AXIS, -margin_right) if margin_right
 
         # Skip segment for this part if leftmost is to the right of rightmost.
-        unless (origin_rightmost-origin_leftmost).samedirection?(X_AXIS)
+        unless (pt_rightmost-pt_leftmost).samedirection?(X_AXIS)
           next
         end
 
@@ -1374,13 +1506,13 @@ class Building
 
           new_origin =
             if ad["align"] == "left"
-              origin_leftmost
+              pt_leftmost
             elsif ad["align"] == "right"
-             origin_rightmost
+             pt_rightmost
             elsif ad["align"] == "center"
-              Geom.linear_combination 0.5, origin_leftmost, 0.5, origin_rightmost
+              Geom.linear_combination 0.5, pt_leftmost, 0.5, pt_rightmost
             elsif ad["align"].is_a? Float
-              Geom.linear_combination(1-ad["align"], origin_leftmost, ad["align"], origin_rightmost)
+              Geom.linear_combination(1-ad["align"], pt_leftmost, ad["align"], pt_rightmost)
             end
           tr_ary = tr_original_ary.dup
           tr_ary[12] = new_origin.x
@@ -1392,7 +1524,7 @@ class Building
           # approximate distance between (in inches). This distance will adapt
           # to fit available space.
 
-          available_distance = origin_leftmost.distance origin_rightmost
+          available_distance = pt_leftmost.distance pt_rightmost
           margin_l = ad["margin_left"] || ad["margin"] || 0
           margin_r = ad["margin_right"] || ad["margin"] || 0
           available_distance -= (margin_l + margin_r)
@@ -1415,7 +1547,7 @@ class Building
           distance_between = available_distance/total_number
           # Each copy has its origin at x = margin_l + (n + 0.5)*distance_between
           (0..total_number-1).each do |n|
-            x = origin_leftmost.x + margin_l + (n + 0.5) * distance_between
+            x = pt_leftmost.x + margin_l + (n + 0.5) * distance_between
             tr_ary = tr_original_ary.dup
             tr_ary[12] = x
             tr = Geom::Transformation.new tr_ary
@@ -1424,7 +1556,7 @@ class Building
             unless ad["override_cut_planes"]
               corners = MyGeom.bb_corners(part_data[:definition].bounds)
               corners.each { |c| c.transform! tr }
-              next if corners.any? { |c| MyGeom.front_of_plane?(plane_left, c) || MyGeom.front_of_plane?(plane_right, c) }
+              next if corners.any? { |c| segment_info[:all_planes].any? { |p| MyGeom.front_of_plane?(p, c) }}
             end
             transformations << tr
           end
@@ -1439,25 +1571,26 @@ class Building
 
   end
 
-  # Internal: Convert path to local coordinates for building Group, calculate
-  # tangents and adapt direction according to @back_along_path.
+  # Internal: Get information for building segments.
+  # A segment is the what is between two adjacent corners.
   #
-  # Returns Array of path (Point3d Array) and tangents (Vector3d Array).
-  def calculate_local_path
+  # Returns Array with information for each segment starting from the left.
+  # Information is a Hash. For Hash content, see the comments inside method.
+  def calculate_segment_info
 
     # Transform path to local building coordinates.
-    trans_inverse = @group.transformation.inverse
-    path = @path.map { |p| p.transform trans_inverse }
+    building_tr = @group.transformation
+    path = @path.map { |p| p.transform building_tr.inverse }
 
     # Get tangent for each point in path.
     # Tangents point in the positive direction of path.
     tangents = []
     tangents << path[1] - path[0]
     if path.size > 2
-      (1..path.size - 2).each do |corner|
-        p_prev = path[corner - 1]
-        p_this = path[corner]
-        p_next = path[corner + 1]
+      (1..path.size - 2).each do |corner_index|
+        p_prev = path[corner_index - 1]
+        p_this = path[corner_index]
+        p_next = path[corner_index + 1]
         v_prev = p_this - p_prev
         v_next = p_next - p_this
         tangents << Geom.linear_combination(0.5, v_prev, 0.5, v_next)
@@ -1477,8 +1610,186 @@ class Building
       tangents.reverse!
       tangents.each { |t| t.reverse! }
     end
+    
+    # Determine if interior corners (all but the building ends) are convex.
+    convex = (1..path.size - 2).map do |corner_index|
+      p_prev = path[corner_index - 1]
+      p_this = path[corner_index]
+      p_next = path[corner_index + 1]
+      v_prev = p_this - p_prev
+      v_next = p_next - p_this
+      (v_prev * v_next).z > 0
+    end
+    
+    # Get segment information.
+    # Coordinates are relative to the segment group except for the group's
+    # Transformation itself which is relative to the building group coordinates.
+    segments_info = []
+    (0..path.size - 2).each do |segment_index|
+    
+      segment_info = {}
+      segments_info << segment_info
+    
+      first = segment_index == 0
+      last  = segment_index == path.size - 2
+    
+      # Values in main building @group's coordinates.
+      corner_left    = path[segment_index]
+      corner_right   = path[segment_index + 1]
+      segment_vector = corner_right - corner_left
+      length         = segment_vector.length
+      tangent_left   = tangents[segment_index]
+      tangent_right  = tangents[segment_index + 1]
+      transformation = Geom::Transformation.axes(
+        corner_left,
+        segment_vector,
+        Z_AXIS * segment_vector,
+        Z_AXIS
+      )
+      
+      # Transformation of segment group.
+      segment_info[:transformation] = transformation
+      
+      # The Length of the segment in the facade plane.
+      segment_info[:length]         = length
 
-    [path, tangents]
+      # Values in local segment group's coordinates.
+      tangent_left  = tangent_left.transform transformation.inverse
+      tangent_right = tangent_right.transform transformation.inverse
+      plane_left    = [ORIGIN, tangent_left.reverse]
+      plane_right   = [[length, 0, 0], tangent_right]
+      side_planes   = [plane_left, plane_right]
+      
+      # Vectors of adjacent path segments (in coordinates of local group).
+      adjacent_vector_left = 
+        if first
+          Z_AXIS*tangents.first.transform(transformation.inverse)
+        else
+          (path[segment_index]-path[segment_index-1]).transform(transformation.inverse).reverse
+        end
+      adjacent_vector_right = 
+        if last
+          Z_AXIS*tangents.last.transform(transformation.inverse)
+        else
+          (path[segment_index+2]-path[segment_index+1]).transform transformation.inverse
+        end
+      segment_info[:adjacent_vector_left]  = adjacent_vector_left
+      segment_info[:adjacent_vector_right] = adjacent_vector_right
+      segment_info[:adjacent_vectors]      = [adjacent_vector_left, adjacent_vector_right]
+      
+      # Tangents of the corners for this segment.
+      segment_info[:tangent_left]  = tangent_left
+      segment_info[:tangent_right] = tangent_right
+      
+      # Planes defining main sides of this segment.
+      segment_info[:plane_left]  = plane_left
+      segment_info[:plane_right] = plane_right
+      
+      # Array of planes defining the main sides of the segment. 0th element is
+      # left plane, 1st is right.
+      segment_info[:side_planes] = side_planes
+
+      # Determine planes to cut volume with for corner transitions.
+      cts = @corner_transitions[@template.id]
+      cut_planes = []
+      if cts
+      
+        # Left side of segment
+        ct = cts[segment_index-1]
+        if ct && ct["length"] && ct["length"] > 0 && !first && convex[segment_index-1]
+          half_angle  = Y_AXIS.angle_between(tangent_left)
+          tangent_vector  = X_AXIS.reverse
+          bisector_vector = Geom.linear_combination 0.5, X_AXIS.reverse, 0.5, tangent_left.reverse
+          case ct["type"]
+          when "chamfer_d"
+            diagonal_length  = ct["length"]
+            projected_length = diagonal_length/(2*Math.sin(half_angle))
+            cut_vector       = bisector_vector
+          when "chamfer_p"
+            projected_length = ct["length"]
+            cut_vector       = bisector_vector
+          end
+          if @back_along_path
+            y = -(@template.depth || Template::FALLBACK_DEPTH)
+            x = y*Math.tan(half_angle-90.degrees) + projected_length
+          else
+            x = projected_length
+            y = 0
+          end
+          cut_planes[0] = [[x, y, 0], cut_vector]
+        end
+        
+        # Right side of segment
+        ct = cts[segment_index]
+        if ct && ct["length"] && ct["length"] > 0 && !last && convex[segment_index]
+          half_angle  = Y_AXIS.angle_between(tangent_right.reverse)
+          tangent_vector  = X_AXIS
+          bisector_vector = Geom.linear_combination 0.5, X_AXIS, 0.5, tangent_right
+          case ct["type"]
+          when "chamfer_d"
+            diagonal_length  = ct["length"]
+            projected_length = diagonal_length/(2*Math.sin(half_angle))
+            cut_vector       = bisector_vector
+          when "chamfer_p"
+            projected_length = ct["length"]
+            cut_vector       = bisector_vector
+          end
+          if @back_along_path
+            y = -(@template.depth || Template::FALLBACK_DEPTH)
+            x = length - y*Math.tan(half_angle-90.degrees) - projected_length
+          else
+            x = length - projected_length
+            y = 0
+          end
+          cut_planes[1] = [[x, y, 0], cut_vector]
+        end
+      
+      end
+      
+      # Array of planes defining how segment should be cut to leave space for
+      # corner transition. 0th element is left plane, 1st is right.
+      segment_info[:cut_planes] = cut_planes
+
+      # List planes that are hidden within building.
+      # All side and cut planes except for gables.
+      internal_planes = []
+      internal_planes << plane_left unless first
+      internal_planes << plane_right unless last
+      internal_planes += cut_planes.compact
+      segment_info[:internal_planes] = internal_planes
+      
+      # List all planes defining the perimeter of segment.
+      all_planes = side_planes + cut_planes.compact
+      segment_info[:all_planes] = all_planes
+      
+      # List all planes for each side.
+      segment_info[:planes_left]  = [plane_left, cut_planes[0]].compact
+      segment_info[:planes_right] = [plane_right, cut_planes[1]].compact
+      
+      # Information for the group the transition geometry is drawn to.
+      # Group should be drawn at the left side of segment similar to how corner
+      # parts are placed.
+      if cts
+        ct = cts[segment_index-1]
+        if ct && ct["length"] && ct["length"] > 0 && !first && convex[segment_index-1]
+          prev_segment = segments_info[segment_index-1]
+          transition_group = {}
+          tr_correction = transformation.inverse*prev_segment[:transformation]
+          plane_left = prev_segment[:cut_planes][1].map { |c| c.transform tr_correction }
+          plane_left[1].reverse!
+          transition_group[:plane_left] = plane_left
+          plane_right = cut_planes[0].dup
+          plane_right[1] = plane_right[1].reverse
+          transition_group[:plane_right] = plane_right
+          transition_group[:planes] = [plane_left, plane_right]
+          
+          segment_info[:transition_group] = transition_group
+        end
+      end
+       
+    end
+
+    segments_info
 
   end
 
@@ -1504,7 +1815,15 @@ class Building
     # Override corner JSON String with actual Hash object.
     # Backward compatibility: Set corners to empty Hash if not already set.
     h[:corners] = h[:corners] ? JSON.parse(h[:corners]) : {}
+    
+    # Override corner_transitions JSON String with actual Hash object.
+    # Backward compatibility: Set corner_transitions to empty Hash if not already set.
+    h[:corner_transitions] = h[:corner_transitions] ? JSON.parse(h[:corner_transitions]) : {}
+    h[:corner_transitions].each_value { |a| a.each { |c| c["length"] = c["length"].to_l if c }}
 
+    # Backward compatibility: Default suggest_corner_transitions to true.
+    h[:suggest_corner_transitions] = true if h[:suggest_corner_transitions].nil?
+    
     # Override gable JSON String with actual Hash object.
     # Backward compatibility: Set gables to empty Hash if not already set.
     h[:gables] = h[:gables] ? JSON.parse(h[:gables]) : {}
@@ -1513,7 +1832,7 @@ class Building
     # Backward compatibility: Set facade_margins to empty Hash if not already set.
     h[:facade_margins] = h[:facade_margins] ? Hash[h[:facade_margins]] : {}
 
-    # Backward compatibility: Default suggest margins to true.
+    # Backward compatibility: Default suggest_margins to true.
     h[:suggest_margins] = true if h[:suggest_margins].nil?
 
     # Override part replacements JSON String with actual Hash object.
@@ -1564,35 +1883,19 @@ class Building
     ents = @group.entities
     ents.clear!
 
-    path, tangents = calculate_local_path
+    segments_info = calculate_segment_info
 
     # Loop path segments.
-    (0..path.size - 2).each do |segment_index|
+    (0..@path.size - 2).each do |segment_index|
 
-      # Values in main building @group's coordinates.
-      corner_left    = path[segment_index]
-      corner_right   = path[segment_index + 1]
-      segment_vector = corner_right - corner_left
-      segment_length = segment_vector.length
-      tangent_left   = tangents[segment_index]
-      tangent_right  = tangents[segment_index + 1]
-      segment_trans  = Geom::Transformation.axes(
-        corner_left,
-        segment_vector,
-        Z_AXIS * segment_vector,
-        Z_AXIS
-      )
-
-      # Values in local segment group's coordinates.
-      plane_left       = [ORIGIN, tangent_left.reverse.transform(segment_trans.inverse)]
-      plane_right      = [[segment_length, 0, 0], tangent_right.transform(segment_trans.inverse)]
-
+      segment_info = segments_info[segment_index]
+      
       # Place template component in segment and explode it so it can be edited
       # without interfering with template.
       # Shift position along Y axis if the back of the building is what follows
       # the given path and not the front.
       segment_group                = ents.add_group
-      segment_group.transformation = segment_trans
+      segment_group.transformation = segment_info[:transformation]
       segment_ents                 = segment_group.entities
       component_trans = if @back_along_path
         Geom::Transformation.new [0, -(@template.depth || Template::FALLBACK_DEPTH), 0]
@@ -1602,10 +1905,10 @@ class Building
       component_inst = segment_ents.add_instance @template.component_def, component_trans
       component_inst.explode
 
-      # Remove all Groups and ComponentInstances from segment.
+      # Purge everything but edges and faces from template.
       # This method only draws the volume and another methods add the details.
-      instances = segment_ents.select { |e| [Sketchup::Group, Sketchup::ComponentInstance].include? e.class }
-      segment_ents.erase_entities instances
+      allowed_classes = [Sketchup::Face, Sketchup::Edge]
+      segment_ents.erase_entities segment_ents.select { |e| !allowed_classes.include? e.class }
 
       # Allow material replacement in segment group.
       segment_group.set_attribute Template::ATTR_DICT_PART, "replace_nested_mateials", true
@@ -1623,17 +1926,7 @@ class Building
       face_left = faces_left.first
       face_right = faces_right.first
 
-      # Hide walls between segments.
-      unless segment_index == 0
-        face_left.hidden = true
-        face_left.edges.each { |e| e.hidden = true if e.line[1].perpendicular?(Z_AXIS) }
-      end
-      unless segment_index == path.size - 2
-        face_right.hidden = true
-        face_right.edges.each { |e| e.hidden = true if e.line[1].perpendicular?(Z_AXIS) }
-      end
-
-      # Adapt building volume to fill this segment by moving and shearing side
+      # Adapt building volume to fill this segment by moving and skewing sides.
       # walls.
 
       x_min       = face_left.vertices.first.position.x
@@ -1642,17 +1935,96 @@ class Building
       edges_left  = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_min } } # All these edges may not bound the left face. For instance Landshövdingehus äldre has a rainwater pipe thingy.
       edges_right = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_max } }
 
-      trans_a = Geom::Transformation.new.to_a
-
-      y_axis = plane_left[1]*Z_AXIS
+      y_axis = segment_info[:plane_left][1]*Z_AXIS
       y_axis.length = 1/Math.cos(y_axis.angle_between(Y_AXIS))
       trans_left = MyGeom.transformation_axes [-x_min, 0, 0], X_AXIS, y_axis, Z_AXIS, true, true
-      y_axis = Z_AXIS*plane_right[1]
+      
+      y_axis = Z_AXIS*segment_info[:plane_right][1]
       y_axis.length = 1/Math.cos(y_axis.angle_between(Y_AXIS))
-      trans_right = MyGeom.transformation_axes [segment_length - x_max, 0, 0], X_AXIS, y_axis, Z_AXIS, true, true
+      trans_right = MyGeom.transformation_axes [segment_info[:length] - x_max, 0, 0], X_AXIS, y_axis, Z_AXIS, true, true
 
       segment_ents.transform_entities trans_left, edges_left
       segment_ents.transform_entities trans_right, edges_right
+      
+      # Cut away from volume for corner transition.
+      cut_planes = segment_info[:cut_planes]
+      if cut_planes
+        cut_planes.compact.each { |p| MyGeom.cut segment_ents, p }
+      end
+      
+      # Hide faces and edges where segments meet.
+      plns = segment_info[:internal_planes]
+      segment_ents.each do |e|
+        next unless e.respond_to? :vertices
+        next if e.is_a?(Sketchup::Edge) && !e.line[1].perpendicular?(Z_AXIS)
+        next unless plns.any?{ |p| e.vertices.all? { |v| v.position.on_plane? p }}
+        e.hidden = true
+      end
+      
+      
+      
+      
+      
+      # Draw volume for corner transition.
+      if segment_info[:transition_group]
+      transition_group = segment_ents.add_group
+        transition_ents = transition_group.entities
+
+        plane_left  = segment_info[:transition_group][:plane_left]
+        plane_right = segment_info[:transition_group][:plane_right]
+        plane_front = [plane_left[0], segment_info[:tangent_left]*Z_AXIS]
+        lines       = [
+          Geom.intersect_plane_plane(plane_front, plane_left),
+          Geom.intersect_plane_plane(plane_left,  plane_right),
+          Geom.intersect_plane_plane(plane_right, plane_front)
+        ]
+        base_plane  = [ORIGIN, Z_AXIS]
+        corners     = lines.map { |l| Geom.intersect_line_plane l, base_plane }
+        depth       = corners[1].distance_to_plane plane_front
+        length      = corners[0].distance corners[2]
+        
+        # Place template.
+        # TODO: Add support for chamfer or comment out on all places in UI.
+        transition_trans = Geom::Transformation.axes(
+          corners[0],
+          corners[2] - corners[0],
+          plane_front[1].reverse,
+          Z_AXIS
+        )
+        transition_group                = segment_ents.add_group
+        transition_group.transformation = transition_trans
+        transition_ents                 = transition_group.entities
+        component_inst                  = transition_ents.add_instance(
+          @template.component_def,
+          Geom::Transformation.new
+        )
+        component_inst.explode
+        transition_ents.erase_entities transition_ents.select { |e| !allowed_classes.include? e.class }
+        
+        # Move ends.
+        edges       = transition_ents.select { |e| e.is_a? Sketchup::Edge }
+        edges_left  = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_min }}
+        edges_right = edges.select { |e| e.vertices.all? { |v| v.position.x.to_l == x_max }}
+        trans_left  = Geom::Transformation.new([-x_min - 1.m, 0, 0])
+        trans_right = Geom::Transformation.new([length - x_max + 1.m, 0, 0])
+        transition_ents.transform_entities trans_left, edges_left
+        transition_ents.transform_entities trans_right, edges_right
+        
+        # Cut sides.
+        plns = segment_info[:transition_group][:planes].map { |p| p.map { |c| c.transform transition_trans.inverse }}
+        plns.each { |p| MyGeom.cut transition_ents, p }
+      
+        # Hide sides.
+        transition_ents.each do |e|
+          next unless e.respond_to? :vertices
+          next if e.is_a?(Sketchup::Edge) && (!e.line[1].valid? || !e.line[1].perpendicular?(Z_AXIS))
+          next unless plns.any?{ |p| e.vertices.all? { |v| v.position.on_plane? p }}
+          e.hidden = true
+        end
+      
+      end
+      
+      
 
     end
 
@@ -1688,7 +2060,7 @@ class Building
       # Purge all existing parts in segment.
       # This method can be called if part settings are changed without first
       # calling draw_volume.
-      instances = segment_ents.select { |e| [Sketchup::Group, Sketchup::ComponentInstance].include? e.class }
+      instances = segment_ents.select { |e| e.attribute_dictionary Template::ATTR_DICT_PART }
       segment_ents.erase_entities instances
 
       # Place instances of all spread or aligned parts that has transformations

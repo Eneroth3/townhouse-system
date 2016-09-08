@@ -156,10 +156,40 @@
         for(var i=1;i<rows.length;i++) rows[i].style.display = bool ? 'none' : '';//First row is always available.
 
       }
+      
+      // Toggle transition length enability depending on transition type.
+      function toggle_transition_length() {
+        var type = document.getElementById('transition_type').value;
+        var length_input = document.getElementById('transition_length');
+        var length_label = label_for(length_input.id)
+        
+        if(type != '' && type != 'sharp') {
+          length_input.disabled = '';
+          length_label.className = '';
+        } else {
+          length_input.disabled = 'disabled';
+          length_label.className = 'disabled';
+        }
+        
+        
+        // Ugly copied code to get same behavior for corresponding inputs in
+        // different sections of form.
+        var type = document.getElementById('transition_type_skewed').value;
+        var length_input = document.getElementById('transition_length_skewed');
+        var length_label = label_for(length_input.id)
+        
+        if(type != '' && type != 'sharp') {
+          length_input.disabled = '';
+          length_label.className = '';
+        } else {
+          length_input.disabled = 'disabled';
+          length_label.className = 'disabled';
+        }
+      }
 
-      //Toggle solid and solid_index enability depending on other inputs' states.
-      //Called when selection changes, positioning changes or solid drop down changes.
-      function toggle_solid(){
+      // Toggle solid and solid_index enability depending on other inputs' states.
+      // Called when selection changes, positioning changes or solid drop down changes.
+      function toggle_solid() {
 
         var positioning = document.getElementById('position_method').value;
         var solid = document.getElementById('solid').value;
@@ -170,21 +200,21 @@
         var index_input = document.getElementById('solid_index');
         var index_label = label_for(index_input.id)
 
-        if (positioning == "corner") {
+        if (positioning == 'corner' || positioning == 'corner_skewed') {
 
-          solid_input.disabled = "disabled";
-          solid_label.className = "disabled";
-          index_input.disabled = "disabled";
-          index_label.className = "disabled";
+          solid_input.disabled = 'disabled';
+          solid_label.className = 'disabled';
+          index_input.disabled = 'disabled';
+          index_label.className = 'disabled';
 
         } else {
 
-          solid_input.disabled = "";
-          solid_label.className = "";
+          solid_input.disabled = '';
+          solid_label.className = '';
 
-          var disabled = solid == "" || solid == "cut_multiple_faces";
+          var disabled = solid == '' || solid == 'cut_multiple_faces';
           index_input.disabled = disabled;
-          index_label.className = disabled ? "disabled" : "";
+          index_label.className = disabled ? 'disabled' : '';
 
         }
 
@@ -245,7 +275,7 @@
             <td><label for="position_method">Method:</label></td>
             <td colspan="3">
               <select name="position_method" id="position_method" onchange="toggle_positioning(this.value); toggle_solid();">
-                <option value="">Unspecified (Not drawn)</option>
+                <option value="">Unspecified (not drawn)</option>
                 <option disabled>──────────</option>
                 <option value="spread">Array</option>
                 <option value="left">Align left</option>
@@ -256,7 +286,8 @@
                 <option value="replacement">Replacement (for any of the above)</option>
                 <option disabled>──────────</option>
                 <option value="gable">Gable</option>
-                <option value="corner">Corner</option>
+                <option value="corner">Corner (bisector)</option>
+                <option value="corner_skewed">Corner (skewed)</option>
               </select>
             </td>
           </tr>
@@ -313,7 +344,7 @@
             <td colspan="3" style="text-align: center;"><img src="template_editor_part_position_gable.png" alt="" /></td>
           </tr>
           <tr data-category="gable">
-            <td><label for="gable_margin">Suggested Margin</label></td>
+            <td><label for="gable_margin">Margin:</label></td><!--TODO: add explanation that these are only suggested values?-->
             <td><input name="gable_margin" id="gable_margin" type="text" /></td>
             <td>&nbsp;</td>
             <td><input type="text" style="visibility: hidden;" /></td><!--Hidden dummy input to fill out table so gable margin field has same width as other fields.-->
@@ -324,8 +355,45 @@
             <td colspan="3" style="text-align: center;"><img src="template_editor_part_position_corner.png" alt="" /></td>
           </tr>
           <tr data-category="corner">
-            <td><label for="corner_margin">Suggested Margin</label></td>
+            <td><label for="transition_type">Transition TY:</label></td>
+            <td>
+              <select name="transition_type" id="transition_type" onchange="toggle_transition_length();">
+                <option value="">No preference</option>
+                <option value="sharp">Sharp</option>
+                <option value="chamfer_d">Chamfer (by diagonal length)</option>
+                <option value="chamfer_p">Chamfer (by projected length)</option>
+              </select>
+            </td>
+            <td><label for="transition_length">Transition len:</label></td>
+            <td><input name="transition_length" id="transition_length" type="text" /></td>
+          </tr>
+          <tr data-category="corner">
+            <td><label for="corner_margin">Margin:</label></td>
             <td><input name="corner_margin" id="corner_margin" type="text" /></td>
+            <td>&nbsp;</td>
+            <td><input type="text" style="visibility: hidden;" /></td><!--Hidden dummy input to fill out table so corner margin field has same width as other fields.-->
+          </tr>
+
+          <tr data-category="corner_skewed">
+            <td></td>
+            <td colspan="3" style="text-align: center;"><img src="template_editor_part_position_corner_skewed.png" alt="" /></td>
+          </tr>
+          <tr data-category="corner_skewed">
+            <td><label for="transition_type_skewed">Transition TY:</label></td>
+            <td>
+              <select name="transition_type_skewed" id="transition_type_skewed" onchange="toggle_transition_length();">
+                <option value="">No preference</option>
+                <option value="sharp">Sharp</option>
+                <option value="chamfer_d">Chamfer (by diagonal length)</option>
+                <option value="chamfer_p">Chamfer (by projected length)</option>
+              </select>
+            </td>
+            <td><label for="transition_length_skewed">Transition len:</label></td>
+            <td><input name="transition_length_skewed" id="transition_length_skewed" type="text" /></td>
+          </tr>
+          <tr data-category="corner_skewed">
+            <td><label for="corner_margin_skewed">Margin:</label></td>
+            <td><input name="corner_margin_skewed" id="corner_margin_skewed" type="text" /></td>
             <td>&nbsp;</td>
             <td><input type="text" style="visibility: hidden;" /></td><!--Hidden dummy input to fill out table so corner margin field has same width as other fields.-->
           </tr>

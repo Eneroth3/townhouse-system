@@ -42,6 +42,44 @@ module MyGeom
 
   end
 
+  # Cut away everything in drawing context by plane.
+  #
+  # entities - Entities object to cut in.
+  # plane    - Cut plane formatted as [Point, Vector]
+  # fill     - Whether cut faces should be created (default: true).
+  #
+  # Returns cut faces if any are created, otherwise true on success.
+  def self.cut(entities, plane, fill = true)
+    
+    # Draw face representing the plane.
+    radius = entities.model.bounds.diagonal
+    ngon_edges = entities.add_ngon plane[0], plane[1], radius, 6
+    ngon_edges[0].find_faces
+    ngon = ngon_edges[0].faces[0]
+    ngon.reverse! unless ngon.normal.samedirection? plane[1]
+    
+    # Intersect.
+    trans = Geom::Transformation.new
+    entities.intersect_with false, trans, entities, trans, true, entities.to_a.select { |e| [Sketchup::Face, Sketchup::Edge].include?(e.class) }
+    ngon_edges.each { |e| e.erase! }
+    
+    # Remove all entities on one side of the cut plane.
+    to_delete = entities.select do |e|
+      next unless e.is_a?(Sketchup::Edge)
+      next if e.vertices.all? { |v| !front_of_plane?(plane, v.position) }
+      true
+    end
+    entities.erase_entities to_delete
+    
+    # Find faces on cut plane, either remove or return them.
+    cut_faces = entities.select { |f| f.is_a?(Sketchup::Face) && f.vertices.all? { |v| v.position.on_plane? plane } }
+    return cut_faces if fill
+    entities.erase_entities cut_faces
+    
+    true
+    
+  end
+    
   # Calculate distance between point and plane.
   #
   # point        - The point.

@@ -18,15 +18,15 @@
 #     Save Template: Save template component to library.
 #     Template Info: Set template information such as name, ID and built year.
 #     Part Info:     Set part information such as positioning within building.
-#     Open Template Directory (Menu only): Open folder templates are saved too.
-#     Documentation (Menu only): Instructions regarding creating templates.
+#     Open Template Directory (menu only): Open folder templates are saved too.
+#     Documentation (menu only): Instructions regarding creating templates.
 #
 # For more information regarding the tools, check the instructor.
 # Also keep an eye on the statusbar while using the tools.
 
 # Requirements
 #   Sketchup 2015+
-#   IE 9+ makes dialogs look as desired* (Only apply to Windows)
+#   IE 9+ makes dialogs look as desired* (only apply to Windows)
 #
 # *Yup, SU on Windows uses IE to render web dialogs no matter what your
 # default browser is.
