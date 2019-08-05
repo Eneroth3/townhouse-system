@@ -80,7 +80,7 @@ module EneBuildings
   # Public: Path to plugin's own directory.
   PLUGIN_DIR = File.join PLUGIN_ROOT, ID
 
-  # Create Extension once required gems are installed.
+  # Create Extension.
   ex = SketchupExtension.new(NAME, File.join(PLUGIN_DIR, "main"))
   ex.description = DESCRIPTION
   ex.version     = VERSION
