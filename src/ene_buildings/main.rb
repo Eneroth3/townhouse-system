@@ -8,7 +8,7 @@ module EneBuildings
   require "json"
 
   unless Sketchup.version.to_i >= REQUIRED_SU_VERSION.to_i
-    msg = "#{NAME} requires Sketchup version #{REQUIRED_SU_VERSION} or later to run."
+    msg = "#{NAME} requires Sketchup version 20#{REQUIRED_SU_VERSION} or later to run."
     UI.messagebox msg
     raise msg
   end
