@@ -64,9 +64,7 @@ module EneBuildings
   AUTHOR      = "Julia Christina Eneroth"
   CONTACT     = "#{AUTHOR} at eneroth3@gmail.com"
   COPYRIGHT   = "#{AUTHOR} #{Time.now.year}"
-  DESCRIPTION =
-    "Draw townhouses precisely after their plots no matter its shape. "\
-    "Can be used from anything to city planning to game making."
+  DESCRIPTION = "Draw urban perimeter block buildings."
   ID          =  File.basename __FILE__, ".rb"
   NAME        = "Eneroth Townhouse System"
   VERSION     = "1.0.2"
