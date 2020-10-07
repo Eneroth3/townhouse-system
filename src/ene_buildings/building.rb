@@ -1240,7 +1240,7 @@ class Building
       available_replacements = list_replacement_parts
       replacement_info = available_replacements.find { |r| r[:name] == replacement }
       unless replacement_info
-        raise ArgumentError "Unknown replacement '#{replacement}'."
+        raise ArgumentError, "Unknown replacement '#{replacement}'."
       end
       slots = replacement_info[:slots]
     else
