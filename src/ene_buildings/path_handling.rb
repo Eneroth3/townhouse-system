@@ -115,7 +115,7 @@ module PathHandling
       type = @hovered_controller == i ? :active : :default
       draw_controller c, view, type
     end
-    if @hovered_controller.is_a?(Fixnum) && @hovered_controller >= 0
+    if @hovered_controller.is_a?(Integer) && @hovered_controller >= 0
       view.tooltip = TOOLTIPS[:select_corner]
     end
 
@@ -126,7 +126,7 @@ module PathHandling
 
     # Path potential corner preview.
     # (When hovering segment)
-    if @corrected_input && @hovered_controller.is_a?(Fixnum) && @hovered_controller < 0
+    if @corrected_input && @hovered_controller.is_a?(Integer) && @hovered_controller < 0
       draw_controller @corrected_input, view, :preview
       view.tooltip = TOOLTIPS[:add_interior]
     end
@@ -224,7 +224,7 @@ module PathHandling
 
   def onKeyUp(key, repeat, flags, view)
 
-      if @active_controller.is_a?(Fixnum) && key == VK_DELETE && @path.size > 2
+      if @active_controller.is_a?(Integer) && key == VK_DELETE && @path.size > 2
         # A path corner was selected and user pressed delete. Remove it.
 
         @path.delete_at @active_controller
@@ -290,7 +290,7 @@ module PathHandling
     if @active_controller
       # A controller is being moved.
 
-      if @active_controller.is_a? Fixnum
+      if @active_controller.is_a? Integer
         @path[@active_controller] = @corrected_input
       else
         angle_from_input
@@ -312,7 +312,7 @@ module PathHandling
     cursor =
       if @add_point_mode && !@active_controller && !@hovered_controller
         CURSOR_PEN
-      elsif @hovered_controller.is_a?(Fixnum) && @hovered_controller < 0
+      elsif @hovered_controller.is_a?(Integer) && @hovered_controller < 0
         CURSOR_PEN
       else
         CURSOR_ARROW
@@ -419,8 +419,8 @@ module PathHandling
 
   # Check where mouse is on path.
   #
-  # Returns Fixnum index starting at 0 when mouse is on corner,
-  # Fixnum index starting at -1 and counting backward when on segment,
+  # Returns Integer index starting at 0 when mouse is on corner,
+  # Integer index starting at -1 and counting backward when on segment,
   # :start when on start angle handle, :end when on end vector
   # handle and nil when not on any of these.
   def mouse_on_controller x, y, view

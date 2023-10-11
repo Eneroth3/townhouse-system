@@ -437,7 +437,7 @@ class Building
   #                        the Template's ComponentDefinition.
   #   :replaces          - String named used to identify what part this one
   #                        replaces.
-  #   :slots             - Fixnum of how many instances if the replaceable part
+  #   :slots             - Integer of how many instances if the replaceable part
   #                        this one replaces.
   def list_replacement_parts
 
@@ -1520,7 +1520,7 @@ class Building
 
         elsif ad["spread"]
           # Array multiple instances.
-          # Either Fixnum telling number of copies or float/length telling
+          # Either Integer telling number of copies or float/length telling
           # approximate distance between (in inches). This distance will adapt
           # to fit available space.
 
@@ -1528,7 +1528,7 @@ class Building
           margin_l = ad["margin_left"] || ad["margin"] || 0
           margin_r = ad["margin_right"] || ad["margin"] || 0
           available_distance -= (margin_l + margin_r)
-          if ad["spread"].is_a?(Fixnum)
+          if ad["spread"].is_a?(Integer)
             total_number = ad["spread"]
             raise "If 'spread' is a Fuxnum it must be zero or more." if total_number < 0
           else

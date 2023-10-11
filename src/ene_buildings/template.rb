@@ -50,7 +50,7 @@ class Template
   # These images can be read (e.g. shown in custom web dialogs) but nothing
   # should be written to this directory from outside this plugin itself.
   PREVIEW_DIR = File.join PLUGIN_TEMP_DIR, "previews"
-  Dir.mkdir PREVIEW_DIR unless File.exists? PREVIEW_DIR
+  Dir.mkdir PREVIEW_DIR unless File.exist? PREVIEW_DIR
 
   # Public: Path to 100 px wide template preview placeholder image.
   PREVIEW_PLACEHOLDER_100 = File.join PLUGIN_DIR, "dialogs", "template_placeholder_100.png"
@@ -66,7 +66,7 @@ class Template
 
   # Internal: Temporary directory used when reading archives.
   EXTRACT_DIR = File.join PLUGIN_TEMP_DIR, "extract"
-  Dir.mkdir EXTRACT_DIR unless File.exists? EXTRACT_DIR
+  Dir.mkdir EXTRACT_DIR unless File.exist? EXTRACT_DIR
 
   # Internal: Vector to point camera in when making template previews.
   PREVIEW_CAM_VECTOR = Geom::Vector3d.new -1, 1, 0

@@ -20,11 +20,11 @@ module EneBuildings
 
   # Internal: Path to plugin's temp directory.
   PLUGIN_TEMP_DIR = File.join Sketchup.temp_dir, ID
-  Dir.mkdir PLUGIN_TEMP_DIR unless File.exists? PLUGIN_TEMP_DIR
+  Dir.mkdir PLUGIN_TEMP_DIR unless File.exist? PLUGIN_TEMP_DIR
 
   # Internal: Path to material thumbnail directory.
   THUMBS_DIR = File.join PLUGIN_TEMP_DIR, "material_thumbnails"
-  Dir.mkdir THUMBS_DIR unless File.exists? THUMBS_DIR
+  Dir.mkdir THUMBS_DIR unless File.exist? THUMBS_DIR
 
   # Internal: Resolution of material thumbnails.
   THUMB_RES = 18
