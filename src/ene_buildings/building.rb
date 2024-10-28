@@ -1591,8 +1591,8 @@ class Building
         p_prev = path[corner_index - 1]
         p_this = path[corner_index]
         p_next = path[corner_index + 1]
-        v_prev = p_this - p_prev
-        v_next = p_next - p_this
+        v_prev = (p_this - p_prev).normalize
+        v_next = (p_next - p_this).normalize
         tangents << Geom.linear_combination(0.5, v_prev, 0.5, v_next)
       end
     end
