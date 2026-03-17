@@ -4,6 +4,12 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
     <title>TITLE</title>
+    <script type="text/javascript" src="utils.js"></script>
+    <script type="text/javascript">
+      window.onerror=function(errorMsg, url, lineNumber) {
+        alert(errorMsg + '\n\n' + url + ':' + lineNumber);
+      };
+    </script>
     <script type="text/javascript">
       "use strict";
 
@@ -59,22 +65,24 @@
           ['Stories', 'stories'],
           ['Source', 'source']
         ]
-        var html = '<span class="name">'+template_info['name']+'</span>';
+        var html = '<span class="name">'+escape_html(template_info['name'])+'</span>';
         html += '<table>';
         for(var i=0;i<pairs.length;i++){
           var label = pairs[i][0];
           var key = pairs[i][1];
           var value = template_info[key];
           if(!value) continue;
+
+          var value_html = escape_html(value)
           //Turn value into link for source if source_url is defined.
           if(key == 'source' && template_info['source_url']){
-            value = '<a href="javascript:void(0);" onclick="window.location=\'skp:openUrl\';">'+value+'</a>';
+            value_html = '<a href="javascript:void(0);" onclick="window.location=\'skp:openUrl\';">'+escape_html(value)+'</a>';
           }
-          html += '<tr><td>'+label+':</td><td>'+value+'</td></tr>';
+          html += '<tr><td>'+escape_html(label)+':</td><td>'+value_html+'</td></tr>';
         }
         html += '</table>';
         var description = template_info['description'];
-        if(description) html += description.replace(/\n/g, '<br />');
+        if(description) html += escape_html(description).replace(/\n/g, '<br />');
         document.getElementById('template_info').innerHTML = html;
       }
 
@@ -90,7 +98,7 @@
         for(var i=0; i<gable_part_settings.length; i++) {
           var gable_data = gable_part_settings[i];
           html += '<tr>';
-          html += '<td>' + gable_data['name'] + ':</td>';
+          html += '<td>' + escape_html(gable_data['name']) + ':</td>';
           html += '<td>';
           html += '<input type="checkbox" ' + (gable_data['use'][0] ? 'checked="checked"' : '') + ' onclick="toggle_gable(\'' + gable_data['name'] + '\', 0, this.checked);" />';
           html += '<input type="checkbox" ' + (gable_data['use'][1] ? 'checked="checked"' : '') + ' onclick="toggle_gable(\'' + gable_data['name'] + '\', 1, this.checked);" />';
@@ -120,11 +128,11 @@
           for(var i=0; i<corner_part_settings.length; i++) {
             var corner_data = corner_part_settings[i];
             html += '<tr>';
-            html += '<td>' + corner_data['name'] + ':</td>';
+            html += '<td>' + escape_html(corner_data['name']) + ':</td>';
             html += '<td>';
             for(var j=0; j<corner_number; j++) {
               var status = corner_data['use'][j];
-              html += '<input type="checkbox" ' + (status ? 'checked="checked"' : '') + ' onclick="toggle_corner(\'' + corner_data['name'] + '\', ' + j + ', this.checked);" />';
+              html += '<input type="checkbox" ' + (status ? 'checked="checked"' : '') + ' onclick="toggle_corner(\'' + escape_html(corner_data['name']) + '\', ' + j + ', this.checked);" />';
             }
             html += '</td>';
             html += '</tr>';
@@ -242,7 +250,7 @@
         html += '<td>';
         for(var i=0; i<margins.length; i++) {
           var v = margins[i];
-          html += '<input type="text" data-index="' + i + '" onchange="set_margin(this);" value="' + v + '"  />';
+          html += '<input type="text" data-index="' + i + '" onchange="set_margin(this);" value="' + escape_html(v) + '"  />';
         }
         html += '</td>';
         html += '</tr>';
@@ -260,14 +268,14 @@
           var original_name   = replacement_info[i]['original_name'];
           var available_slots = replacement_info[i]['available_slots'];
           html += '<fieldset>';
-          html += '<legend>Replace ' + original_name + '</legend>';
+          html += '<legend>Replace ' + escape_html(original_name) + '</legend>';
           html += '<table class="leftmost-is-label">';
           for(var j=0; j<replacement_info[i]['replacements'].length; j++) {
             var replacement_name = replacement_info[i]['replacements'][j]['replacement_name'];
             var slots            = replacement_info[i]['replacements'][j]['slots'];
             var use              = replacement_info[i]['replacements'][j]['use'];
             html += '<tr>';
-            html += '<td>' + replacement_name + ':</td>';
+            html += '<td>' + escape_html(replacement_name) + ':</td>';
             html += '<td>';
             for(var segment=0; segment<available_slots.length; segment++) {
               if(available_slots[segment] == 0) continue;
@@ -278,11 +286,11 @@
               for(var index=0; index<available_slots[segment]+1-slots; index++) {
                 html += '<div>';
                 html += '<input type="checkbox" onclick="toggle_replacement(this)" ';
-                html += 'data-original-name="' + original_name + '" ';
-                html += 'data-replacement-name="' + replacement_name + '" ';
-                html += 'data-segment="' + segment + '" ';
-                html += 'data-index="' + index + '" ';
-                html += 'data-slots="' + slots + '" ';
+                html += 'data-original-name="' + escape_html(original_name) + '" ';
+                html += 'data-replacement-name="' + escape_html(replacement_name) + '" ';
+                html += 'data-segment="' + escape_html(segment) + '" ';
+                html += 'data-index="' + escape_html(index) + '" ';
+                html += 'data-slots="' + escape_html(slots) + '" ';
                 if ((use[segment] || [])[index]){
                   html += 'checked="checked" ';
                 }
@@ -329,11 +337,11 @@
               var background = 'url(nil_material.png)';
             }
 
-            html += '<div data-id="'+original['id']+'">';
-            html += '<div style="background:'+original['css_string']+';" title="'+title+'"></div>';
+            html += '<div data-id="'+escape_html(original['id'])+'">';
+            html += '<div style="background:'+escape_html(original['css_string'])+';" title="'+title+'"></div>';
             html += ' &rarr; ';
-            html += '<button onclick="window.location=\'skp:replace_material@'+original['id']+'\'" title="'+tooltip+'">';
-            html += '<div style="background:'+background+';" title="'+title_replacement+'"></div>';
+            html += '<button onclick="window.location=\'skp:replace_material@'+original['id']+'\'" title="'+escape_html(tooltip)+'">';
+            html += '<div style="background:'+escape_html(background)+';" title="'+escape_html(title_replacement)+'"></div>';
             html += ' Apply active';
             html += '</button>';
             html += '</div>';

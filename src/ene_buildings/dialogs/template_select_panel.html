@@ -4,6 +4,12 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
     <title>TITLE</title>
+    <script type="text/javascript" src="utils.js"></script>
+    <script type="text/javascript">
+      window.onerror=function(errorMsg, url, lineNumber) {
+        alert(errorMsg + '\n\n' + url + ':' + lineNumber);
+      };
+    </script>
     <script type="text/javascript">
       /*Variables set from ruby side in WebDialog.show*/
       //var templates = [{"id":"id-string","title":"Title"}];
@@ -110,7 +116,7 @@
         html = '';
         for(i=0;i<groups.length;i++){
           group = groups[i];
-          html += '<h4>' + group['title'] + '</h4>';
+          html += '<h4>' + escape_html(group['title']) + '</h4>';
           for(j=0;j<group['content'].length;j++){
             template = group['content'][j];
             tooltip = template['name']
@@ -132,9 +138,9 @@
               tooltip += '\n'+label+': '+value;
             }
             if(template['description']) tooltip +='\n\n' + template['description'];
-            tooltip = tooltip.replace(/\"/g, "&quot;");
+            // tooltip = tooltip.replace(/\"/g, "&quot;");
             src = preview_dir + '/' + template['id'] + '_100.png';
-            html += '<img src="' + src + '" data-id="' + template['id'] + '" onclick="select(this);" title="' + tooltip + '" />';
+            html += '<img src="' + escape_html(src) + '" data-id="' + escape_html(template['id']) + '" onclick="select(this);" title="' + escape_html(tooltip) + '" />';
           }
         }
         document.getElementById('library').innerHTML = html;

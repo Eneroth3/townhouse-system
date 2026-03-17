@@ -4,6 +4,12 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
     <title>TITLE</title>
+    <script type="text/javascript" src="utils.js"></script>
+    <script type="text/javascript">
+      window.onerror=function(errorMsg, url, lineNumber) {
+        alert(errorMsg + '\n\n' + url + ':' + lineNumber);
+      };
+    </script>
     <script type="text/javascript">
 
       //Display either warning message or actual form.
@@ -16,7 +22,7 @@
         form.style.display = bool ? "none" : "";
         warning.style.display = bool ? "" : "none";
 
-        if(title) warning.innerHTML = "<div>"+title+"</div>"+msg;
+        if(title) warning.innerHTML = "<div>"+escape_html(title)+"</div>"+msg;
 
       }
 

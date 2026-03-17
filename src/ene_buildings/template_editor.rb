@@ -2,6 +2,8 @@
 
 # Copyright Julia Christina Eneroth, eneroth3@gmail.com
 
+require "cgi"
+
 module EneBuildings
 
 # Internal: UI for creating and editing Templates.
@@ -362,16 +364,16 @@ module TemplateEditor
       name = unique_part_name(@@part, name) unless name == ""
 
       # Create dropdown menu for replacement.
-      dropdown = "<select name=\"replaces\" id=\"replaces\" style=\"width: 100%\">"
-      dropdown += "<option value=\"\" style=\"font-style: italic;\">Please select</option>"
+      dropdown_html = "<select name=\"replaces\" id=\"replaces\" style=\"width: 100%\">"
+      dropdown_html += "<option value=\"\" style=\"font-style: italic;\">Please select</option>"
       list_replaceable_names.each do |name|
-        dropdown += "<option value=\"#{name}\">#{name}</option>"
+        dropdown_html += "<option value=\"#{CGI.escapeHTML(name)}\">#{CGI.escapeHTML(name)}</option>"
       end
-      dropdown += "</select>"
+      dropdown_html += "</select>"
 
       # Add data to dialog.
       js = "warn(false);"
-      js << "document.getElementById('replacable_wrapper').innerHTML=#{dropdown.inspect};"
+      js << "document.getElementById('replacable_wrapper').innerHTML=#{dropdown_html.inspect};"
       js << "document.getElementById('name').value=#{name.to_s.inspect};"
       js << "toggle_positioning(#{position_method.inspect});"
       js << "document.getElementById('margin').value=#{margin.to_s.inspect};"
