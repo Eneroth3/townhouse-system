@@ -61,13 +61,13 @@ require "sketchup.rb"
 module EneBuildings
 
   # Public: General extension information.
-  AUTHOR      = "Julia Christina Eneroth"
+  AUTHOR      = "Christina Eneroth"
   CONTACT     = "#{AUTHOR} at eneroth3@gmail.com"
-  COPYRIGHT   = "#{AUTHOR} 2024"
+  COPYRIGHT   = "Copyright 2015-2026 Christina Eneroth"
   DESCRIPTION = "Draw urban perimeter block buildings."
   ID          =  File.basename __FILE__, ".rb"
   NAME        = "Eneroth Townhouse System"
-  VERSION     = "1.1.1"
+  VERSION     = "1.1.2"
 
   # Public: Minimum Sketchup version required to run plugin.
   REQUIRED_SU_VERSION = "15"
