@@ -325,7 +325,7 @@ module TemplateEditor
             "percentage"
           end
         elsif data[:spread]
-          spread_fix_number = data[:spread].is_a? Fixnum
+          spread_fix_number = data[:spread].is_a? Integer
           if spread_fix_number
             spread_int = data[:spread]
           else
