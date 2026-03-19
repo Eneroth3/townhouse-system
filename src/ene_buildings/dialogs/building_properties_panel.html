@@ -340,7 +340,7 @@
             html += '<div data-id="'+escape_html(original['id'])+'">';
             html += '<div style="background:'+escape_html(original['css_string'])+';" title="'+title+'"></div>';
             html += ' &rarr; ';
-            html += '<button onclick="window.location=\'skp:replace_material@'+original['id']+'\'" title="'+escape_html(tooltip)+'">';
+            html += '<button onclick="window.location=\'skp:replace_material@'+escape_html(encodeSkpParam(original['id']))+'\'" title="'+escape_html(tooltip)+'">';
             html += '<div style="background:'+escape_html(background)+';" title="'+escape_html(title_replacement)+'"></div>';
             html += ' Apply active';
             html += '</button>';
@@ -385,12 +385,12 @@
 
       function toggle_gable(name, side, status) {
         var params = JSON.stringify([name, side, status]);
-        window.location='skp:toggle_gable@' + encodeURIComponent(params);
+        window.location='skp:toggle_gable@' + encodeSkpParam(params);
       }
 
       function toggle_corner(name, index, status) {
         var params = JSON.stringify([name, index, status]);
-        window.location='skp:toggle_corner@' + encodeURIComponent(params);
+        window.location='skp:toggle_corner@' + encodeSkpParam(params);
       }
       
       function set_corner_transition_type(selector) {
@@ -403,7 +403,7 @@
         if(type == null) length_input.value = '';
         var params = JSON.stringify([index, type]);
         setTimeout(function(){ // HACK: Let the newly focused element "fully" gain focus before calling ruby side to change form content. New element must be  "fully" focused for reference to be saved so focus can be restored once the fotm has been updated.
-          window.location='skp:set_corner_transition_type@' + encodeURIComponent(params);
+          window.location='skp:set_corner_transition_type@' + encodeSkpParam(params);
         }, 0);
       }
       
@@ -412,14 +412,14 @@
         var length  = input.value;
         var params = JSON.stringify([index, length]);
         setTimeout(function(){ // HACK: Let the newly focused element "fully" gain focus before calling ruby side to change form content. New element must be  "fully" focused for reference to be saved so focus can be restored once the fotm has been updated.
-          window.location='skp:set_corner_transition_length@' + encodeURIComponent(params);
+          window.location='skp:set_corner_transition_length@' + encodeSkpParam(params);
         }, 0);
       }
       
       function toggle_suggest_corner_transitions(checkbox) {
         var status = checkbox.checked;
         var params = JSON.stringify(status);
-        window.location='skp:toggle_suggest_corner_transitions@' + params;
+        window.location='skp:toggle_suggest_corner_transitions@' + encodeSkpParam(params);
       }
 
       function set_margin(input) {
@@ -427,14 +427,14 @@
         var length = input.value;
         var params = JSON.stringify([index, length]);
         setTimeout(function(){ // HACK: Let the newly focused element "fully" gain focus before calling ruby side to change form content. New element must be  "fully" focused for reference to be saved so focus can be restored once the fotm has been updated.
-          window.location='skp:set_margin@' + encodeURIComponent(params);
+          window.location='skp:set_margin@' + encodeSkpParam(params);
         }, 0);
       }
 
       function toggle_suggest_margins(checkbox) {
         var status = checkbox.checked;
         var params = JSON.stringify(status);
-        window.location='skp:toggle_suggest_margins@' + params;
+        window.location='skp:toggle_suggest_margins@' + encodeSkpParam(params);
       }
 
       function toggle_replacement(checkbox){
@@ -445,7 +445,7 @@
         var status           = checkbox.checked;
 
         var params = JSON.stringify([original_name, replacement_name, segment, index, status]);
-        window.location='skp:toggle_replacement@' + encodeURIComponent(params);
+        window.location='skp:toggle_replacement@' + encodeSkpParam(params);
 
         // Disable checkboxes for part replacement if another replacement is
         // already using slot.

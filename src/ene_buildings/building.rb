@@ -841,6 +841,7 @@ class Building
 
     # Toggling a gable.
     dlg.add_action_callback("toggle_gable") do |_, params|
+      params = EneBuildings.parse_params(params)
       set_gable *JSON.parse(params)
       if @suggest_margins
         suggest_margins
@@ -850,6 +851,7 @@ class Building
 
     # Toggling a corner.
     dlg.add_action_callback("toggle_corner") do |_, params|
+      params = EneBuildings.parse_params(params)
       set_corner *JSON.parse(params)
       if @suggest_margins || @suggest_corner_transitions
         suggest_margins if @suggest_margins
@@ -860,6 +862,7 @@ class Building
     
     # Change corner transition type.
     dlg.add_action_callback("set_corner_transition_type") do |_, params|
+      params = EneBuildings.parse_params(params)
       set_corner_transition_type *JSON.parse(params)
       @suggest_corner_transitions = false
       add_data.call
@@ -867,6 +870,7 @@ class Building
     
     # Change corner transition length.
     dlg.add_action_callback("set_corner_transition_length") do |_, params|
+      params = EneBuildings.parse_params(params)
       index, length = *JSON.parse(params)
       begin
         length = length.to_l
@@ -892,6 +896,7 @@ class Building
 
     # Setting margin
     dlg.add_action_callback("set_margin") do |_, params|
+      params = EneBuildings.parse_params(params)
       index, length = *JSON.parse(params)
       begin
         length = length.to_l
@@ -907,6 +912,7 @@ class Building
 
     # Toggle margin suggestions.
     dlg.add_action_callback("toggle_suggest_margins") do |_, params|
+      params = EneBuildings.parse_params(params)
       status = params == "true"
       @suggest_margins = status
       if @suggest_margins
@@ -917,6 +923,7 @@ class Building
 
     # Setting part replacement
     dlg.add_action_callback("toggle_replacement") do |_, params|
+      params = EneBuildings.parse_params(params)
       original, replacement, segment, index, status = *JSON.parse(params)
       replacement = status ? replacement : nil
       set_replacement original, segment, index, replacement
@@ -924,6 +931,7 @@ class Building
 
     # Clicking material replacement button.
     dlg.add_action_callback("replace_material") do |_, original_string|
+      original_string = EneBuildings.parse_params(original_string)
       original = model.materials[original_string]
       next unless original
       active_m = model.materials.current

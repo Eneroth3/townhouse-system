@@ -155,7 +155,7 @@
         selected = el.getAttribute('data-id');
 
         //Ruby callback.
-        window.location='skp:select@' + selected;
+        window.location='skp:select@' + encodeSkpParam(selected);
 
         //Outline selected.
         outline();

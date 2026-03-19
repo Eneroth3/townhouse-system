@@ -308,6 +308,7 @@ class Template
 
     # Clicking on building template.
     dlg.add_action_callback("select") do |_, id|
+      id = EneBuildings.parse_params(id)
       selected = @@instances.find{ |t| t.id == id }
       block.call(selected) if block && instant
     end

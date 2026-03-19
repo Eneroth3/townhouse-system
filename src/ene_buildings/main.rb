@@ -6,6 +6,7 @@ module EneBuildings
 
   require "fileutils"
   require "json"
+  require "cgi"
 
   unless Sketchup.version.to_i >= REQUIRED_SU_VERSION.to_i
     msg = "#{NAME} requires Sketchup version 20#{REQUIRED_SU_VERSION} or later to run."
@@ -47,6 +48,13 @@ module EneBuildings
   # REVIEW: Typically these would fit better as refinements to classes outside
   # this extension.
 
+  # Internal: Parse params in WebDialog callback.
+  #
+  # Corresponds to JS encodeSkpParam()
+  def self.parse_params(params)
+    CGI.unescape(params)
+  end
+  
   # Internal: Get hash from attribute dictionary.
   #
   # entity    - The entity the dictionary is attached to.
