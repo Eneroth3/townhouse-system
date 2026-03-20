@@ -237,7 +237,7 @@ module TemplateEditor
       #No active template to edit.
       title = "No active template."
       msg = "Please select a single template component."
-      js = "warn(true, '#{title}', '#{msg}');"
+      js = "warn(true, #{title.inspect}, #{msg.inspect});"
       @@dlg.execute_script js
 
     else
@@ -294,7 +294,7 @@ module TemplateEditor
 
       title = "Not available outside template component."
       msg = "Please enter a template component."
-      js = "warn(true, '#{title}', '#{msg}');"
+      js = "warn(true, #{title.inspect}, #{msg.inspect});"
       @@dlg_part.execute_script js
 
     elsif !@@part
@@ -302,7 +302,7 @@ module TemplateEditor
 
       title = "Not available for this selection."
       msg = "Please select a single group or component."
-      js = "warn(true, '#{title}', '#{msg}');"
+      js = "warn(true, #{title.inspect}, #{msg.inspect});"
       @@dlg_part.execute_script js
 
     else

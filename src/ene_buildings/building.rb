@@ -653,7 +653,7 @@ class Building
     # changed.
     add_data = lambda do
 
-      js ="var preview_dir = '#{Template::PREVIEW_DIR}';"
+      js ="var preview_dir = #{Template::PREVIEW_DIR.inspect};"
 
       # If more dialogs are opened, offset this one to avoid it being on top of others
       js << "offset_window(10);" if @@opened_dialogs.size > 1
@@ -972,7 +972,7 @@ class Building
          "null"
         end
       # js = "update_material_section();"# Recreating whole list moves focus.
-      js = "update_material_replacment('#{original_string}', #{json});"
+      js = "update_material_replacment(#{original_string.inspect}, #{json});"
       dlg.execute_script js
     end
 
