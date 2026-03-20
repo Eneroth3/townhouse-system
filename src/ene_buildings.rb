@@ -67,7 +67,7 @@ module EneBuildings
   DESCRIPTION = "Draw urban perimeter block buildings."
   ID          =  File.basename __FILE__, ".rb"
   NAME        = "Eneroth Townhouse System"
-  VERSION     = "1.1.2"
+  VERSION     = "1.1.3"
 
   # Public: Minimum Sketchup version required to run plugin.
   REQUIRED_SU_VERSION = "15"
@@ -76,7 +76,7 @@ module EneBuildings
   PLUGIN_ROOT = File.expand_path(File.dirname(__FILE__))
 
   # Public: Path to plugin's own directory.
-  PLUGIN_DIR = File.join PLUGIN_ROOT, ID# TODO: DO NOT SAVE USERS CONTENT IN PKLUGIN DIR!
+  PLUGIN_DIR = File.join PLUGIN_ROOT, ID# TODO: DO NOT SAVE USERS CONTENT IN PLUGIN DIR!
 
   # Create Extension.
   ex = SketchupExtension.new(NAME, File.join(PLUGIN_DIR, "main"))
