@@ -76,14 +76,14 @@ module EneBuildings
   PLUGIN_ROOT = File.expand_path(File.dirname(__FILE__))
 
   # Public: Path to plugin's own directory.
-  PLUGIN_DIR = File.join PLUGIN_ROOT, ID# TODO: DO NOT SAVE USERS CONTENT IN PLUGIN DIR!
+  PLUGIN_DIR = File.join PLUGIN_ROOT, ID
 
   # Create Extension.
-  ex = SketchupExtension.new(NAME, File.join(PLUGIN_DIR, "main"))
-  ex.description = DESCRIPTION
-  ex.version     = VERSION
-  ex.copyright   = COPYRIGHT
-  ex.creator     = AUTHOR
-  Sketchup.register_extension ex, true
+  EXTENSION = SketchupExtension.new(NAME, File.join(PLUGIN_DIR, "main"))
+  EXTENSION.description = DESCRIPTION
+  EXTENSION.version     = VERSION
+  EXTENSION.copyright   = COPYRIGHT
+  EXTENSION.creator     = AUTHOR
+  Sketchup.register_extension(EXTENSION, true)
 
 end
