@@ -65,7 +65,7 @@ class Template
   # Made separate of the installation folder as SketchUp purges it on extension
   # update.
   TEMPLATE_DIR = "#{Dir.home}/Eneroth Building System/Building Templates"
-  
+
   # Internal: Path to where the extension stores templates it's shipped with.
   SHIPPED_TEMPLATE_DIR = File.join(PLUGIN_DIR, "building_templates")
 
@@ -109,23 +109,27 @@ class Template
   def self.manually_resize_previews=(v); @@manually_resize_previews = v; end
 
   # Class methods
-  
+
   # Copy templates from shipped templates to user templates.
   #
   # Keeping user templates separate so the files are not purge by SketchUp on
   # extension update.
   def self.install_templates
     FileUtils.mkdir_p(TEMPLATE_DIR) unless File.exist?(TEMPLATE_DIR)
-    
-    # Overwrite. There may be updates to shipped templates.
-    # If a user abuses the ene_ namespace for their custom template, that's on them.
-    Dir.glob("#{SHIPPED_TEMPLATE_DIR}/*").each do |file|
-      FileUtils.cp(file, "#{TEMPLATE_DIR}/#{File.basename(file)}")
+
+    # Don't overwrite. If the user has custom templates since before in the
+    # extension install dir and later makes changes in he user document dir,
+    # the outdated ones should not overwrite the newer.
+    Dir.glob("#{SHIPPED_TEMPLATE_DIR}/*").each do |source|
+      destination = "#{TEMPLATE_DIR}/#{File.basename(source)}"
+      next if File.exist?(destination)
+
+      FileUtils.cp(source, destination)
     end
-    
+
     Sketchup.write_default(ID, "templates_installed_extension_version", EXTENSION.version)
   end
-  
+
   # Check if templates need installing.
   #
   # Done restrictively, in case any user or organization wants to remove a
@@ -133,11 +137,11 @@ class Template
   # forced broken shipped extensions on users).
   def self.templates_install_needed?
     return true unless File.exist?(TEMPLATE_DIR)
-    
+
     version_last_installed = Sketchup.read_default(ID, "templates_installed_extension_version")
     return true unless version_last_installed
     return true if version_last_installed < EXTENSION.version
-    
+
     false
   end
 
@@ -209,7 +213,7 @@ class Template
   # Returns nothing.
   def self.load_all
     install_templates if templates_install_needed?
-    
+
     purge
 
     files = Dir.glob(File.join(TEMPLATE_DIR, "*.#{FILE_EXTENSION}"))
